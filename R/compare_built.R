@@ -51,6 +51,12 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
       stop("Identifier column '", id, "' is duplicated in ", nm,
            ". Comparison requires one row per identifier.", call. = FALSE)
     }
+    if (anyNA(d[[id]])) {
+      stop("Identifier column '", id, "' contains ", sum(is.na(d[[id]])),
+           " missing value(s) in ", nm,
+           ". Comparison requires a usable identifier for every row.",
+           call. = FALSE)
+    }
   }
 
   o_ids <- as.character(oracle[[id]])
@@ -64,6 +70,13 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
     only_oracle = setdiff(o_ids, r_ids),
     only_r      = setdiff(r_ids, o_ids)
   )
+
+  if (length(common) == 0L) {
+    stop("No shared values of identifier '", id, "': ",
+         rows$n_oracle, " row(s) in oracle, ", rows$n_r, " in R, 0 in common. ",
+         "Check that both datasets are the same study and that '", id,
+         "' is the right identifier.", call. = FALSE)
+  }
 
   o_common <- oracle[match(common, o_ids), , drop = FALSE]
   r_common <- r[match(common, r_ids), , drop = FALSE]
