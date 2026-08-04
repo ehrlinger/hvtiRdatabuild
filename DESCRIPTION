@@ -21,13 +21,16 @@ Description: Builds analysis-ready clinical datasets for the clinical
 Depends:
     R (>= 4.1.0)
 Imports:
+    digest,
     haven,
+    hvtiRutilities,
     tools
 Suggests:
     arrow,
     knitr,
     quarto,
     testthat (>= 3.0.0),
-    withr
+    withr,
+    yaml
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0
