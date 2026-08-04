@@ -42,7 +42,29 @@ test_that("print never emits an overall pass or fail", {
   d <- data.frame(ccfidu = "A1", age = 1)
   out <- paste(capture.output(print(compare_built(d, d, id = "ccfidu"))),
                collapse = "\n")
-  expect_false(grepl("PASS|FAIL|\\bOK\\b", out))
+  # Case-insensitive, so a future "Pass"/"ok" would also be caught. Word
+  # boundaries keep "ok" from matching inside ordinary words.
+  expect_false(grepl("\\b(pass|fail|ok)\\b", out, ignore.case = TRUE))
+})
+
+test_that("str() does not print identifiers", {
+  # str() dispatches on the object, not through print.built_comparison(), so
+  # the default method would dump the rows attribute verbatim. str() is typed
+  # reflexively and its output gets pasted into issues and logs, so the
+  # disclosure here is incidental rather than requested.
+  o <- data.frame(ccfidu = c("1234567820200115", "A2"), age = c(65, 70))
+  r <- data.frame(ccfidu = c("A2", "9876543220190302"), age = c(70, 55))
+  res <- compare_built(o, r, id = "ccfidu")
+
+  out <- paste(capture.output(str(res)), collapse = "\n")
+  expect_false(grepl("1234567820200115", out, fixed = TRUE))
+  expect_false(grepl("9876543220190302", out, fixed = TRUE))
+
+  # Counts still reported, so the method stays useful.
+  expect_match(out, "1 only in oracle")
+
+  # Deliberate retrieval is unchanged.
+  expect_equal(attr(res, "rows")$only_oracle, "1234567820200115")
 })
 
 test_that("compare_built returns no scalar verdict field", {

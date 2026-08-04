@@ -60,3 +60,43 @@ print.built_comparison <- function(x, ...,
 
   invisible(x)
 }
+
+#' Structure of a dataset comparison, without identifiers
+#'
+#' `str()` dispatches on the object rather than routing through
+#' [print.built_comparison()], so the default method would print the `rows`
+#' attribute verbatim — including the identifier vectors. In this group's data
+#' an identifier is a medical record number concatenated with a date of
+#' surgery.
+#'
+#' The hazard here is *incidental* disclosure, not retrieval. `str()` is what
+#' people type reflexively to inspect an object, and its output is routinely
+#' pasted into issues, chat, and logs, so PHI arrives without anyone having
+#' asked for it. Deliberate retrieval stays available and unchanged:
+#' `attr(x, "rows")$only_oracle` and `$only_r`.
+#'
+#' @param object An object of class `built_comparison`.
+#' @param ... Passed to the underlying [utils::str()] call.
+#'
+#' @return `NULL`, invisibly. Called for its side effect.
+#'
+#' @seealso [print.built_comparison()]
+#'
+#' @export
+str.built_comparison <- function(object, ...) {
+  rows <- attr(object, "rows")
+
+  bare <- object
+  attr(bare, "rows") <- NULL
+  class(bare) <- "data.frame"
+  utils::str(bare, ...)
+
+  cat(sprintf(
+    " - attr(*, \"rows\"): %d oracle, %d R, %d common; %d only in oracle, %d only in R\n",
+    rows$n_oracle, rows$n_r, rows$n_common,
+    length(rows$only_oracle), length(rows$only_r)
+  ))
+  cat("   identifiers withheld (possible PHI); see ?print.built_comparison\n")
+
+  invisible(NULL)
+}

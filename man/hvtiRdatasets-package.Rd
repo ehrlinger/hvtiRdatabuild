@@ -17,11 +17,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: John Ehrlinger \email{ehrlinj@ccf.org}
+\strong{Maintainer}: John Ehrlinger \email{john.ehrlinger@gmail.com}
 
 Authors:
 \itemize{
-  \item John Ehrlinger \email{ehrlinj@ccf.org}
+  \item John Ehrlinger \email{john.ehrlinger@gmail.com}
 }
 
 }
