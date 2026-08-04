@@ -24,7 +24,8 @@ Imports:
     digest,
     haven,
     hvtiRutilities,
-    tools
+    tools,
+    utils
 Suggests:
     arrow,
     knitr,
