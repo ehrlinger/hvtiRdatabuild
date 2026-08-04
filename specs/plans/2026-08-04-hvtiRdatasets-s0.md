@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Package version starts at `0.0.0.9000`. Bump the patch/dev digit only; never the minor or major.
+- Package version starts at `0.1.0`. Always a straight three-digit semantic version — never a `.9000` dev suffix or any fourth digit. Bump the patch digit only; never the minor or major.
 - `R (>= 4.1.0)` in `Depends`. Licence `GPL (>= 3)`. Maintainer `John Ehrlinger <john.ehrlinger@gmail.com>`.
 - `arrow` is in **Suggests**, not Imports. Every use is guarded by `requireNamespace("arrow", quietly = TRUE)`; every test touching it calls `skip_if_not_installed("arrow")`.
 - `testthat` edition 3 (`Config/testthat/edition: 3`).
@@ -21,7 +21,7 @@
 - Maximum 2 cores anywhere.
 - **No PHI in any fixture, test, or vignette.** All data is synthetic.
 - **No credential value in any file, log line, error message, or commit.**
-- **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`:** that flag runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE for any package never published to CRAN, plus notes on the `.9000` version component and not-yet-public URLs. `hvtiRdatasets` is not a CRAN target (see the spec), so `--as-cran` sets a gate no task can pass. It is still required at release time, per the group's release gate.
+- **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`:** that flag runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE for any package never published to CRAN, plus a note on the not-yet-public URLs. `hvtiRdatasets` is not a CRAN target (see the spec), so `--as-cran` sets a gate no task can pass. It is still required at release time, per the group's release gate.
 - **Add a package to `Imports` in the same task that first uses it, never earlier.** `R CMD check` notes any declared import that no code uses, so a speculative dependency list breaks the 0/0/0 gate. See Task 1.
 - Work happens on branch `feat/s0-verify`. Never commit to `main`.
 - **Put LaTeX on `PATH` before checking: `export PATH="/Library/TeX/texbin:$PATH"`.** A non-interactive shell does not inherit it, and without it `R CMD check` fails the PDF-manual step with `1 ERROR, 1 WARNING` — which looks like a package defect and is not. **Do not reach for `--no-manual`.** The manual build is what catches raw Unicode in `.Rd` files, and skipping it hides that class of defect entirely. `pdflatex` is present at both `/Library/TeX/texbin` (MacTeX) and `~/Library/TinyTeX/bin/universal-darwin`.
@@ -51,12 +51,12 @@
 Package: hvtiRdatasets
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
-Version: 0.0.0.9000
+Version: 0.1.0
 Date: 2026-08-04
 Authors@R: c(
     person(
       "John", "Ehrlinger",
-      email = "ehrlinj@ccf.org",
+      email = "john.ehrlinger@gmail.com",
       role = c("aut", "cre")
     )
   )
@@ -157,7 +157,7 @@ test_that("package loads and declares its dependencies", {
 Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
-R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
@@ -1398,7 +1398,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: all tests pass; `Status: OK` at 0/0/0.
 
@@ -1619,7 +1619,7 @@ Expected: renders with no error. The `MERGE` chunk prints `[1] 4`.
 
 Run:
 ```bash
-R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0/0/0, vignette built.
 
@@ -1709,7 +1709,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
