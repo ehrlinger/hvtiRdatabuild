@@ -303,8 +303,13 @@ test_that(".read_sas_dataset reads a sas7bdat faithfully", {
 
   expect_s3_class(got, "data.frame")
   expect_equal(nrow(got), 4L)
-  expect_equal(as.numeric(got$age), expected$age)
-  expect_equal(as.character(got$ccfidu), expected$ccfidu)
+  # Strip both sides: expected$age carries a "label" attribute and
+  # expect_equal() compares attributes, so comparing a stripped vector
+  # against a labelled one fails on the attribute rather than the values.
+  # Do NOT "fix" this by removing the labels from .fixture_frame() -- the
+  # labelled numeric is the case .cmp_class() exists to collapse in Task 5.
+  expect_equal(as.numeric(got$age), as.numeric(expected$age))
+  expect_equal(as.character(got$ccfidu), as.character(expected$ccfidu))
 })
 
 test_that(".read_sas_dataset rejects unknown extensions and missing files", {

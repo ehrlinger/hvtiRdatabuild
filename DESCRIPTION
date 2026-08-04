@@ -20,6 +20,9 @@ Description: Builds analysis-ready clinical datasets for the clinical
   they replace.
 Depends:
     R (>= 4.1.0)
+Imports:
+    haven,
+    tools
 Suggests:
     arrow,
     knitr,
