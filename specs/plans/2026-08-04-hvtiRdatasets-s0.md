@@ -180,7 +180,19 @@ git commit -m "feat: package scaffold for hvtiRdatasets"
 - Consumes: nothing.
 - Produces: `.fixture_frame()` returning the canonical synthetic data frame used by every later test; a committed `oracle_small.sas7bdat` reachable via `system.file("extdata", "oracle_small.sas7bdat", package = "hvtiRdatasets")`.
 
-The fixture exercises every comparison path: a character id, a plain numeric, a labelled numeric, a `Date`, a character with trailing blanks, and `NA` in each.
+The fixture carries a character id, a plain numeric, a labelled numeric, a `Date`, a character column, and `NA` in each.
+
+**Known limitation — two comparison paths cannot be exercised through a SAS file, and this is a property of SAS, not of the fixture.** Verified by reading the committed fixture back:
+
+| Written | Reads back as |
+|---|---|
+| `"Jones "` | `"Jones"` — trailing blank stripped |
+| `NA_character_` | `""` — empty string, **not** `NA` |
+| `NA_real_` | `NA` — numeric missing survives |
+
+**SAS has no character `NA`. Missing character *is* the empty string.** This is load-bearing for Task 5: on a real study, every missing character value in the oracle reads as `""` while the R rebuild holds `NA`. Compared naively, every character column containing any missing value reports `differs` — false positives in bulk, drowning real findings. `.as_comparable()` must therefore treat `""` and `NA` as the same value for character columns.
+
+Trailing-blank and character-`NA` behaviour must be tested with in-memory vectors in Task 5, never through this fixture, because the fixture physically cannot carry them.
 
 It lives in `inst/extdata/` rather than `tests/testthat/fixtures/` so that roxygen examples can reach it too, not only tests.
 
@@ -694,6 +706,27 @@ test_that(".compare_vector ignores trailing blanks, as SAS does", {
   expect_equal(r$verdict, "identical")
 })
 
+test_that('.compare_vector treats SAS empty-string as character NA', {
+  # SAS has no character missing value distinct from "". A missing character
+  # in the oracle reads back as ""; the R pipeline produces NA. Reporting that
+  # as a difference would be a false positive on every character column that
+  # has any missing value.
+  sas <- c("Smith", "")
+  r   <- c("Smith", NA_character_)
+  expect_equal(.compare_vector(sas, r, tolerance = 1e-8)$verdict, "identical")
+
+  # Whitespace-only is also missing, once trimmed.
+  expect_equal(
+    .compare_vector(c("Smith", "   "), r, tolerance = 1e-8)$verdict,
+    "identical"
+  )
+
+  # A genuine value difference is still caught.
+  differs <- .compare_vector(c("Smith", "Jones"), r, tolerance = 1e-8)
+  expect_equal(differs$verdict, "differs")
+  expect_equal(differs$n_differ, 1L)
+})
+
 test_that(".compare_vector compares dates by value, not representation", {
   a <- as.Date(c("2020-01-15", NA))
   b <- as.Date(c("2020-01-15", NA))
@@ -739,7 +772,7 @@ Expected: FAIL with `could not find function ".cmp_class"`
 #' @param x A vector.
 #'
 #' @return A plain atomic vector: dates as numeric days, factors as character,
-#'   character trimmed of leading and trailing whitespace.
+#'   character trimmed of surrounding whitespace with `""` folded to `NA`.
 #'
 #' @keywords internal
 #' @noRd
@@ -749,13 +782,43 @@ Expected: FAIL with `could not find function ".cmp_class"`
     cls,
     date      = as.numeric(as.Date(x)),
     factor    = as.character(x),
-    character = trimws(as.character(unclass(x))),
+    character = .normalise_character(x),
     logical   = as.logical(x),
     numeric   = as.numeric(unclass(x)),
     unclass(x)
   )
   attributes(out) <- NULL
   out
+}
+
+#' Normalise a character vector to SAS's notion of a string
+#'
+#' Two adjustments, both required for a SAS oracle to compare meaningfully
+#' against an R rebuild:
+#'
+#' * **Trailing blanks are stripped.** SAS pads character values to their
+#'   declared width, so `'Smith'` and `'Smith   '` are the same value there and
+#'   different in R.
+#' * **`""` is folded to `NA`.** SAS has no character missing value distinct
+#'   from the empty string. A missing character in a SAS dataset reads back as
+#'   `""`, while the R pipeline produces `NA`. Treating them as different would
+#'   report `differs` for every character column containing any missing value —
+#'   false positives in bulk, on every study.
+#'
+#' The information loss is real but unavoidable: the oracle cannot distinguish
+#' `""` from missing, so a difference between them is never evidence of
+#' anything.
+#'
+#' @param x A character or `haven_labelled` character vector.
+#'
+#' @return A plain character vector, trimmed, with `""` as `NA`.
+#'
+#' @keywords internal
+#' @noRd
+.normalise_character <- function(x) {
+  v <- trimws(as.character(unclass(x)))
+  v[!is.na(v) & v == ""] <- NA_character_
+  v
 }
 
 #' Compare two vectors elementwise
@@ -1443,6 +1506,28 @@ trimws("Smith   ") == "Smith"
 
 This bites hardest on merges keyed by a character id. `compare_built()` trims
 before comparing, for exactly this reason.
+
+### SAS has no missing character value
+
+R distinguishes `NA` from `""`. SAS does not — a missing character **is** the
+empty string. Read a SAS dataset and every missing character comes back as
+`""`:
+
+```{r}
+f <- system.file("extdata", "oracle_small.sas7bdat",
+                 package = "hvtiRdatasets")
+surgeon <- haven::read_sas(f)$surgeon
+surgeon                 # the fourth value was written as NA
+is.na(surgeon)          # ... and is not NA any more
+```
+
+So a faithful R rebuild holding `NA` disagrees with the oracle holding `""` on
+every missing value. `compare_built()` folds `""` to `NA` for character columns
+so this does not flood the report with false differences.
+
+The consequence for your own code is sharper: **never test a SAS-sourced
+character for `NA`**. `is.na(surgeon)` is `FALSE` even where the value is
+missing. Test for `""`, or convert on read.
 
 ### `MERGE` is not a join
 
