@@ -11,3 +11,4 @@
 *.parquet
 *.csv
 *.rds
+.superpowers/

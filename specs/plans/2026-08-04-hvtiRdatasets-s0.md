@@ -22,6 +22,8 @@
 - **No PHI in any fixture, test, or vignette.** All data is synthetic.
 - **No credential value in any file, log line, error message, or commit.**
 - `R CMD check` must finish 0 errors / 0 warnings / 0 notes before each commit that touches package code.
+- **Add a package to `Imports` in the same task that first uses it, never earlier.** `R CMD check` notes any declared import that no code uses, so a speculative dependency list breaks the 0/0/0 gate. See Task 1.
+- Work happens on branch `feat/s0-verify`. Never commit to `main`.
 - **This package never writes SAS files.** `snapshot_oracle()` reads SAS and writes parquet; nothing else touches a SAS format. `haven::write_sas()` is deprecated as of haven 2.5.2 and is called exactly once, by a manual `data-raw/` script, to generate the committed test fixture. **No haven writer runs in the test suite.**
 - Only `.sas7bdat` is supported. The oracle is `library.built`. The `.xpt` files on disk are output of `tp.bd.SAStoR.sas`, the bridge this package replaces, and are not an input.
 - **Development is on macOS; execution is on the SAS server.** No task in this slice touches a database. When S1 arrives, warehouse connections are mocked in tests and real pulls run on the server, never on a laptop.
@@ -68,13 +70,6 @@ Description: Builds analysis-ready clinical datasets for the clinical
   they replace.
 Depends:
     R (>= 4.1.0)
-Imports:
-    digest,
-    dplyr,
-    haven,
-    hvtiRutilities,
-    stats,
-    utils
 Suggests:
     arrow,
     knitr,
@@ -82,9 +77,23 @@ Suggests:
     testthat (>= 3.0.0),
     withr
 VignetteBuilder: quarto
-RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 ```
+
+**Task 1 declares no `Imports`, deliberately.** `R CMD check` emits
+`Namespaces in Imports field not imported from: ...` for any declared import
+that no code uses, and Task 1 contains no R code at all. Declaring the full
+dependency list here would make the 0/0/0 gate unreachable on the very first
+task. Each later task adds the package it actually uses:
+
+| Task | Adds to `Imports` |
+|---|---|
+| 3 | `haven`, `tools` |
+| 4 | `digest`, `hvtiRutilities` |
+| 8 | `utils` |
+
+`RoxygenNote` is omitted; `roxygen2::roxygenise()` writes it in Step 7 with
+whatever version is installed. Do not hand-set it.
 
 - [ ] **Step 2: Write `.Rbuildignore`**
 
