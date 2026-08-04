@@ -45,6 +45,23 @@ compare_built(oracle, my_rebuild, id = "ccfidu")
 There is no overall pass/fail. Read the table, and record a resolution for
 every variable that is not `identical`.
 
+## Local integration testing
+
+The committed fixtures are synthetic. To exercise the read path against real
+SAS output, point `HVTI_ORACLE_DIR` at a study directory:
+
+```bash
+HVTI_ORACLE_DIR=/studies/st1234/datasets Rscript -e 'devtools::test()'
+```
+
+That directory holds PHI. It must live outside this repository, and nothing in
+the test suite copies from it. With the variable unset — the default, and what
+CI sees — these tests skip.
+
+`print()` never emits identifiers unless `show_ids = TRUE`, because `ccfidu` is
+a medical record number combined with a date of surgery. Do not enable it in a
+session whose output is logged or shared.
+
 ## Documentation
 
 - `vignette("coming-from-sas")` — migration guide for SAS users. Start here.
