@@ -1559,11 +1559,15 @@ R makes the same mistake loud:
 #| warning: true
 a <- data.frame(id = c("A", "A"), x = 1:2)
 b <- data.frame(id = c("A", "A"), y = 3:4)
-nrow(dplyr::left_join(a, b, by = "id", relationship = "many-to-many"))
+nrow(dplyr::left_join(a, b, by = "id"))
 ```
 
-Four rows from two. Without `relationship = "many-to-many"`, `dplyr` warns.
-**Never suppress that warning.** It is the check SAS never gave you.
+Four rows from two — and `dplyr` says so, out loud, which SAS never did.
+
+You can silence that warning with `relationship = "many-to-many"`, and there
+are joins where the fan-out is genuinely intended. But reach for it only once
+you have confirmed the duplication is what you want. Do not pass it reflexively
+to quiet the output — that turns the one check SAS never gave you back off.
 
 ### Dates use different origins
 
