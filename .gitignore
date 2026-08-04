@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+*.tar.gz
+.Renviron
+.odbc.ini
+*.sas7bdat
+*.xpt
+*.parquet
+*.csv
+*.rds
