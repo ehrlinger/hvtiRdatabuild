@@ -19,15 +19,19 @@
 #' @param r Data frame produced by the R pipeline.
 #' @param id Name of the identifier column present in both. Must be unique
 #'   within each.
-#' @param tolerance Numeric. Absolute numeric differences at or below this are
-#'   reported as `"within_tolerance"`.
+#' @param tolerance Numeric. **Absolute** numeric differences at or below
+#'   this are reported as `"within_tolerance"`. A single absolute threshold
+#'   cannot serve columns of very different magnitude; see the "Coming from
+#'   SAS" vignette for how to read `max_rel_diff` alongside it.
 #'
 #' @return An object of class `built_comparison`: a data frame with one row per
-#'   variable and columns `variable`, `verdict`, `n_differ`, `max_abs_diff`,
-#'   `max_rel_diff`, and `detail`. `verdict` is one of `"identical"`,
-#'   `"within_tolerance"`, `"differs"`, `"absent_in_r"`, `"absent_in_sas"`, or
-#'   `"type_mismatch"`. The `rows` attribute holds a list with `n_oracle`,
-#'   `n_r`, `n_common`, `only_oracle`, and `only_r`.
+#'   variable and columns `variable`, `n_common`, `verdict`, `n_differ`,
+#'   `max_abs_diff`, `max_rel_diff`, and `detail`. `n_common` is the number of
+#'   rows compared (constant across all rows, so it survives `write.csv()` or
+#'   `as.data.frame()`, unlike the `rows` attribute). `verdict` is one of
+#'   `"identical"`, `"within_tolerance"`, `"differs"`, `"absent_in_r"`,
+#'   `"absent_in_sas"`, or `"type_mismatch"`. The `rows` attribute holds a
+#'   list with `n_oracle`, `n_r`, `n_common`, `only_oracle`, and `only_r`.
 #'
 #' @seealso [snapshot_oracle()]
 #'
@@ -86,7 +90,8 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
 
   out <- do.call(rbind, c(
     lapply(union(o_vars, r_vars), function(v) {
-      .compare_one_variable(v, o_common, r_common, o_vars, r_vars, tolerance)
+      .compare_one_variable(v, o_common, r_common, o_vars, r_vars, tolerance,
+                            rows$n_common)
     }),
     list(make.row.names = FALSE)
   ))
@@ -121,6 +126,7 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
 .empty_comparison <- function() {
   data.frame(
     variable     = character(0),
+    n_common     = integer(0),
     verdict      = character(0),
     n_differ     = integer(0),
     max_abs_diff = numeric(0),
@@ -136,18 +142,21 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
 #' @param o_common,r_common Row-aligned data frames restricted to shared ids.
 #' @param o_vars,r_vars Variable names on each side, excluding the id.
 #' @param tolerance Numeric tolerance passed to [.compare_vector()].
+#' @param n_common Integer. Number of rows compared, constant across the
+#'   whole comparison. Recorded on every row so it survives `write.csv()`.
 #'
 #' @return A one-row data frame with the `built_comparison` columns.
 #'
 #' @keywords internal
 #' @noRd
 .compare_one_variable <- function(v, o_common, r_common, o_vars, r_vars,
-                                  tolerance) {
+                                  tolerance, n_common) {
   row <- function(verdict, n_differ = NA_integer_, max_abs = NA_real_,
                   max_rel = NA_real_, detail = "") {
-    data.frame(variable = v, verdict = verdict, n_differ = n_differ,
-               max_abs_diff = max_abs, max_rel_diff = max_rel,
-               detail = detail, stringsAsFactors = FALSE)
+    data.frame(variable = v, n_common = n_common, verdict = verdict,
+               n_differ = n_differ, max_abs_diff = max_abs,
+               max_rel_diff = max_rel, detail = detail,
+               stringsAsFactors = FALSE)
   }
 
   if (!v %in% r_vars) {

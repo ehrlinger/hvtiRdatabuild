@@ -62,8 +62,14 @@ jobs:
       - name: Install package for vignette rendering
         run: Rscript -e "install.packages('.', repos = NULL, type = 'source')"
 
+      # --as-cran (the action's default) emits an incoming-feasibility
+      # WARNING here (new submission, unknown Remotes field, hvtiRutilities
+      # not on CRAN, GitHub URLs) that this package is not meant to pass —
+      # it is not a CRAN-target package. Omit --as-cran so CI checks what we
+      # actually gate on instead of contradicting our own release plan.
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
+          args: 'c("--no-manual")'
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'
           error-on: '"warning"'

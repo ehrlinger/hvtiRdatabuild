@@ -55,7 +55,10 @@ print.built_comparison <- function(x, ...,
   needs_review <- x[x$verdict != "identical", , drop = FALSE]
   if (nrow(needs_review)) {
     cat("\n  requiring review:\n")
-    print.data.frame(needs_review, row.names = FALSE)
+    # n_common is already reported in the header line above; drop it here
+    # so the per-variable table stays focused on what differs.
+    print.data.frame(needs_review[setdiff(names(needs_review), "n_common")],
+                     row.names = FALSE)
   }
 
   invisible(x)

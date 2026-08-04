@@ -80,6 +80,28 @@ test_that("compare_built aligns rows by identifier, not by position", {
   expect_equal(res2$verdict[res2$variable == "bmi"], "identical")
 })
 
+test_that("compare_built distinguishes a Date column from a datetime column", {
+  o <- data.frame(ccfidu = "A1", dtn = as.Date("2020-01-15"))
+  r <- data.frame(ccfidu = "A1",
+                  dtn = as.POSIXct("2020-01-15 08:00:00", tz = "UTC"))
+  res <- compare_built(o, r, id = "ccfidu")
+  expect_equal(res$verdict[res$variable == "dtn"], "type_mismatch")
+})
+
+test_that("the comparison table itself records how many rows were compared", {
+  # The rows attribute does not survive write.csv() or as.data.frame().
+  o <- data.frame(ccfidu = c("A1", "A2", "A3"), age = c(65, 70, 58))
+  r <- data.frame(ccfidu = c("A2", "A3"), age = c(70, 58))
+
+  res <- compare_built(o, r, id = "ccfidu")
+  expect_true("n_common" %in% names(res))
+  expect_equal(unique(res$n_common), 2L)
+
+  # Survives the round trip that drops attributes.
+  flat <- as.data.frame(res)
+  expect_equal(unique(flat$n_common), 2L)
+})
+
 test_that("compare_built reports within_tolerance end to end", {
   o <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70))
   r <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70 + 1e-10))

@@ -15,16 +15,20 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
 \item{id}{Name of the identifier column present in both. Must be unique
 within each.}
 
-\item{tolerance}{Numeric. Absolute numeric differences at or below this are
-reported as `"within_tolerance"`.}
+\item{tolerance}{Numeric. **Absolute** numeric differences at or below
+this are reported as `"within_tolerance"`. A single absolute threshold
+cannot serve columns of very different magnitude; see the "Coming from
+SAS" vignette for how to read `max_rel_diff` alongside it.}
 }
 \value{
 An object of class `built_comparison`: a data frame with one row per
-  variable and columns `variable`, `verdict`, `n_differ`, `max_abs_diff`,
-  `max_rel_diff`, and `detail`. `verdict` is one of `"identical"`,
-  `"within_tolerance"`, `"differs"`, `"absent_in_r"`, `"absent_in_sas"`, or
-  `"type_mismatch"`. The `rows` attribute holds a list with `n_oracle`,
-  `n_r`, `n_common`, `only_oracle`, and `only_r`.
+  variable and columns `variable`, `n_common`, `verdict`, `n_differ`,
+  `max_abs_diff`, `max_rel_diff`, and `detail`. `n_common` is the number of
+  rows compared (constant across all rows, so it survives `write.csv()` or
+  `as.data.frame()`, unlike the `rows` attribute). `verdict` is one of
+  `"identical"`, `"within_tolerance"`, `"differs"`, `"absent_in_r"`,
+  `"absent_in_sas"`, or `"type_mismatch"`. The `rows` attribute holds a
+  list with `n_oracle`, `n_r`, `n_common`, `only_oracle`, and `only_r`.
 }
 \description{
 Joins `r` to `oracle` on `id` and classifies every variable. Row-set

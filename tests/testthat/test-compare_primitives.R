@@ -63,6 +63,26 @@ test_that(".compare_vector compares dates by value, not representation", {
   expect_equal(.compare_vector(a, b, tolerance = 1e-8)$verdict, "identical")
 })
 
+test_that(".compare_vector does not truncate datetimes to dates", {
+  # haven returns POSIXct for SAS DATETIME variables (dtn_disc, dtn_inst...).
+  # Folding those to Date would silently pass any within-day difference.
+  a <- as.POSIXct("2020-01-15 08:00:00", tz = "UTC")
+  b <- as.POSIXct("2020-01-15 23:59:00", tz = "UTC")
+
+  expect_equal(.cmp_class(a), "datetime")
+
+  r <- .compare_vector(a, b, tolerance = 1e-8)
+  expect_equal(r$verdict, "differs")
+  expect_equal(r$n_differ, 1L)
+  expect_true(r$max_abs_diff > 0)
+
+  # Equal datetimes still agree.
+  expect_equal(.compare_vector(a, a, tolerance = 1e-8)$verdict, "identical")
+
+  # A Date and a POSIXct are different types, not silently equal.
+  expect_equal(.cmp_class(as.Date("2020-01-15")), "date")
+})
+
 test_that(".compare_vector handles infinities without warning", {
   # Inf - Inf is NaN; equal values must still differ by zero.
   expect_silent(r <- .compare_vector(c(Inf, 1), c(Inf, 1), tolerance = 1e-8))

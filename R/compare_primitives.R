@@ -6,13 +6,14 @@
 #'
 #' @param x A vector.
 #'
-#' @return A length-one character: one of `"date"`, `"factor"`,
+#' @return A length-one character: one of `"date"`, `"datetime"`, `"factor"`,
 #'   `"character"`, `"logical"`, `"numeric"`, or the vector's first class.
 #'
 #' @keywords internal
 #' @noRd
 .cmp_class <- function(x) {
-  if (inherits(x, "Date") || inherits(x, "POSIXct")) return("date")
+  if (inherits(x, "POSIXct")) return("datetime")
+  if (inherits(x, "Date"))    return("date")
   if (is.factor(x))                                  return("factor")
   if (inherits(x, "haven_labelled")) {
     return(if (is.character(unclass(x))) "character" else "numeric")
@@ -37,6 +38,7 @@
   out <- switch(
     cls,
     date      = as.numeric(as.Date(x)),
+    datetime  = as.numeric(x),
     factor    = as.character(x),
     character = .normalise_character(x),
     logical   = as.logical(x),

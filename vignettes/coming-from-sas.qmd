@@ -129,6 +129,7 @@ R makes the same mistake loud:
 
 ```{r}
 #| warning: true
+#| eval: !expr requireNamespace("dplyr", quietly = TRUE)
 a <- data.frame(id = c("A", "A"), x = 1:2)
 b <- data.frame(id = c("A", "A"), y = 3:4)
 nrow(dplyr::left_join(a, b, by = "id"))
@@ -164,9 +165,18 @@ exist. One of those programs produced wrong counts.
 
 A SAS numeric written with `length 4` loses precision on disk. A value read
 back from an old dataset may not equal a freshly computed R value, and **the
-SAS side is the lossy one**. This is what `tolerance` in `compare_built()` is
-for. If a variable is `within_tolerance` rather than `identical`, storage
-precision is the first thing to suspect.
+SAS side is the lossy one**. `tolerance` in `compare_built()` is what catches
+this — but it is an **absolute** threshold, not a relative one. A single
+absolute threshold cannot serve columns of mixed magnitude: a value large
+enough to be at risk of `length 4` truncation (into the millions, for
+identifiers or accumulated counts) can differ by more than a small absolute
+`tolerance` while the difference is still storage precision, not a real
+disagreement. `1234567` vs `1234567.06` reports `differs`, not
+`within_tolerance`, with `max_abs_diff` of `0.06` — but `max_rel_diff` is
+`4.9e-08`. For a large-magnitude variable, that tiny relative difference
+alongside a `differs` verdict is the signal to suspect storage precision, not
+the `within_tolerance` verdict itself. Read `max_rel_diff`, not the verdict
+alone, when judging whether a difference is real.
 
 ## Verifying your own port
 
