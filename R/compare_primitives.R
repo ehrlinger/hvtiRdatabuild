@@ -83,6 +83,12 @@
 #' Character comparison trims whitespace, because SAS pads character values to
 #' their declared length and R does not.
 #'
+#' `NaN` is folded into "missing" (`is.na(NaN)` is `TRUE` in R), so it
+#' compares equal to `NA` and to another `NaN`. This matches the oracle: SAS
+#' collapses invalid numeric results (`0/0`, `log()` of a negative, division
+#' by zero) into its single missing value, so treating `NaN` as missing here
+#' avoids false-positive differences against a SAS-derived `NA`.
+#'
 #' @param a,b Vectors of equal length.
 #' @param tolerance Numeric. Absolute differences at or below this are
 #'   `"within_tolerance"` rather than `"differs"`.
@@ -102,6 +108,10 @@
     d <- abs(av - bv)
     d[both_na] <- 0
     d[one_na]  <- Inf
+    # Inf - Inf is NaN, not 0. Without this, a column that is Inf on both
+    # sides leaves an all-NaN d, and max(d, na.rm = TRUE) reduces over an
+    # empty set: -Inf, plus a warning. Equal values differ by zero.
+    d[!is.na(av) & !is.na(bv) & av == bv] <- 0
     denom <- pmax(abs(av), abs(bv))
     rel <- ifelse(is.finite(d) & denom > 0, d / denom, d)
     rel[both_na] <- 0

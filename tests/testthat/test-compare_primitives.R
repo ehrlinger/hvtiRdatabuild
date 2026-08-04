@@ -62,3 +62,33 @@ test_that(".compare_vector compares dates by value, not representation", {
   b <- as.Date(c("2020-01-15", NA))
   expect_equal(.compare_vector(a, b, tolerance = 1e-8)$verdict, "identical")
 })
+
+test_that(".compare_vector handles infinities without warning", {
+  # Inf - Inf is NaN; equal values must still differ by zero.
+  expect_silent(r <- .compare_vector(c(Inf, 1), c(Inf, 1), tolerance = 1e-8))
+  expect_equal(r$verdict, "identical")
+  expect_equal(r$max_abs_diff, 0)
+  expect_equal(r$max_rel_diff, 0)
+
+  expect_silent(neg <- .compare_vector(-Inf, -Inf, tolerance = 1e-8))
+  expect_equal(neg$verdict, "identical")
+  expect_equal(neg$max_abs_diff, 0)
+
+  # Opposite infinities are a real difference.
+  expect_equal(.compare_vector(Inf, -Inf, tolerance = 1e-8)$verdict, "differs")
+
+  # An infinity against a finite value is a real difference.
+  differs <- .compare_vector(Inf, 5, tolerance = 1e-8)
+  expect_equal(differs$verdict, "differs")
+  expect_equal(differs$n_differ, 1L)
+})
+
+test_that(".compare_vector folds NaN into missing, as SAS does", {
+  # SAS has one missing value and no NaN: 0/0 and log(-1) both land there.
+  expect_equal(.compare_vector(NaN, NA_real_, tolerance = 1e-8)$verdict,
+               "identical")
+  expect_equal(.compare_vector(NaN, NaN, tolerance = 1e-8)$verdict,
+               "identical")
+  # But NaN against a real value still differs.
+  expect_equal(.compare_vector(NaN, 5, tolerance = 1e-8)$verdict, "differs")
+})
