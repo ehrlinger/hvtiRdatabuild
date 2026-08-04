@@ -26,6 +26,8 @@ Imports:
     hvtiRutilities,
     tools,
     utils
+Remotes:
+    ehrlinger/hvtiRutilities
 Suggests:
     arrow,
     dplyr,

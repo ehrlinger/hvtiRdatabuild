@@ -19,6 +19,11 @@ pushed to `ehrlinger/hvtiRdatasets`, install with:
 remotes::install_github("ehrlinger/hvtiRdatasets")
 ```
 
+This package imports `hvtiRutilities`, which is **not on CRAN**. The `Remotes:`
+field in `DESCRIPTION` points `remotes`/`pak` at `ehrlinger/hvtiRutilities`, so
+the command above pulls it in automatically. Installing with plain
+`install.packages()` will fail to resolve it.
+
 `arrow` is an optional dependency, required only for writing oracle snapshots.
 
 ## Verifying an R build against SAS
