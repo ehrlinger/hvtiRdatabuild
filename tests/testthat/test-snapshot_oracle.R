@@ -101,8 +101,13 @@ test_that("snapshot_oracle records the snapshot in a manifest", {
   # A drifted oracle is detected. This is the spec requirement that an oracle
   # whose recorded checksum no longer matches the file is an error.
   writeLines("corrupted", out)
-  drifted <- hvtiRutilities::verify_manifest(
-    manifest_path = man, data_dir = dir, stop_on_error = FALSE
+  # Capture the warning explicitly. Letting it escape into the suite would
+  # mask a future unexpected warning behind this expected one.
+  expect_warning(
+    drifted <- hvtiRutilities::verify_manifest(
+      manifest_path = man, data_dir = dir, stop_on_error = FALSE
+    ),
+    "SHA-256 mismatch"
   )
   expect_true(any(drifted$status == "FAIL"))
 })

@@ -632,9 +632,16 @@ test_that("snapshot_oracle records the snapshot in a manifest", {
 
   # A drifted oracle is detected. This is the spec requirement that an oracle
   # whose recorded checksum no longer matches the file is an error.
+  #
+  # verify_manifest(stop_on_error = FALSE) signals the mismatch with
+  # warning(). Capture it explicitly -- a warning left to escape into the
+  # suite masks a future unexpected one behind this expected one.
   writeLines("corrupted", out)
-  drifted <- hvtiRutilities::verify_manifest(
-    manifest_path = man, data_dir = dir, stop_on_error = FALSE
+  expect_warning(
+    drifted <- hvtiRutilities::verify_manifest(
+      manifest_path = man, data_dir = dir, stop_on_error = FALSE
+    ),
+    "SHA-256 mismatch"
   )
   expect_true(any(drifted$status == "FAIL"))
 })
@@ -645,7 +652,9 @@ Add `yaml` to `Suggests` in `DESCRIPTION` for this test.
 - [ ] **Step 7: Run tests to verify they pass**
 
 Run: `Rscript -e 'devtools::test(filter = "snapshot_oracle")'`
-Expected: `[ FAIL 0 | PASS 18 ]`
+Expected: `[ FAIL 0 | PASS 18 ]` for the filtered run — but count the
+brief's own assertions rather than trusting this number; the authoritative
+check is `FAIL 0` with no loose warnings.
 
 Note that validation runs *before* the parquet is written, so a failed validation leaves no file behind. The `expect_false(file.exists(bad))` assertion pins that ordering.
 
