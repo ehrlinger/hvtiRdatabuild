@@ -21,7 +21,7 @@
 - Maximum 2 cores anywhere.
 - **No PHI in any fixture, test, or vignette.** All data is synthetic.
 - **No credential value in any file, log line, error message, or commit.**
-- `R CMD check` must finish 0 errors / 0 warnings / 0 notes before each commit that touches package code.
+- **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`:** that flag runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE for any package never published to CRAN, plus notes on the `.9000` version component and not-yet-public URLs. `hvtiRdatasets` is not a CRAN target (see the spec), so `--as-cran` sets a gate no task can pass. It is still required at release time, per the group's release gate.
 - **Add a package to `Imports` in the same task that first uses it, never earlier.** `R CMD check` notes any declared import that no code uses, so a speculative dependency list breaks the 0/0/0 gate. See Task 1.
 - Work happens on branch `feat/s0-verify`. Never commit to `main`.
 - **This package never writes SAS files.** `snapshot_oracle()` reads SAS and writes parquet; nothing else touches a SAS format. `haven::write_sas()` is deprecated as of haven 2.5.2 and is called exactly once, by a manual `data-raw/` script, to generate the committed test fixture. **No haven writer runs in the test suite.**
@@ -59,7 +59,6 @@ Authors@R: c(
       role = c("aut", "cre")
     )
   )
-Maintainer: John Ehrlinger <john.ehrlinger@gmail.com>
 License: GPL (>= 3)
 Encoding: UTF-8
 URL: https://github.com/ehrlinger/hvtiRdatasets
@@ -76,9 +75,17 @@ Suggests:
     quarto,
     testthat (>= 3.0.0),
     withr
-VignetteBuilder: quarto
 Config/testthat/edition: 3
 ```
+
+**No `Maintainer:` field.** When `Authors@R` is present, R derives the
+maintainer from the `cre` role. Declaring both — with different addresses, as
+`hvtiRutilities` does — produces a `checking DESCRIPTION meta-information`
+NOTE. The `cre` address in `Authors@R` is the maintainer.
+
+**No `VignetteBuilder:` field yet.** Declaring it with no vignettes present
+notes. Task 9 adds it along with the first vignette, consistent with the
+per-task dependency rule below.
 
 **Task 1 declares no `Imports`, deliberately.** `R CMD check` emits
 `Namespaces in Imports field not imported from: ...` for any declared import
@@ -149,7 +156,7 @@ test_that("package loads and declares its dependencies", {
 Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
@@ -1313,7 +1320,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
 ```
 Expected: all tests pass; `Status: OK` at 0/0/0.
 
@@ -1512,7 +1519,7 @@ Expected: renders with no error. The `MERGE` chunk prints `[1] 4`.
 
 Run:
 ```bash
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
 ```
 Expected: `Status: OK`, 0/0/0, vignette built.
 
@@ -1602,7 +1609,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.0.0.9000.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
@@ -1636,22 +1643,26 @@ Consequently:
 - `show_ids` is never enabled here.
 - The test skips silently when the variable is unset, so CI, `R CMD check`, and every other checkout are unaffected.
 
-- [ ] **Step 1: Extend `.gitignore` as a backstop**
+- [ ] **Step 1: Confirm `.gitignore` already covers clinical data**
 
-Append:
+No change should be needed. `.gitignore` was set up at repo creation with
+`*.sas7bdat`, `*.parquet`, `*.xpt`, `*.csv`, `*.rds`, `oracle/`, and the
+negation `!inst/extdata/oracle_small.sas7bdat` that lets the one synthetic
+fixture through.
 
-```
-# Real clinical data must never enter this repository.
-# The primary control is that it lives outside the working tree, under
-# HVTI_ORACLE_DIR. These entries only catch mistakes.
-oracle/
-*.sas7bdat
-!inst/extdata/oracle_small.sas7bdat
-*.parquet
-*.xpt
+Verify:
+
+```bash
+grep -E 'sas7bdat|parquet|xpt|oracle/' .gitignore
 ```
 
-Note the negation: the synthetic fixture is the one `.sas7bdat` that *is* committed.
+Expected: all of the above present, with the negation *after* `*.sas7bdat`.
+Order matters — a negation before the pattern it exempts has no effect. Add
+anything missing; do not duplicate what is there.
+
+These entries are a backstop against mistakes, not the primary control. The
+primary control is that real data lives outside the working tree, under
+`HVTI_ORACLE_DIR`.
 
 - [ ] **Step 2: Write the integration test**
 
