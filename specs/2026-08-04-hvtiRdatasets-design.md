@@ -221,6 +221,20 @@ mechanisms available; they are not equally safe.
    Service daemon that a headless server does not provide.
 5. Interactive prompt, when the session is interactive.
 
+**Driver 18 defaults to `Encrypt=yes`.** The development machine has *ODBC
+Driver 18 for SQL Server* (verified 2026-08-05, alongside `odbc` 1.7.0 and
+unixODBC). Microsoft flipped the `Encrypt` default from `no` in driver 17 to
+`yes` in 18, so a connection string that worked under the older driver fails
+with a certificate error under 18 unless it sets `Encrypt=no` or trusts the
+server certificate.
+
+The legacy SAS `CONNECT TO ODBC` string already carries
+`TrustServerCertificate=Yes` — added in 2022 per its revision history, when the
+group moved to a new SAS server. That setting is why the pull works, and it must
+survive into `dw_connect()` rather than being dropped as legacy cruft. Whether
+trusting the certificate is the right long-term posture, versus installing the
+institutional CA chain, is a question for whoever administers the DSN.
+
 **Why the DSN outranks `.Renviron`.** `.Renviron` places the password in the R
 process environment, where `Sys.getenv()` prints it and any handler that dumps
 the environment on error captures it. A DSN password is read by the driver and
@@ -609,7 +623,11 @@ Critical assertions:
 
 ## Open questions
 
-- **Is Kerberos integrated auth available** against `<AD-DOMAIN>` for the
+- **DEFERRED 2026-08-05, by the maintainer.** Not a blocker: the credential
+  ladder below is built with Kerberos as its first rung and the stored-secret
+  rungs operative beneath it. If Kerberos later proves available, the lower
+  rungs become deletable rather than needing redesign. Re-ask before S1 ships,
+  not before it starts. — **Is Kerberos integrated auth available** against `<AD-DOMAIN>` for the
   warehouse service account? One question to whoever administers the DSN. A yes
   removes stored credentials from the design entirely and makes the rest of the
   credential ladder dead code worth deleting.
