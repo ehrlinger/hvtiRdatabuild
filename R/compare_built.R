@@ -88,16 +88,23 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
   o_vars <- setdiff(names(oracle), id)
   r_vars <- setdiff(names(r), id)
 
-  out <- do.call(rbind, c(
-    lapply(union(o_vars, r_vars), function(v) {
-      .compare_one_variable(v, o_common, r_common, o_vars, r_vars, tolerance,
-                            rows$n_common)
-    }),
-    list(make.row.names = FALSE)
-  ))
+  all_vars <- union(o_vars, r_vars)
 
-  if (is.null(out)) {
-    out <- .empty_comparison()
+  # Handle "no variables to compare" before rbind rather than after. With an
+  # empty list, do.call(rbind, list(make.row.names = FALSE)) does not return
+  # NULL -- it returns an atomic -- so an is.null() guard downstream never
+  # fires and the failure surfaces later as "$ operator is invalid for
+  # atomic vectors".
+  out <- if (length(all_vars) == 0L) {
+    .empty_comparison()
+  } else {
+    do.call(rbind, c(
+      lapply(all_vars, function(v) {
+        .compare_one_variable(v, o_common, r_common, o_vars, r_vars, tolerance,
+                              rows$n_common)
+      }),
+      list(make.row.names = FALSE)
+    ))
   }
   out <- out[order(match(out$verdict, .verdict_levels()), out$variable), ,
              drop = FALSE]

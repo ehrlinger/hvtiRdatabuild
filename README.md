@@ -11,9 +11,6 @@ implemented. The pipeline itself — `dw_pull()`, `build_dataset()`,
 
 ## Installation
 
-This repository is local-only for now (no GitHub remote yet). Once it is
-pushed to `ehrlinger/hvtiRdatasets`, install with:
-
 ```r
 # install.packages("remotes")
 remotes::install_github("ehrlinger/hvtiRdatasets")

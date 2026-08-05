@@ -34,6 +34,24 @@ test_that("compare_built reports row-set differences separately", {
   expect_equal(res$verdict[res$variable == "age"], "identical")
 })
 
+test_that("compare_built handles frames with no variables to compare", {
+  # Only the identifier column. .empty_comparison() must actually be reached:
+  # do.call(rbind, list(make.row.names = FALSE)) returns an atomic, not NULL,
+  # so an is.null() guard would silently miss this.
+  o <- data.frame(ccfidu = c("A1", "A2"), stringsAsFactors = FALSE)
+  r <- data.frame(ccfidu = c("A1", "A2"), stringsAsFactors = FALSE)
+
+  res <- compare_built(o, r, id = "ccfidu")
+
+  expect_s3_class(res, "built_comparison")
+  expect_equal(nrow(res), 0L)
+  expect_true(all(c("variable", "verdict", "n_common") %in% names(res)))
+  expect_equal(attr(res, "rows")$n_common, 2L)
+
+  # It must still print rather than error.
+  expect_output(print(res), "Dataset comparison")
+})
+
 test_that("compare_built errors when the id column is missing", {
   o <- data.frame(ccfidu = "A1", age = 1)
   r <- data.frame(other  = "A1", age = 1)
