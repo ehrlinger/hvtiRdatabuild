@@ -1,0 +1,41 @@
+Package: hvtiRdatasets
+Type: Package
+Title: Build and Verify Analytic Datasets for the HVTI CORR Group
+Version: 0.1.0
+Date: 2026-08-04
+Authors@R: c(
+    person(
+      "John", "Ehrlinger",
+      email = "john.ehrlinger@gmail.com",
+      role = c("aut", "cre")
+    )
+  )
+License: GPL (>= 3)
+Encoding: UTF-8
+URL: https://github.com/ehrlinger/hvtiRdatasets
+BugReports: https://github.com/ehrlinger/hvtiRdatasets/issues
+Description: Builds analysis-ready clinical datasets for the clinical
+  investigations statistics group within The Heart and Vascular Institute at
+  the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets
+  they replace.
+Depends:
+    R (>= 4.1.0)
+Imports:
+    digest,
+    haven,
+    hvtiRutilities,
+    tools,
+    utils
+Remotes:
+    ehrlinger/hvtiRutilities
+Suggests:
+    arrow,
+    dplyr,
+    knitr,
+    quarto,
+    testthat (>= 3.0.0),
+    withr,
+    yaml
+VignetteBuilder: quarto
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

@@ -1,0 +1,8 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.github$
+^specs$
+^LICENSE\.md$
+^data-raw$
+^\.vscode$
+^\.superpowers$

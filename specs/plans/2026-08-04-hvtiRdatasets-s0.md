@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- Package version starts at `0.0.0.9000`. Bump the patch/dev digit only; never the minor or major.
+- Package version starts at `0.1.0`. Always a straight three-digit semantic version — never a `.9000` dev suffix or any fourth digit. Bump the patch digit only; never the minor or major.
 - `R (>= 4.1.0)` in `Depends`. Licence `GPL (>= 3)`. Maintainer `John Ehrlinger <john.ehrlinger@gmail.com>`.
 - `arrow` is in **Suggests**, not Imports. Every use is guarded by `requireNamespace("arrow", quietly = TRUE)`; every test touching it calls `skip_if_not_installed("arrow")`.
 - `testthat` edition 3 (`Config/testthat/edition: 3`).
@@ -21,7 +21,10 @@
 - Maximum 2 cores anywhere.
 - **No PHI in any fixture, test, or vignette.** All data is synthetic.
 - **No credential value in any file, log line, error message, or commit.**
-- `R CMD check` must finish 0 errors / 0 warnings / 0 notes before each commit that touches package code.
+- **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`:** that flag runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE for any package never published to CRAN, plus a note on the not-yet-public URLs. `hvtiRdatasets` is not a CRAN target (see the spec), so `--as-cran` sets a gate no task can pass. It is still required at release time, per the group's release gate.
+- **Add a package to `Imports` in the same task that first uses it, never earlier.** `R CMD check` notes any declared import that no code uses, so a speculative dependency list breaks the 0/0/0 gate. See Task 1.
+- Work happens on branch `feat/s0-verify`. Never commit to `main`.
+- **Put LaTeX on `PATH` before checking: `export PATH="/Library/TeX/texbin:$PATH"`.** A non-interactive shell does not inherit it, and without it `R CMD check` fails the PDF-manual step with `1 ERROR, 1 WARNING` — which looks like a package defect and is not. **Do not reach for `--no-manual`.** The manual build is what catches raw Unicode in `.Rd` files, and skipping it hides that class of defect entirely. `pdflatex` is present at both `/Library/TeX/texbin` (MacTeX) and `~/Library/TinyTeX/bin/universal-darwin`.
 - **This package never writes SAS files.** `snapshot_oracle()` reads SAS and writes parquet; nothing else touches a SAS format. `haven::write_sas()` is deprecated as of haven 2.5.2 and is called exactly once, by a manual `data-raw/` script, to generate the committed test fixture. **No haven writer runs in the test suite.**
 - Only `.sas7bdat` is supported. The oracle is `library.built`. The `.xpt` files on disk are output of `tp.bd.SAStoR.sas`, the bridge this package replaces, and are not an input.
 - **Development is on macOS; execution is on the SAS server.** No task in this slice touches a database. When S1 arrives, warehouse connections are mocked in tests and real pulls run on the server, never on a laptop.
@@ -48,16 +51,15 @@
 Package: hvtiRdatasets
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
-Version: 0.0.0.9000
+Version: 0.1.0
 Date: 2026-08-04
 Authors@R: c(
     person(
       "John", "Ehrlinger",
-      email = "ehrlinj@ccf.org",
+      email = "john.ehrlinger@gmail.com",
       role = c("aut", "cre")
     )
   )
-Maintainer: John Ehrlinger <john.ehrlinger@gmail.com>
 License: GPL (>= 3)
 Encoding: UTF-8
 URL: https://github.com/ehrlinger/hvtiRdatasets
@@ -68,23 +70,38 @@ Description: Builds analysis-ready clinical datasets for the clinical
   they replace.
 Depends:
     R (>= 4.1.0)
-Imports:
-    digest,
-    dplyr,
-    haven,
-    hvtiRutilities,
-    stats,
-    utils
 Suggests:
     arrow,
     knitr,
     quarto,
     testthat (>= 3.0.0),
     withr
-VignetteBuilder: quarto
-RoxygenNote: 7.3.3
 Config/testthat/edition: 3
 ```
+
+**No `Maintainer:` field.** When `Authors@R` is present, R derives the
+maintainer from the `cre` role. Declaring both — with different addresses, as
+`hvtiRutilities` does — produces a `checking DESCRIPTION meta-information`
+NOTE. The `cre` address in `Authors@R` is the maintainer.
+
+**No `VignetteBuilder:` field yet.** Declaring it with no vignettes present
+notes. Task 9 adds it along with the first vignette, consistent with the
+per-task dependency rule below.
+
+**Task 1 declares no `Imports`, deliberately.** `R CMD check` emits
+`Namespaces in Imports field not imported from: ...` for any declared import
+that no code uses, and Task 1 contains no R code at all. Declaring the full
+dependency list here would make the 0/0/0 gate unreachable on the very first
+task. Each later task adds the package it actually uses:
+
+| Task | Adds to `Imports` |
+|---|---|
+| 3 | `haven`, `tools` |
+| 4 | `digest`, `hvtiRutilities` |
+| 8 | `utils` |
+
+`RoxygenNote` is omitted; `roxygen2::roxygenise()` writes it in Step 7 with
+whatever version is installed. Do not hand-set it.
 
 - [ ] **Step 2: Write `.Rbuildignore`**
 
@@ -140,7 +157,7 @@ test_that("package loads and declares its dependencies", {
 Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
@@ -164,7 +181,19 @@ git commit -m "feat: package scaffold for hvtiRdatasets"
 - Consumes: nothing.
 - Produces: `.fixture_frame()` returning the canonical synthetic data frame used by every later test; a committed `oracle_small.sas7bdat` reachable via `system.file("extdata", "oracle_small.sas7bdat", package = "hvtiRdatasets")`.
 
-The fixture exercises every comparison path: a character id, a plain numeric, a labelled numeric, a `Date`, a character with trailing blanks, and `NA` in each.
+The fixture carries a character id, a plain numeric, a labelled numeric, a `Date`, a character column, and `NA` in each.
+
+**Known limitation — two comparison paths cannot be exercised through a SAS file, and this is a property of SAS, not of the fixture.** Verified by reading the committed fixture back:
+
+| Written | Reads back as |
+|---|---|
+| `"Jones "` | `"Jones"` — trailing blank stripped |
+| `NA_character_` | `""` — empty string, **not** `NA` |
+| `NA_real_` | `NA` — numeric missing survives |
+
+**SAS has no character `NA`. Missing character *is* the empty string.** This is load-bearing for Task 5: on a real study, every missing character value in the oracle reads as `""` while the R rebuild holds `NA`. Compared naively, every character column containing any missing value reports `differs` — false positives in bulk, drowning real findings. `.as_comparable()` must therefore treat `""` and `NA` as the same value for character columns.
+
+Trailing-blank and character-`NA` behaviour must be tested with in-memory vectors in Task 5, never through this fixture, because the fixture physically cannot carry them.
 
 It lives in `inst/extdata/` rather than `tests/testthat/fixtures/` so that roxygen examples can reach it too, not only tests.
 
@@ -275,8 +304,13 @@ test_that(".read_sas_dataset reads a sas7bdat faithfully", {
 
   expect_s3_class(got, "data.frame")
   expect_equal(nrow(got), 4L)
-  expect_equal(as.numeric(got$age), expected$age)
-  expect_equal(as.character(got$ccfidu), expected$ccfidu)
+  # Strip both sides: expected$age carries a "label" attribute and
+  # expect_equal() compares attributes, so comparing a stripped vector
+  # against a labelled one fails on the attribute rather than the values.
+  # Do NOT "fix" this by removing the labels from .fixture_frame() -- the
+  # labelled numeric is the case .cmp_class() exists to collapse in Task 5.
+  expect_equal(as.numeric(got$age), as.numeric(expected$age))
+  expect_equal(as.character(got$ccfidu), as.character(expected$ccfidu))
 })
 
 test_that(".read_sas_dataset rejects unknown extensions and missing files", {
@@ -599,9 +633,16 @@ test_that("snapshot_oracle records the snapshot in a manifest", {
 
   # A drifted oracle is detected. This is the spec requirement that an oracle
   # whose recorded checksum no longer matches the file is an error.
+  #
+  # verify_manifest(stop_on_error = FALSE) signals the mismatch with
+  # warning(). Capture it explicitly -- a warning left to escape into the
+  # suite masks a future unexpected one behind this expected one.
   writeLines("corrupted", out)
-  drifted <- hvtiRutilities::verify_manifest(
-    manifest_path = man, data_dir = dir, stop_on_error = FALSE
+  expect_warning(
+    drifted <- hvtiRutilities::verify_manifest(
+      manifest_path = man, data_dir = dir, stop_on_error = FALSE
+    ),
+    "SHA-256 mismatch"
   )
   expect_true(any(drifted$status == "FAIL"))
 })
@@ -612,7 +653,9 @@ Add `yaml` to `Suggests` in `DESCRIPTION` for this test.
 - [ ] **Step 7: Run tests to verify they pass**
 
 Run: `Rscript -e 'devtools::test(filter = "snapshot_oracle")'`
-Expected: `[ FAIL 0 | PASS 18 ]`
+Expected: `[ FAIL 0 | PASS 18 ]` for the filtered run — but count the
+brief's own assertions rather than trusting this number; the authoritative
+check is `FAIL 0` with no loose warnings.
 
 Note that validation runs *before* the parquet is written, so a failed validation leaves no file behind. The `expect_false(file.exists(bad))` assertion pins that ordering.
 
@@ -678,6 +721,27 @@ test_that(".compare_vector ignores trailing blanks, as SAS does", {
   expect_equal(r$verdict, "identical")
 })
 
+test_that('.compare_vector treats SAS empty-string as character NA', {
+  # SAS has no character missing value distinct from "". A missing character
+  # in the oracle reads back as ""; the R pipeline produces NA. Reporting that
+  # as a difference would be a false positive on every character column that
+  # has any missing value.
+  sas <- c("Smith", "")
+  r   <- c("Smith", NA_character_)
+  expect_equal(.compare_vector(sas, r, tolerance = 1e-8)$verdict, "identical")
+
+  # Whitespace-only is also missing, once trimmed.
+  expect_equal(
+    .compare_vector(c("Smith", "   "), r, tolerance = 1e-8)$verdict,
+    "identical"
+  )
+
+  # A genuine value difference is still caught.
+  differs <- .compare_vector(c("Smith", "Jones"), r, tolerance = 1e-8)
+  expect_equal(differs$verdict, "differs")
+  expect_equal(differs$n_differ, 1L)
+})
+
 test_that(".compare_vector compares dates by value, not representation", {
   a <- as.Date(c("2020-01-15", NA))
   b <- as.Date(c("2020-01-15", NA))
@@ -723,7 +787,7 @@ Expected: FAIL with `could not find function ".cmp_class"`
 #' @param x A vector.
 #'
 #' @return A plain atomic vector: dates as numeric days, factors as character,
-#'   character trimmed of leading and trailing whitespace.
+#'   character trimmed of surrounding whitespace with `""` folded to `NA`.
 #'
 #' @keywords internal
 #' @noRd
@@ -733,13 +797,43 @@ Expected: FAIL with `could not find function ".cmp_class"`
     cls,
     date      = as.numeric(as.Date(x)),
     factor    = as.character(x),
-    character = trimws(as.character(unclass(x))),
+    character = .normalise_character(x),
     logical   = as.logical(x),
     numeric   = as.numeric(unclass(x)),
     unclass(x)
   )
   attributes(out) <- NULL
   out
+}
+
+#' Normalise a character vector to SAS's notion of a string
+#'
+#' Two adjustments, both required for a SAS oracle to compare meaningfully
+#' against an R rebuild:
+#'
+#' * **Trailing blanks are stripped.** SAS pads character values to their
+#'   declared width, so `'Smith'` and `'Smith   '` are the same value there and
+#'   different in R.
+#' * **`""` is folded to `NA`.** SAS has no character missing value distinct
+#'   from the empty string. A missing character in a SAS dataset reads back as
+#'   `""`, while the R pipeline produces `NA`. Treating them as different would
+#'   report `differs` for every character column containing any missing value —
+#'   false positives in bulk, on every study.
+#'
+#' The information loss is real but unavoidable: the oracle cannot distinguish
+#' `""` from missing, so a difference between them is never evidence of
+#' anything.
+#'
+#' @param x A character or `haven_labelled` character vector.
+#'
+#' @return A plain character vector, trimmed, with `""` as `NA`.
+#'
+#' @keywords internal
+#' @noRd
+.normalise_character <- function(x) {
+  v <- trimws(as.character(unclass(x)))
+  v[!is.na(v) & v == ""] <- NA_character_
+  v
 }
 
 #' Compare two vectors elementwise
@@ -1304,7 +1398,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: all tests pass; `Status: OK` at 0/0/0.
 
@@ -1428,6 +1522,28 @@ trimws("Smith   ") == "Smith"
 This bites hardest on merges keyed by a character id. `compare_built()` trims
 before comparing, for exactly this reason.
 
+### SAS has no missing character value
+
+R distinguishes `NA` from `""`. SAS does not — a missing character **is** the
+empty string. Read a SAS dataset and every missing character comes back as
+`""`:
+
+```{r}
+f <- system.file("extdata", "oracle_small.sas7bdat",
+                 package = "hvtiRdatasets")
+surgeon <- haven::read_sas(f)$surgeon
+surgeon                 # the fourth value was written as NA
+is.na(surgeon)          # ... and is not NA any more
+```
+
+So a faithful R rebuild holding `NA` disagrees with the oracle holding `""` on
+every missing value. `compare_built()` folds `""` to `NA` for character columns
+so this does not flood the report with false differences.
+
+The consequence for your own code is sharper: **never test a SAS-sourced
+character for `NA`**. `is.na(surgeon)` is `FALSE` even where the value is
+missing. Test for `""`, or convert on read.
+
 ### `MERGE` is not a join
 
 A SAS data-step `MERGE` on a non-unique BY key does not error. It produces
@@ -1443,11 +1559,15 @@ R makes the same mistake loud:
 #| warning: true
 a <- data.frame(id = c("A", "A"), x = 1:2)
 b <- data.frame(id = c("A", "A"), y = 3:4)
-nrow(dplyr::left_join(a, b, by = "id", relationship = "many-to-many"))
+nrow(dplyr::left_join(a, b, by = "id"))
 ```
 
-Four rows from two. Without `relationship = "many-to-many"`, `dplyr` warns.
-**Never suppress that warning.** It is the check SAS never gave you.
+Four rows from two — and `dplyr` says so, out loud, which SAS never did.
+
+You can silence that warning with `relationship = "many-to-many"`, and there
+are joins where the fan-out is genuinely intended. But reach for it only once
+you have confirmed the duplication is what you want. Do not pass it reflexively
+to quiet the output — that turns the one check SAS never gave you back off.
 
 ### Dates use different origins
 
@@ -1503,7 +1623,7 @@ Expected: renders with no error. The `MERGE` chunk prints `[1] 4`.
 
 Run:
 ```bash
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0/0/0, vignette built.
 
@@ -1593,7 +1713,7 @@ Run:
 ```bash
 Rscript -e 'roxygen2::roxygenise()'
 Rscript -e 'devtools::test()'
-R CMD build . && R CMD check --as-cran hvtiRdatasets_0.0.0.9000.tar.gz
+R CMD build . && R CMD check hvtiRdatasets_0.1.0.tar.gz
 ```
 Expected: `Status: OK`, 0 errors / 0 warnings / 0 notes.
 
@@ -1627,22 +1747,26 @@ Consequently:
 - `show_ids` is never enabled here.
 - The test skips silently when the variable is unset, so CI, `R CMD check`, and every other checkout are unaffected.
 
-- [ ] **Step 1: Extend `.gitignore` as a backstop**
+- [ ] **Step 1: Confirm `.gitignore` already covers clinical data**
 
-Append:
+No change should be needed. `.gitignore` was set up at repo creation with
+`*.sas7bdat`, `*.parquet`, `*.xpt`, `*.csv`, `*.rds`, `oracle/`, and the
+negation `!inst/extdata/oracle_small.sas7bdat` that lets the one synthetic
+fixture through.
 
-```
-# Real clinical data must never enter this repository.
-# The primary control is that it lives outside the working tree, under
-# HVTI_ORACLE_DIR. These entries only catch mistakes.
-oracle/
-*.sas7bdat
-!inst/extdata/oracle_small.sas7bdat
-*.parquet
-*.xpt
+Verify:
+
+```bash
+grep -E 'sas7bdat|parquet|xpt|oracle/' .gitignore
 ```
 
-Note the negation: the synthetic fixture is the one `.sas7bdat` that *is* committed.
+Expected: all of the above present, with the negation *after* `*.sas7bdat`.
+Order matters — a negation before the pattern it exempts has no effect. Add
+anything missing; do not duplicate what is there.
+
+These entries are a backstop against mistakes, not the primary control. The
+primary control is that real data lives outside the working tree, under
+`HVTI_ORACLE_DIR`.
 
 - [ ] **Step 2: Write the integration test**
 
