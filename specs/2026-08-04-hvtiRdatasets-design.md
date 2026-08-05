@@ -9,6 +9,14 @@ Phase 0 amendment itself remains in `hvtiRutilities`.
 **Supersedes:** the `bd`/`vars`/`dt` → `hvtiRutilities` ownership line in
 `2026-07-10-sas-macro-canonicalization-design.md`
 
+> **Redacted for public release.** This repository is public, so internal
+> infrastructure identifiers are replaced with placeholders throughout:
+> `<DW-SERVER>`, `<PORT>`, `<DW-DB>`, `<SCHEMA>`, `<warehouse>`, `<Module>`,
+> `<AD-DOMAIN>`, `<dbcreds>.sas`. The real values are in the SAS templates on
+> the internal volume; they are not needed to follow the design, and publishing
+> a production database host, its port, and the location of a plaintext
+> credential file would be gratuitous. Keep it that way when editing.
+
 ## Context
 
 The CORR group is reimplementing its legacy SAS library in the `hvti*` R
