@@ -50,7 +50,13 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./cobertura.xml
           disable_search: true
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' || secrets.CODECOV_TOKEN != '' }}
+          # Fail the build only when a token is configured and the upload
+          # still errors -- a missing token should never fail CI. (The
+          # prior `event_name != 'pull_request' || ...` form was
+          # unconditionally true on every push regardless of token state,
+          # defeating that intent.) A single `!=` comparison can only
+          # ever evaluate to `true`/`false`.
+          fail_ci_if_error: ${{ secrets.CODECOV_TOKEN != '' }}
 
       - name: Show testthat output
         if: always()

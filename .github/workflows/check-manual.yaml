@@ -42,14 +42,10 @@ jobs:
         with:
           extra-packages: |
             any::rcmdcheck
-            any::devtools
             github::ehrlinger/hvtiRutilities
           needs: check
 
       - uses: r-lib/actions/setup-tinytex@v2
-
-      - name: Generate documentation
-        run: Rscript -e 'devtools::document()'
 
       # Install the package into the user library so that Quarto's subprocess
       # can resolve library(hvtiRdatasets) during vignette rendering.
