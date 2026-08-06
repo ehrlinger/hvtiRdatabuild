@@ -12,7 +12,7 @@ Authors@R: c(
   )
 License: GPL (>= 3)
 Encoding: UTF-8
-URL: https://github.com/ehrlinger/hvtiRdatasets
+URL: https://github.com/ehrlinger/hvtiRdatasets, https://ehrlinger.github.io/hvtiRdatasets/
 BugReports: https://github.com/ehrlinger/hvtiRdatasets/issues
 Description: Builds analysis-ready clinical datasets for the clinical
   investigations statistics group within The Heart and Vascular Institute at

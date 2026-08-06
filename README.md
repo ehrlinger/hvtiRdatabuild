@@ -1,4 +1,14 @@
 # hvtiRdatasets
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/R-CMD-check.yaml)
+[![Codecov test coverage](https://codecov.io/gh/ehrlinger/hvtiRdatasets/graph/badge.svg)](https://app.codecov.io/gh/ehrlinger/hvtiRdatasets)
+[![active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/badges/latest/active.svg)
+[![pkgdown](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/pkgdown.yaml)
+
+[![R package version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatasets)](https://github.com/ehrlinger/hvtiRdatasets)
+
+[![lint](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml)
+<!-- badges: end -->
 
 Builds analysis-ready clinical datasets for the HVTI CORR group, and verifies
 them against the legacy SAS datasets they replace.
