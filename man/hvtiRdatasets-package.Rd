@@ -12,6 +12,7 @@ Builds analysis-ready clinical datasets for the clinical investigations statisti
 Useful links:
 \itemize{
   \item \url{https://github.com/ehrlinger/hvtiRdatasets}
+  \item \url{https://ehrlinger.github.io/hvtiRdatasets/}
   \item Report bugs at \url{https://github.com/ehrlinger/hvtiRdatasets/issues}
 }
 
