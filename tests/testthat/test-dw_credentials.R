@@ -31,7 +31,7 @@ test_that("a named DSN outranks .Renviron and carries no secret", {
   # CI machine happens to have at that path.
   withr::local_envvar(c(
     HVI_DW_UID = "someone", HVI_DW_PWD = "hunter2",
-    HOME = withr::local_tempdir()
+    HOME = withr::local_tempdir(), HVI_DW_KERBEROS = NA
   ))
 
   res <- .resolve_credentials(dsn = "HVI_DW", interactive_ok = FALSE)
@@ -46,7 +46,7 @@ test_that(".Renviron variables are used when no DSN is given", {
   # CI machine happens to have at that path.
   withr::local_envvar(c(
     HVI_DW_UID = "someone", HVI_DW_PWD = "hunter2",
-    HOME = withr::local_tempdir()
+    HOME = withr::local_tempdir(), HVI_DW_KERBEROS = NA
   ))
 
   res <- .resolve_credentials(dsn = NULL, interactive_ok = FALSE)
@@ -56,7 +56,7 @@ test_that(".Renviron variables are used when no DSN is given", {
 })
 
 test_that("no resolvable source in a non-interactive session is an error", {
-  withr::local_envvar(c(HVI_DW_UID = NA, HVI_DW_PWD = NA))
+  withr::local_envvar(c(HVI_DW_UID = NA, HVI_DW_PWD = NA, HVI_DW_KERBEROS = NA))
 
   expect_error(
     .resolve_credentials(dsn = NULL, interactive_ok = FALSE),

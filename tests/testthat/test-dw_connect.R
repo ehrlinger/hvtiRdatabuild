@@ -88,15 +88,29 @@ test_that("a failed connection message never contains the password", {
     HVI_DW_UID = "someone", HVI_DW_PWD = "hunter2",
     HOME = withr::local_tempdir()
   ))
+  # A real ODBC driver error commonly quotes the connection string back at
+  # the caller. Echo it here so the test actually discriminates: it only
+  # passes if dw_connect()'s tryCatch wrapper replaces the driver's message
+  # rather than passing it through.
   testthat::local_mocked_bindings(
-    dbConnect = function(drv, ...) stop("login failed for user 'someone'"),
+    dbConnect = function(drv, ...) {
+      seen <- list(...)
+      stop(sprintf(
+        "[ODBC Driver 18 for SQL Server]Login failed. Connection string: UID=%s;PWD=%s;",
+        seen$uid, seen$pwd
+      ))
+    },
     .package = "DBI"
   )
 
-  msg <- tryCatch(
+  result <- tryCatch(
     dw_connect(server = "<DW-SERVER>", database = "<DW-DB>"),
-    error = conditionMessage
+    error = function(e) e
   )
 
-  expect_false(grepl("hunter2", msg, fixed = TRUE))
+  expect_false(grepl("hunter2", conditionMessage(result), fixed = TRUE))
+  # call. = FALSE means the replacement error carries no call component, so
+  # the driver's original call (which could itself embed the credential
+  # through matched arguments) cannot leak through conditionCall() either.
+  expect_null(conditionCall(result))
 })

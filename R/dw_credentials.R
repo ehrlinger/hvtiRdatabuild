@@ -20,7 +20,8 @@
 #' @param interactive_ok Whether prompting is permitted.
 #'
 #' @return A list with element `method`, and for the `renviron` and `keyring`
-#'   methods, `uid` and `pwd`. The `kerberos` and `dsn` methods carry no secret.
+#'   methods, `uid` and `pwd`; for the `dsn` method, `dsn`. The `kerberos` and
+#'   `dsn` methods carry no secret.
 #'
 #' @keywords internal
 #' @noRd
