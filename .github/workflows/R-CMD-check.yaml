@@ -46,14 +46,16 @@ jobs:
       # hvtiRdatasets Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
+      # roxygen2 is pinned below: it stamps its own version into DESCRIPTION,
+      # so an unpinned upgrade fails the roxygen-currency check on a version
+      # bump rather than a doc change. This comment sits outside the block
+      # scalar deliberately -- inside a `|` block, `#` lines are literal text
+      # and pak tries to install them as package names.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
             any::rcmdcheck
             any::devtools
-            # roxygen2 is pinned: it stamps its own version into DESCRIPTION,
-            # so an unpinned upgrade fails the roxygen-currency check on a
-            # version bump rather than a doc change.
             any::roxygen2@8.1.0
             github::ehrlinger/hvtiRutilities
           needs: check
