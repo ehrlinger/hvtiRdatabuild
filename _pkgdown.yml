@@ -30,6 +30,7 @@ reference:
     and pull the modules the study declares. The pull is read-only.
   contents:
   - read_study_config
+  - dw_connect
 
 articles:
 - title: "Getting Started"
