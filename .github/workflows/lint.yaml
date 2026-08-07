@@ -38,3 +38,47 @@ jobs:
         shell: Rscript {0}
         env:
           LINTR_ERROR_ON_LINT: true
+
+  # Catches generated documentation drifting from its roxygen sources, on the
+  # PR rather than after the merge. Replaces a `devtools::document()` step that
+  # ran inside R-CMD-check: regenerating docs before checking meant the check
+  # could never see drift, because it had just fixed it. This one regenerates
+  # and then *fails on the diff*.
+  #
+  # pull_request only. It is seconds, and does not build the manual, so the
+  # CRAN check-time budget decision is untouched.
+  docs-current:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          # roxygen2 is pinned because it stamps its own version into
+          # DESCRIPTION (Config/roxygen2/version), so an unpinned upgrade
+          # fails this check on a version bump rather than a doc change.
+          # This is the only job in the repo that installs roxygen2 -- keep
+          # it that way, so the pin has exactly one place to be wrong.
+          extra-packages: |
+            any::roxygen2@8.1.0
+            local::.
+            github::ehrlinger/hvtiRutilities
+          # roxygenise() only needs this package's Imports loadable. The
+          # action defaults to dependencies: "all", which additionally pulls
+          # every Suggests -- arrow, dplyr, quarto -- and their system
+          # requirements, so a job whose real work is a one-second git diff
+          # sat behind a 30-package apt queue. On 2026-08-07 a degraded
+          # Ubuntu mirror left it stranded there for 32 minutes.
+          dependencies: '"hard"'
+
+      - name: Documentation is current
+        run: |
+          Rscript -e 'roxygen2::roxygenise()'
+          git diff --exit-code man/ NAMESPACE DESCRIPTION
