@@ -51,6 +51,10 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             any::devtools
+            # roxygen2 is pinned: it stamps its own version into DESCRIPTION,
+            # so an unpinned upgrade fails the roxygen-currency check on a
+            # version bump rather than a doc change.
+            any::roxygen2@8.1.0
             github::ehrlinger/hvtiRutilities
           needs: check
 
