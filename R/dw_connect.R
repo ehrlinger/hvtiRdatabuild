@@ -51,15 +51,26 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
     encrypt = encrypt, trust_certificate = trust_certificate
   )
 
-  # tryCatch, not a bare call: a driver error can quote the connection string
-  # back at us, and that string may hold a password.
-  tryCatch(
-    do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
-    error = function(e) {
-      stop("Could not connect to the warehouse. The driver reported a ",
-           "failure; the connection string is not shown because it may ",
-           "carry a credential. Check the DSN, server, and database.",
-           call. = FALSE)
+  # tryCatch/withCallingHandlers, not a bare call: do.call() builds a call
+  # object holding the *evaluated* argument values, so both an error and a
+  # warning raised inside dbConnect() can carry uid/pwd in their
+  # conditionCall() regardless of what the driver puts in the message. Every
+  # condition is replaced with call. = FALSE before it leaves this function.
+  withCallingHandlers(
+    tryCatch(
+      do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
+      error = function(e) {
+        stop("Could not connect to the warehouse. The driver reported a ",
+             "failure; the connection string is not shown because it may ",
+             "carry a credential. Check the DSN, server, and database.",
+             call. = FALSE)
+      }
+    ),
+    warning = function(w) {
+      warning("The driver reported a warning while connecting. The ",
+              "message is not shown because it may carry a credential.",
+              call. = FALSE)
+      invokeRestart("muffleWarning")
     }
   )
 }

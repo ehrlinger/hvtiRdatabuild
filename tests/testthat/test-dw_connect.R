@@ -114,3 +114,33 @@ test_that("a failed connection message never contains the password", {
   # through matched arguments) cannot leak through conditionCall() either.
   expect_null(conditionCall(result))
 })
+
+test_that("a connection warning never reveals the password", {
+  skip_if_not_installed("odbc")
+  withr::local_envvar(c(
+    HVI_DW_UID = "someone", HVI_DW_PWD = "hunter2",
+    HOME = withr::local_tempdir()
+  ))
+  # dw_connect() builds its DBI::dbConnect() call with
+  # do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))), so the
+  # constructed call object holds the *evaluated* uid/pwd values. A warning
+  # signalled inside dbConnect() gets that call as its default
+  # conditionCall() -- unrelated to what the driver puts in the message.
+  # This mock reproduces that exact mechanism instead of guessing at driver
+  # text.
+  testthat::local_mocked_bindings(
+    dbConnect = function(drv, ...) warning("fallback"),
+    .package = "DBI"
+  )
+
+  result <- tryCatch(
+    dw_connect(server = "<DW-SERVER>", database = "<DW-DB>"),
+    warning = function(w) w
+  )
+
+  shown <- paste(deparse(result), collapse = "\n")
+
+  expect_false(grepl("hunter2", conditionMessage(result), fixed = TRUE))
+  expect_null(conditionCall(result))
+  expect_false(grepl("hunter2", shown, fixed = TRUE))
+})
