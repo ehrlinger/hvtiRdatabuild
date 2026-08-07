@@ -3,4 +3,5 @@
 S3method(print,built_comparison)
 S3method(str,built_comparison)
 export(compare_built)
+export(read_study_config)
 export(snapshot_oracle)

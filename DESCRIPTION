@@ -25,7 +25,8 @@ Imports:
     haven,
     hvtiRutilities,
     tools,
-    utils
+    utils,
+    yaml
 Remotes:
     ehrlinger/hvtiRutilities
 Suggests:
@@ -34,8 +35,7 @@ Suggests:
     knitr,
     quarto,
     testthat (>= 3.0.0),
-    withr,
-    yaml
+    withr
 VignetteBuilder: quarto
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0

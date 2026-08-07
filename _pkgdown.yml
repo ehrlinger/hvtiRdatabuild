@@ -24,6 +24,13 @@ reference:
   - print.built_comparison
   - str.built_comparison
 
+- title: "Pull: Warehouse to R"
+  desc: >
+    Read a study's configuration, open a credentialed warehouse connection,
+    and pull the modules the study declares. The pull is read-only.
+  contents:
+  - read_study_config
+
 articles:
 - title: "Getting Started"
   contents:
