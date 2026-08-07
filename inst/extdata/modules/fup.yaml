@@ -1,0 +1,12 @@
+module: fup
+output: fup
+join_key: patid
+optional: false
+description: >
+  Follow-up records for the cohort. Ports the fourth PROC SQL block of
+  tp.stXXXX_dwpull.sas. Note that the cohort's dtn_surg is aliased to
+  dtn_inst, matching SAS.
+sql: >
+  select c.patid, c.masterid, c.mrn, c.dtn_surg dtn_inst, s.*
+  from {cohort} c
+  inner join {warehouse}.{view_schema}.vw_FUP_Base s on c.patid = s.patid

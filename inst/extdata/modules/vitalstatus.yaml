@@ -1,0 +1,14 @@
+module: vitalstatus
+output: bdstat
+join_key: masterid
+optional: false
+description: >
+  Vital-status columns only, from the CardSurg Base view. Ports the second
+  PROC SQL block of tp.stXXXX_dwpull.sas. The column list is explicit in SAS
+  and stays explicit here.
+sql: >
+  select c.masterid, s.patid, s.dtn_inst,
+         s.dt_vstat, s.vit_stat, s.vit_src, s.vstatiss, s.mtdate,
+         s.hdeath, s.dt_dthep, s.dt_alive, s.dead30d
+  from {cohort} c
+  inner join {warehouse}.{view_schema}.vw_CardSurg_Base s on c.masterid = s.masterid
