@@ -32,6 +32,7 @@ Remotes:
 Suggests:
     arrow,
     dplyr,
+    keyring,
     knitr,
     quarto,
     testthat (>= 3.0.0),
