@@ -87,6 +87,15 @@ compare_built(oracle, my_rebuild, id = "ccfidu")
 There is no overall pass/fail. Read the table, and record a resolution for
 every variable that is not `identical`.
 
+`compare_built()` requires exactly one row per identifier on both sides. Of
+the five warehouse modules, only `bdbase` and `bdstat` are one row per patient
+and so are measurable against the SAS oracle today. `echo`, `fup`, and
+`bdevents` are one row per *event* (echocardiogram, follow-up visit,
+reoperation) — a given `patid` legitimately repeats — so a direct
+per-identifier comparison errors on them by design, not by oversight.
+Verifying those three needs a composite-key comparison, deferred to a later
+slice.
+
 ## Local integration testing
 
 The committed fixtures are synthetic. To exercise the read path against real

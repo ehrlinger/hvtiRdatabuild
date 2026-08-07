@@ -18,6 +18,7 @@
 # without an actual decision.
 
 - module: echo
+  output: echo
   variable: null
   resolution: pending
   sas_behaviour: >

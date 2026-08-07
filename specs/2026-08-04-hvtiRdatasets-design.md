@@ -473,6 +473,17 @@ discovering it at slice 6.
 **S3 must first resolve the `%vars` divergence** between `tp.vars.sas` and
 `tp.vars_base_only.sas`.
 
+**S1's pull-stage equivalence is partial by construction.** `compare_built()`
+requires one row per identifier on both sides. `bdbase` and `bdstat` are one
+row per patient (join key `masterid`) and are measurable against the oracle
+today. `echo`, `fup`, and `bdevents` are one row per *event* — echocardiogram,
+follow-up visit, reoperation — so `patid` legitimately repeats within each,
+and a direct per-identifier comparison errors by design. The eventual fix is
+shaped like a composite-key comparison (e.g. `patid` plus an event date), not
+a change to `compare_built()`'s single-identifier contract; the maintainer has
+deferred designing it to a later slice rather than have S1 quietly overclaim
+coverage it does not have.
+
 ### Documentation
 
 Two documents, with different audiences and different jobs. Both are package
