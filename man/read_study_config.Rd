@@ -12,7 +12,8 @@ read_study_config(path)
 \value{
 An object of class \code{study_config}: a list with elements \code{study},
 \code{cohort_table}, \code{warehouse}, \code{view_schema}, \code{pull_date} (a \code{Date}),
-\code{modules}, \code{varsets}, and \code{derive} (a named logical vector).
+\code{modules} (a non-empty character vector), \code{varsets}, and \code{derive} (a
+named logical vector).
 }
 \description{
 Loads the \code{study.yaml} that declares which warehouse modules a study pulls
@@ -23,7 +24,11 @@ diffable, committed file.
 \details{
 Validation is strict by design. An unknown key is an error rather than a
 warning, because a typo'd module name must not silently disable a module —
-that failure mode produces a quietly incomplete dataset with no signal.
+that failure mode produces a quietly incomplete dataset with no signal. For
+the same reason, \code{modules} must name at least one module: an empty or bare
+\code{modules} key would otherwise pull zero data with no error, the same
+failure mode the SAS-era workflow of commenting out the last enabled block
+produces.
 }
 \examples{
 path <- tempfile(fileext = ".yaml")

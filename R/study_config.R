@@ -7,13 +7,18 @@
 #'
 #' Validation is strict by design. An unknown key is an error rather than a
 #' warning, because a typo'd module name must not silently disable a module —
-#' that failure mode produces a quietly incomplete dataset with no signal.
+#' that failure mode produces a quietly incomplete dataset with no signal. For
+#' the same reason, `modules` must name at least one module: an empty or bare
+#' `modules` key would otherwise pull zero data with no error, the same
+#' failure mode the SAS-era workflow of commenting out the last enabled block
+#' produces.
 #'
 #' @param path Path to a `study.yaml` file.
 #'
 #' @return An object of class `study_config`: a list with elements `study`,
 #'   `cohort_table`, `warehouse`, `view_schema`, `pull_date` (a `Date`),
-#'   `modules`, `varsets`, and `derive` (a named logical vector).
+#'   `modules` (a non-empty character vector), `varsets`, and `derive` (a
+#'   named logical vector).
 #'
 #' @examples
 #' path <- tempfile(fileext = ".yaml")
@@ -68,13 +73,22 @@ read_study_config <- function(path) {
          as.character(raw$pull_date), call. = FALSE)
   }
 
+  modules <- .as_character_vector(raw$modules, "modules")
+  if (length(modules) == 0L) {
+    stop("Study configuration key 'modules' must name at least one ",
+         "module. An empty 'modules' list silently pulls zero data, ",
+         "which is the exact failure this file exists to prevent. ",
+         "Comment out or delete the whole study rather than emptying ",
+         "'modules'.", call. = FALSE)
+  }
+
   cfg <- list(
     study        = raw$study,
     cohort_table = raw$cohort_table,
     warehouse    = raw$warehouse,
     view_schema  = raw$view_schema,
     pull_date    = pull_date,
-    modules      = .as_character_vector(raw$modules, "modules"),
+    modules      = modules,
     varsets      = .as_character_vector(raw$varsets %||% list(), "varsets"),
     derive       = .as_derive_flags(raw$derive)
   )

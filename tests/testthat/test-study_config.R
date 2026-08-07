@@ -58,6 +58,39 @@ test_that("a missing file names the path", {
   expect_error(read_study_config("/nonexistent/study.yaml"), "does not exist")
 })
 
+test_that("an empty modules list is an error, not a silent zero-pull", {
+  # utils::modifyList() recurses into list-valued keys, so an empty override
+  # list() is a no-op against .write_config()'s default modules -- the YAML
+  # is built directly here to actually produce `modules: []`.
+  cfg <- list(
+    study        = "st1234",
+    cohort_table = "<DW-DB>.<SCHEMA>.st1234_cohort",
+    warehouse    = "<WAREHOUSE>",
+    view_schema  = "dbo",
+    pull_date    = "2026-08-04",
+    modules      = list()
+  )
+  path <- withr::local_tempfile(fileext = ".yaml")
+  yaml::write_yaml(cfg, path)
+
+  expect_error(read_study_config(path), "modules")
+})
+
+test_that("a bare modules key is an error, not a silent zero-pull", {
+  cfg <- list(
+    study        = "st1234",
+    cohort_table = "<DW-DB>.<SCHEMA>.st1234_cohort",
+    warehouse    = "<WAREHOUSE>",
+    view_schema  = "dbo",
+    pull_date    = "2026-08-04",
+    modules      = NULL
+  )
+  path <- withr::local_tempfile(fileext = ".yaml")
+  yaml::write_yaml(cfg, path)
+
+  expect_error(read_study_config(path), "modules")
+})
+
 test_that("a mapping where modules must be a sequence is an error", {
   cfg <- list(
     study        = "st1234",
