@@ -1,0 +1,9 @@
+pandoc: 3.8.3
+pkgdown: 2.2.1
+pkgdown_sha: ~
+articles:
+  coming-from-sas: coming-from-sas.html
+last_built: 2026-08-07T14:43Z
+urls:
+  reference: https://ehrlinger.github.io/hvtiRdatasets/reference
+  article: https://ehrlinger.github.io/hvtiRdatasets/articles

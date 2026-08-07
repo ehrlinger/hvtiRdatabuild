@@ -1,0 +1,215 @@
+# Coming from SAS
+
+## Who this is for
+
+You know the `tp.bd.*` and `tp.vars.*` templates. You now have to read
+and write R. This guide will not teach you R. Its job is to make what
+you already know transferable, and to warn you about the handful of
+places where a reasonable translation from SAS silently produces a
+*different, plausible* number rather than an error.
+
+Read the traps section even if you skip everything else.
+
+## The model shift
+
+A SAS program mutates a dataset through a sequence of steps, and the
+program itself is the record of what happened. If an analyst commented
+out a block with `%macro skip`, that decision lives only in their copy
+of the script.
+
+R passes values through functions, and the study’s `study.yaml` is the
+record. Enabling a step is a change to a committed configuration file,
+not an uncommented block. This is the whole reason the port is worth
+doing: what used to be invisible becomes reviewable.
+
+## Idiom translation
+
+``` r
+
+# Functions marked (S1)-(S3) arrive in later slices.
+```
+
+| SAS | R |
+|----|----|
+| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | `dw_connect()` (S1) |
+| `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` (S1) |
+| `libname library "&STUDY/datasets"` | paths in `study.yaml` |
+| `%macro skip; ... %mend skip;` | `modules:` / `derive:` toggles in `study.yaml` |
+| `%vars(in=built, out=built, transf=1)` | `derive_vars(built, config)` (S3) |
+| `data x; set y; ... run;` | a `dplyr` pipeline |
+| `PROC CONTENTS` | [`hvtiRutilities::data_dictionary()`](https://ehrlinger.github.io/hvtiRutilities/reference/data_dictionary.html) |
+| `label x = 'Age at surgery';` | `labelled` + [`hvtiRutilities::label_map()`](https://ehrlinger.github.io/hvtiRutilities/reference/label_map.html) |
+| `first.id` / `last.id` | `group_by()` + `slice_head()` / `slice_tail()` |
+| `libname out xport` then `read.xport()` | parquet, or just return the object |
+
+## The traps
+
+Each of these produces a wrong number rather than an error. They are the
+reason
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+exists.
+
+### Missing sorts low
+
+In SAS a missing numeric orders *below every number*. So this marks a
+patient with unknown BMI as underweight:
+
+    if bmi < 18.5 then underweight = 1;
+
+R does not:
+
+``` r
+
+bmi <- c(31.2, NA, 17.0)
+bmi < 18.5
+#> [1] FALSE    NA  TRUE
+```
+
+`NA` propagates instead of comparing as small. R is right and SAS is
+wrong, so a faithful port will *fail* equivalence here. That is what the
+`intentional_divergence` resolution in `equivalence_signoff.yaml` is
+for. Do not reproduce the SAS behaviour to make the comparison green.
+
+### Character comparison is blank-padded in SAS
+
+SAS pads character values to their declared length, so `'Smith'` and
+`'Smith '` compare equal. In R they do not:
+
+``` r
+
+"Smith" == "Smith   "
+#> [1] FALSE
+trimws("Smith   ") == "Smith"
+#> [1] TRUE
+```
+
+This bites hardest on merges keyed by a character id.
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+trims before comparing, for exactly this reason.
+
+### SAS has no missing character value
+
+R distinguishes `NA` from `""`. SAS does not — a missing character
+**is** the empty string. Read a SAS dataset and every missing character
+comes back as `""`:
+
+``` r
+
+f <- system.file("extdata", "oracle_small.sas7bdat",
+                 package = "hvtiRdatasets")
+surgeon <- haven::read_sas(f)$surgeon
+surgeon                 # the fourth value was written as NA
+#> [1] "Smith" "Jones" "Smith" ""
+is.na(surgeon)          # ... and is not NA any more
+#> [1] FALSE FALSE FALSE FALSE
+```
+
+So a faithful R rebuild holding `NA` disagrees with the oracle holding
+`""` on every missing value.
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+folds `""` to `NA` for character columns so this does not flood the
+report with false differences.
+
+The consequence for your own code is sharper: **never test a SAS-sourced
+character for `NA`**. `is.na(surgeon)` is `FALSE` even where the value
+is missing. Test for `""`, or convert on read.
+
+### `MERGE` is not a join
+
+A SAS data-step `MERGE` on a non-unique BY key does not error. It
+produces undefined results. This is not hypothetical — from the revision
+history of `tp.bd.data.master.sas`:
+
+> 07/03/23: Changed the join logic for the FUP dataset to correct
+> many-to-1 join problem when patient has multiple surgeries in the
+> dataset
+
+R makes the same mistake loud:
+
+``` r
+
+a <- data.frame(id = c("A", "A"), x = 1:2)
+b <- data.frame(id = c("A", "A"), y = 3:4)
+nrow(dplyr::left_join(a, b, by = "id"))
+#> Warning in dplyr::left_join(a, b, by = "id"): Detected an unexpected many-to-many relationship between `x` and `y`.
+#> ℹ Row 1 of `x` matches multiple rows in `y`.
+#> ℹ Row 1 of `y` matches multiple rows in `x`.
+#> ℹ If a many-to-many relationship is expected, set `relationship =
+#>   "many-to-many"` to silence this warning.
+#> [1] 4
+```
+
+Four rows from two — and `dplyr` says so, out loud, which SAS never did.
+
+You can silence that warning with `relationship = "many-to-many"`, and
+there are joins where the fan-out is genuinely intended. But reach for
+it only once you have confirmed the duplication is what you want. Do not
+pass it reflexively to quiet the output — that turns off the one check
+SAS never gave you.
+
+### Dates use different origins
+
+SAS counts days from 1960-01-01; R from 1970-01-01. The gap is 3,653
+days. `haven` converts correctly, so a value read through
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+is already right. A hand-rolled conversion is where this goes wrong.
+
+``` r
+
+as.Date(0, origin = "1970-01-01")   # R's zero
+#> [1] "1970-01-01"
+as.Date(0, origin = "1960-01-01")   # what a raw SAS number means
+#> [1] "1960-01-01"
+```
+
+### Automatic variables do not exist in R
+
+`_N_`, `_FREQ_`, and `_TYPE_` are created by SAS. In R you construct
+them, and the name is not magic. Phase 0 of this migration found a
+defect of exactly this class: `keep _freq_ tau` in one file versus
+`keep freq tau` in its sibling. `_FREQ_` is the automatic variable;
+`freq` is an ordinary one that may not exist. One of those programs
+produced wrong counts.
+
+### `length 4` silently truncates
+
+A SAS numeric written with `length 4` loses precision on disk. A value
+read back from an old dataset may not equal a freshly computed R value,
+and **the SAS side is the lossy one**. `tolerance` in
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+is what catches this — but it is an **absolute** threshold, not a
+relative one. A single absolute threshold cannot serve columns of mixed
+magnitude: a value large enough to be at risk of `length 4` truncation
+(into the millions, for identifiers or accumulated counts) can differ by
+more than a small absolute `tolerance` while the difference is still
+storage precision, not a real disagreement. `1234567` vs `1234567.06`
+reports `differs`, not `within_tolerance`, with `max_abs_diff` of `0.06`
+— but `max_rel_diff` is `4.9e-08`. For a large-magnitude variable, that
+tiny relative difference alongside a `differs` verdict is the signal to
+suspect storage precision, not the `within_tolerance` verdict itself.
+Read `max_rel_diff`, not the verdict alone, when judging whether a
+difference is real.
+
+## Verifying your own port
+
+Build the variable in R, then compare against the oracle:
+
+``` r
+
+oracle <- data.frame(ccfidu = c("A1", "A2", "A3"), age = c(65.5, 70.2, 58.0))
+mine   <- data.frame(ccfidu = c("A1", "A2", "A3"), age = c(65.5, 70.2, 58.5))
+
+compare_built(oracle, mine, id = "ccfidu")
+#> Dataset comparison
+#>   rows: 3 oracle, 3 R, 3 common
+#> 
+#>   variables by verdict:
+#>     differs            1
+#> 
+#>   requiring review:
+#>  variable verdict n_differ max_abs_diff max_rel_diff detail
+#>       age differs        1          0.5  0.008547009
+```
+
+There is no overall pass or fail, deliberately. Read the table, and
+record a resolution for every variable that is not `identical`.

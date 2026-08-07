@@ -1,0 +1,120 @@
+# hvtiRdatasets
+
+[![R package
+version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatasets)](https://github.com/ehrlinger/hvtiRdatasets)
+
+[![lint](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml)
+
+Builds analysis-ready clinical datasets for the HVTI CORR group, and
+verifies them against the legacy SAS datasets they replace.
+
+## Status
+
+Slice S0 (Verify) only.
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+and
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+are implemented. The pipeline itself — `dw_pull()`, `build_dataset()`,
+`derive_vars()` — arrives in S1–S3.
+
+## Installation
+
+``` r
+
+# install.packages("remotes")
+remotes::install_github("ehrlinger/hvtiRdatasets")
+```
+
+This package imports `hvtiRutilities`, which is **not on CRAN**. The
+`Remotes:` field in `DESCRIPTION` points `remotes`/`pak` at
+`ehrlinger/hvtiRutilities`, so the command above pulls it in
+automatically. Installing with plain
+[`install.packages()`](https://rdrr.io/r/utils/install.packages.html)
+will fail to resolve it.
+
+`arrow` is an optional dependency, required only for writing oracle
+snapshots.
+
+## Verifying an R build against SAS
+
+``` r
+
+library(hvtiRdatasets)
+
+# Freeze the SAS-built dataset once.
+snapshot_oracle(
+  "/studies/st1234/datasets/built.sas7bdat",
+  "oracle/st1234_built.parquet"
+)
+
+# Compare an R rebuild against it.
+oracle <- arrow::read_parquet("oracle/st1234_built.parquet")
+compare_built(oracle, my_rebuild, id = "ccfidu")
+```
+
+There is no overall pass/fail. Read the table, and record a resolution
+for every variable that is not `identical`.
+
+## Local integration testing
+
+The committed fixtures are synthetic. To exercise the read path against
+real SAS output, point `HVTI_ORACLE_DIR` at a study directory:
+
+``` bash
+HVTI_ORACLE_DIR=/studies/st1234/datasets Rscript -e 'devtools::test()'
+```
+
+That directory holds PHI. It must live outside this repository, and
+nothing in the test suite copies from it. With the variable unset — the
+default, and what CI sees — these tests skip.
+
+[`print()`](https://rdrr.io/r/base/print.html) never emits identifiers
+unless `show_ids = TRUE`, because `ccfidu` is a medical record number
+combined with a date of surgery. Do not enable it in a session whose
+output is logged or shared.
+
+## Documentation
+
+- [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatasets/articles/coming-from-sas.md)
+  — migration guide for SAS users. Start here.
+
+## Design
+
+See `specs/2026-08-04-hvtiRdatasets-design.md`.
+
+# Package index
+
+## Package Overview
+
+Package-level documentation: what the package builds, who it’s for, and
+how the verify workflow fits together.
+
+- [`hvtiRdatasets`](https://ehrlinger.github.io/hvtiRdatasets/reference/hvtiRdatasets-package.md)
+  [`hvtiRdatasets-package`](https://ehrlinger.github.io/hvtiRdatasets/reference/hvtiRdatasets-package.md)
+  : hvtiRdatasets: Build and Verify Analytic Datasets for the HVTI CORR
+  Group
+
+## Verify: R Build vs. SAS Oracle
+
+Freeze a SAS-built dataset as a checksummed parquet oracle, then compare
+an R-built dataset against it. Use
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+once per legacy SAS dataset to create the frozen reference; use
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+for every R rebuild you want to verify against it.
+
+- [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+  : Freeze a SAS-built dataset as a checksummed parquet oracle
+- [`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+  : Compare an R-built dataset against a SAS oracle
+- [`print(`*`<built_comparison>`*`)`](https://ehrlinger.github.io/hvtiRdatasets/reference/print.built_comparison.md)
+  : Print a dataset comparison
+- [`str(`*`<built_comparison>`*`)`](https://ehrlinger.github.io/hvtiRdatasets/reference/str.built_comparison.md)
+  : Structure of a dataset comparison, without identifiers
+
+# Articles
+
+### Getting Started
+
+- [Coming from
+  SAS](https://ehrlinger.github.io/hvtiRdatasets/articles/coming-from-sas.md):
