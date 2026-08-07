@@ -2,6 +2,7 @@
 ^\.Rproj\.user$
 ^\.github$
 ^specs$
+^equivalence_signoff\.yaml$
 ^LICENSE\.md$
 ^data-raw$
 ^\.vscode$

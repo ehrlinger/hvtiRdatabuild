@@ -70,3 +70,66 @@ test_that("real-study output carries no identifiers by default", {
   skip_if(length(dropped) == 0, "No dropped ids to check.")
   expect_false(grepl(as.character(dropped[1]), out, fixed = TRUE))
 })
+
+# --- S1: pull-stage oracles -------------------------------------------------
+# The pull writes permanent datasets alongside `built`. Each is an oracle in
+# its own right, so S1 is measurable without waiting for S2.
+
+.pull_oracles <- c("bdbase", "bdstat", "echo", "fup", "bdevents")
+
+.find_pull_oracle <- function(dir, stem) {
+  # SAS names carry a pull date (bdbase_mmddyy); match on the stem.
+  hits <- list.files(dir, pattern = paste0("^", stem, ".*\\.sas7bdat$"),
+                     full.names = TRUE)
+  if (length(hits) == 0L) NA_character_ else sort(hits)[1]
+}
+
+test_that("each pull-stage oracle snapshots and self-compares as identical", {
+  dir <- skip_unless_real_oracle()
+
+  found <- vapply(.pull_oracles, function(s) .find_pull_oracle(dir, s),
+                  character(1))
+  skip_if(all(is.na(found)), "No pull-stage datasets in HVTI_ORACLE_DIR.")
+
+  for (stem in names(found)[!is.na(found)]) {
+    src <- found[[stem]]
+    out <- withr::local_tempfile(fileext = ".parquet")
+    info <- snapshot_oracle(src, out)
+
+    expect_gt(info$n_rows, 0L)
+    expect_match(info$sha256, "^[0-9a-f]{64}$")
+
+    d  <- haven::read_sas(src)
+    id <- if ("masterid" %in% names(d)) "masterid" else names(d)[1]
+    if (anyDuplicated(d[[id]]) > 0) next
+
+    res <- compare_built(d, d, id = id)
+    offending <- sum(res$verdict != "identical")
+
+    # Counts only. A value in a failure message would be PHI.
+    expect_equal(
+      offending, 0L,
+      info = paste0(stem, ": ", offending,
+                    " variable(s) not identical to themselves.")
+    )
+  }
+})
+
+test_that("row-set drift is reported apart from value differences", {
+  dir <- skip_unless_real_oracle()
+  src <- .find_pull_oracle(dir, "bdbase")
+  skip_if(is.na(src), "No bdbase dataset in HVTI_ORACLE_DIR.")
+
+  d  <- haven::read_sas(src)
+  id <- if ("masterid" %in% names(d)) "masterid" else names(d)[1]
+  skip_if(anyDuplicated(d[[id]]) > 0, "Identifier is not unique.")
+  skip_if(nrow(d) < 4L, "Too few rows to split.")
+
+  # Simulate the live-warehouse case: the R side has rows the oracle lacks.
+  fewer <- d[seq_len(nrow(d) - 2L), , drop = FALSE]
+  res   <- compare_built(fewer, d, id = id)
+
+  # Every shared row still matches on value; the difference is row-set only.
+  expect_equal(sum(res$verdict != "identical"), 0L)
+  expect_gt(length(attr(res, "rows")$only_r), 0L)
+})

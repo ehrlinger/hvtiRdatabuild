@@ -15,9 +15,11 @@ them against the legacy SAS datasets they replace.
 
 ## Status
 
-Slice S0 (Verify) only. `snapshot_oracle()` and `compare_built()` are
-implemented. The pipeline itself — `dw_pull()`, `build_dataset()`,
-`derive_vars()` — arrives in S1–S3.
+Slices S0 (Verify) and S1 (Pull). `snapshot_oracle()` and `compare_built()`
+verify an R-built dataset against its SAS oracle. `read_study_config()`,
+`dw_connect()`, `dw_modules()`, and `dw_pull()` read a study's warehouse
+modules into R. The rest of the pipeline — `build_dataset()`, `derive_vars()`
+— arrives in S2–S3.
 
 ## Installation
 
@@ -32,6 +34,28 @@ the command above pulls it in automatically. Installing with plain
 `install.packages()` will fail to resolve it.
 
 `arrow` is an optional dependency, required only for writing oracle snapshots.
+
+## Pulling warehouse modules for a study
+
+```r
+library(hvtiRdatasets)
+
+# What modules exist, and what each one requires.
+dw_modules()
+
+config <- read_study_config("study.yaml")
+conn   <- dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW")
+result <- dw_pull(config, conn)
+
+result$tables    # named list of raw tables, keyed by each module's `output`
+result$manifest  # module, output, n_rows, n_cols, pulled_at
+```
+
+`dw_pull()` is **read-only**. It never writes to the warehouse — the cohort
+write-back the SAS templates perform (`libsql`) is deliberately not ported in
+this slice. The re-pull variants (`snapshotpull`, `ccfpull`), which take an
+existing built dataset and remap keys because `masterid` stopped being stable
+in April 2023, need that write path and arrive in a later slice.
 
 ## Verifying an R build against SAS
 
