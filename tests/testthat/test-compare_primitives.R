@@ -36,7 +36,7 @@ test_that(".compare_vector ignores trailing blanks, as SAS does", {
   expect_equal(r$verdict, "identical")
 })
 
-test_that('.compare_vector treats SAS empty-string as character NA', {
+test_that(".compare_vector treats SAS empty-string as character NA", {
   # SAS has no character missing value distinct from "". A missing character
   # in the oracle reads back as ""; the R pipeline produces NA. Reporting that
   # as a difference would be a false positive on every character column that

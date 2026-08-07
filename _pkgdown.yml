@@ -1,0 +1,38 @@
+url: https://ehrlinger.github.io/hvtiRdatasets/
+
+template:
+  bootstrap: 5
+  light-switch: true
+
+reference:
+- title: "Package Overview"
+  desc: >
+    Package-level documentation: what the package builds, who it's for,
+    and how the verify workflow fits together.
+  contents:
+  - hvtiRdatasets-package
+
+- title: "Verify: R Build vs. SAS Oracle"
+  desc: >
+    Freeze a SAS-built dataset as a checksummed parquet oracle, then compare
+    an R-built dataset against it. Use `snapshot_oracle()` once per legacy
+    SAS dataset to create the frozen reference; use `compare_built()` for
+    every R rebuild you want to verify against it.
+  contents:
+  - snapshot_oracle
+  - compare_built
+  - print.built_comparison
+  - str.built_comparison
+
+articles:
+- title: "Getting Started"
+  contents:
+  - coming-from-sas
+
+footer:
+  structure:
+    left: developed_by
+    right: built_with_pkgdown
+  components:
+    developed_by: "John Ehrlinger"
+    built_with_pkgdown: "This site was built using [pkgdown](https://pkgdown.r-lib.org/)!&nbsp;&nbsp;<img src='https://pkgdown.r-lib.org/logo.png' alt='pkgdown logo' width='25'>"
