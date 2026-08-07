@@ -105,6 +105,11 @@ read_study_config <- function(path) {
   if (length(x) == 0L) {
     return(character(0))
   }
+  if (!is.null(names(x))) {
+    stop("Study configuration key '", what,
+         "' must be a YAML sequence (a list of strings), not a mapping.",
+         call. = FALSE)
+  }
   out <- unlist(x, use.names = FALSE)
   if (!is.character(out)) {
     stop("Study configuration key '", what,

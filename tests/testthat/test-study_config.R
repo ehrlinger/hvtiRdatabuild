@@ -57,3 +57,18 @@ test_that("a non-logical derive flag is an error", {
 test_that("a missing file names the path", {
   expect_error(read_study_config("/nonexistent/study.yaml"), "does not exist")
 })
+
+test_that("a mapping where modules must be a sequence is an error", {
+  cfg <- list(
+    study        = "st1234",
+    cohort_table = "<DW-DB>.<SCHEMA>.st1234_cohort",
+    warehouse    = "<WAREHOUSE>",
+    view_schema  = "dbo",
+    pull_date    = "2026-08-04",
+    modules      = list(base = "alpha", fup = "beta")
+  )
+  path <- withr::local_tempfile(fileext = ".yaml")
+  yaml::write_yaml(cfg, path)
+
+  expect_error(read_study_config(path), "modules")
+})
