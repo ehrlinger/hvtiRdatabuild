@@ -78,22 +78,35 @@ test_that("real-study output carries no identifiers by default", {
 .pull_oracles <- c("bdbase", "bdstat", "echo", "fup", "bdevents")
 
 .find_pull_oracle <- function(dir, stem) {
-  # SAS names carry a pull date (bdbase_mmddyy); match on the stem.
-  hits <- list.files(dir, pattern = paste0("^", stem, ".*\\.sas7bdat$"),
+  # SAS names carry a pull date and are not consistently stem-first: bdbase,
+  # bdstat, and bdevents are written stem_mmddyy, but echo and fup are
+  # written study-prefixed (stXXXX_echo, stXXXX_fup). Match the stem anywhere
+  # in the filename so both conventions are found; no study prefix is
+  # hardcoded.
+  hits <- list.files(dir, pattern = paste0(stem, ".*\\.sas7bdat$"),
                      full.names = TRUE)
   if (length(hits) == 0L) NA_character_ else sort(hits)[1]
 }
 
-test_that("each pull-stage oracle snapshots and self-compares as identical", {
-  dir <- skip_unless_real_oracle()
+# Records, per module, whether it was found-and-compared, found-but-skipped,
+# or not found at all -- so a module can never drop out of the run without a
+# trace. Populated by the per-module tests below; read by the coverage test
+# at the end of this file.
+.pull_module_log <- new.env(parent = emptyenv())
 
-  found <- vapply(.pull_oracles, function(s) .find_pull_oracle(dir, s),
-                  character(1))
-  skip_if(all(is.na(found)), "No pull-stage datasets in HVTI_ORACLE_DIR.")
+.run_pull_module_test <- function(stem) {
+  title <- paste0("pull-stage oracle '", stem,
+                  "' snapshots and self-compares as identical")
+  test_that(title, {
+    dir <- skip_unless_real_oracle()
 
-  for (stem in names(found)[!is.na(found)]) {
-    src <- found[[stem]]
-    out <- withr::local_tempfile(fileext = ".parquet")
+    src <- .find_pull_oracle(dir, stem)
+    if (is.na(src)) {
+      assign(stem, "not_found", envir = .pull_module_log)
+      skip(paste0("No '", stem, "' pull-stage dataset in HVTI_ORACLE_DIR."))
+    }
+
+    out  <- withr::local_tempfile(fileext = ".parquet")
     info <- snapshot_oracle(src, out)
 
     expect_gt(info$n_rows, 0L)
@@ -101,10 +114,16 @@ test_that("each pull-stage oracle snapshots and self-compares as identical", {
 
     d  <- haven::read_sas(src)
     id <- if ("masterid" %in% names(d)) "masterid" else names(d)[1]
-    if (anyDuplicated(d[[id]]) > 0) next
+    if (anyDuplicated(d[[id]]) > 0) {
+      assign(stem, "skipped_nonunique_key", envir = .pull_module_log)
+      skip(paste0(stem, ": identifier '", id, "' is not unique. This ",
+                  "module is one-to-many by design and cannot ",
+                  "self-compare on a single key."))
+    }
 
     res <- compare_built(d, d, id = id)
     offending <- sum(res$verdict != "identical")
+    assign(stem, "compared", envir = .pull_module_log)
 
     # Counts only. A value in a failure message would be PHI.
     expect_equal(
@@ -112,7 +131,21 @@ test_that("each pull-stage oracle snapshots and self-compares as identical", {
       info = paste0(stem, ": ", offending,
                     " variable(s) not identical to themselves.")
     )
-  }
+  })
+}
+
+for (.pull_stem in .pull_oracles) .run_pull_module_test(.pull_stem)
+
+test_that("the pull-stage harness accounts for every declared module", {
+  # Fixes the exact failure mode this suite exists to catch: a module that
+  # silently drops out of the comparison with no failure and no skip. Every
+  # module in .pull_oracles must land in the log as compared, explicitly
+  # skipped, or explicitly not found -- never simply absent.
+  skip_unless_real_oracle()
+  skip_if(length(ls(.pull_module_log)) == 0L,
+          "No pull-stage module was attempted in this run.")
+
+  expect_setequal(ls(.pull_module_log), .pull_oracles)
 })
 
 test_that("row-set drift is reported apart from value differences", {
