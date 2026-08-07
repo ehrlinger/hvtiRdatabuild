@@ -36,7 +36,7 @@
 - **Every new exported topic must be added to `_pkgdown.yml`'s `reference:` index in the same task that exports it.** The index is explicit, and pkgdown fails the build on a topic that exists but is not listed. The `pkgdown.yaml` workflow runs on every push.
 - **Documentation must be committed in sync with its roxygen sources.** The `docs-current` CI job runs `roxygen2::roxygenise()` and then `git diff --exit-code man/ NAMESPACE DESCRIPTION`. Always `devtools::document()` and commit `man/` and `NAMESPACE` alongside the code. Local roxygen2 must be **8.1.0** — CI pins it, and roxygen stamps its own version into `Config/roxygen2/version`, so a mismatched local version fails the check on a version line rather than a doc change.
 - **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`** — that runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE. `hvtiRdatasets` is not a CRAN target.
-- **Put LaTeX on `PATH` before checking: `export PATH="/Library/TeX/texbin:$PATH"`.** A non-interactive shell does not inherit it, and without it the PDF-manual step fails with `1 ERROR, 1 WARNING` that looks like a package defect and is not. **Do not reach for `--no-manual`** — the manual build is what catches raw Unicode in `.Rd`.
+- **Put LaTeX on `PATH` before checking: `export PATH="/Library/TeX/texbin:$PATH"`.** A non-interactive shell does not inherit it, and without it the PDF-manual step fails with `1 ERROR, 1 WARNING` that looks like a package defect and is not. **Pass `manual = TRUE` explicitly** — `devtools::check()` defaults it to `FALSE`, so the plain call silently skips the PDF manual, which is the step that catches raw Unicode in `.Rd` and unresolvable `\link{}` cross-references. Never reach for `--no-manual`.
 - Work happens on branch `feat/s1-pull`. Never commit to `main`.
 - Development is on macOS; execution is on the SAS/RStudio server. No task in this slice opens a real connection.
 
@@ -337,7 +337,7 @@ First add this task's newly exported topic(s) to the `Pull: Warehouse to R` sect
 ```bash
 Rscript -e 'devtools::document()'
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0 errors, 0 warnings, 0 notes.
 
@@ -570,7 +570,7 @@ Expected: PASS, 8 tests.
 
 ```bash
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0/0/0.
 
@@ -854,7 +854,7 @@ First add this task's newly exported topic(s) to the `Pull: Warehouse to R` sect
 ```bash
 Rscript -e 'devtools::document()'
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0/0/0.
 
@@ -1181,7 +1181,7 @@ First add this task's newly exported topic(s) to the `Pull: Warehouse to R` sect
 ```bash
 Rscript -e 'devtools::document()'
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0/0/0.
 
@@ -1456,7 +1456,7 @@ First add this task's newly exported topic(s) to the `Pull: Warehouse to R` sect
 ```bash
 Rscript -e 'devtools::document()'
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0/0/0.
 
@@ -1581,7 +1581,7 @@ Add `dw_connect()`, `dw_pull()`, `dw_modules()`, and `read_study_config()` to th
 
 ```bash
 Rscript -e 'lintr::lint_package()'
-export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
+export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE, manual = TRUE)'
 ```
 Expected: no lint output, then 0/0/0.
 
