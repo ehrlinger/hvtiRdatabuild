@@ -48,6 +48,31 @@ test_that("an unknown module name is an error naming the known ones", {
   expect_error(.module_sql("nonsuch", .test_config()), "base")
 })
 
+test_that(".module_sql() errors on a leftover placeholder, naming it", {
+  # A genuinely uninterpolated placeholder, exercised through the real
+  # dw_modules()/.module_sql() code path rather than a unit-level shortcut,
+  # because .read_module_specs() always reads from the package's shipped
+  # module directory. The shipped module files are not touched: a temporary
+  # fixture is written into that directory and removed when the test ends.
+  dir <- system.file("extdata", "modules", package = "hvtiRdatasets")
+  fixture <- file.path(dir, "zzz_leftover_placeholder.yaml")
+  writeLines(c(
+    "module: zzz_leftover_placeholder",
+    "output: zzz_leftover_placeholder",
+    "join_key: patid",
+    "optional: true",
+    "sql: >",
+    "  select * from {cohort} where {not_a_real_placeholder} = 1"
+  ), fixture)
+  withr::defer(unlink(fixture))
+
+  expect_error(
+    .module_sql("zzz_leftover_placeholder", .test_config()),
+    "not_a_real_placeholder",
+    fixed = TRUE
+  )
+})
+
 test_that("the echo module records the SAS window as a known divergence", {
   path <- system.file("extdata", "modules", "echo.yaml",
                       package = "hvtiRdatasets")
