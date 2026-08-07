@@ -44,6 +44,17 @@ dw_pull <- function(config, conn) {
          ". Nothing was pulled.", call. = FALSE)
   }
 
+  outputs <- vapply(config$modules, function(m) specs[[m]]$output, character(1))
+  dupe_outputs <- unique(outputs[duplicated(outputs)])
+  if (length(dupe_outputs)) {
+    offenders <- vapply(dupe_outputs, function(o) {
+      paste0("'", o, "' (", paste(config$modules[outputs == o], collapse = ", "), ")")
+    }, character(1))
+    stop("Modules share an output name, which would overwrite one another ",
+         "in the result: ", paste(offenders, collapse = "; "),
+         ". Nothing was pulled.", call. = FALSE)
+  }
+
   pulled_at <- Sys.time()
   tables <- list()
   rows   <- list()

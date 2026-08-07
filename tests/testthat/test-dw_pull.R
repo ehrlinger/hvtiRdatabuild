@@ -100,6 +100,40 @@ test_that("dw_pull() issues only SELECT statements", {
                          seen, ignore.case = TRUE)))
 })
 
+.colliding_specs <- function() {
+  list(
+    one = list(module = "one", output = "same", join_key = "masterid",
+               sql = "select 1 as masterid"),
+    two = list(module = "two", output = "same", join_key = "masterid",
+               sql = "select 1 as masterid")
+  )
+}
+
+test_that("two modules sharing an output name is an error before any query runs", {
+  queried <- FALSE
+  testthat::local_mocked_bindings(
+    .read_module_specs = .colliding_specs
+  )
+  testthat::local_mocked_bindings(
+    dbGetQuery = function(conn, statement, ...) {
+      queried <<- TRUE
+      .fake_rows()
+    },
+    .package = "DBI"
+  )
+
+  err <- tryCatch(
+    dw_pull(.pull_config(c("one", "two")), .fake_conn()),
+    error = function(e) e
+  )
+
+  expect_s3_class(err, "error")
+  expect_match(conditionMessage(err), "same")
+  expect_match(conditionMessage(err), "one")
+  expect_match(conditionMessage(err), "two")
+  expect_false(queried)
+})
+
 test_that("a query failure names the module and not the SQL", {
   testthat::local_mocked_bindings(
     dbGetQuery = function(conn, statement, ...) stop("driver exploded"),
