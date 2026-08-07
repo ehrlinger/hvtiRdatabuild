@@ -32,6 +32,8 @@ reference:
   - read_study_config
   - dw_connect
   - dw_modules
+  - dw_pull
+  - print.pull_result
 
 articles:
 - title: "Getting Started"
