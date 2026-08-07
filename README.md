@@ -17,9 +17,9 @@ them against the legacy SAS datasets they replace.
 
 Slices S0 (Verify) and S1 (Pull). `snapshot_oracle()` and `compare_built()`
 verify an R-built dataset against its SAS oracle. `read_study_config()`,
-`dw_connect()`, `dw_modules()`, and `dw_pull()` read a study's warehouse
-modules into R. The rest of the pipeline — `build_dataset()`, `derive_vars()`
-— arrives in S2–S3.
+`dw_connect()`, `dw_modules()`, `dw_pull()`, and `print.pull_result()` read a
+study's warehouse modules into R. The rest of the pipeline — `build_dataset()`,
+`derive_vars()` — arrives in S2–S3.
 
 ## Installation
 
@@ -49,7 +49,18 @@ result <- dw_pull(config, conn)
 
 result$tables    # named list of raw tables, keyed by each module's `output`
 result$manifest  # module, output, n_rows, n_cols, pulled_at
+
+result
+#> Warehouse pull: 2 module(s)
+#>
+#>  module output n_rows n_cols           pulled_at
+#>    base bdbase      3      3 2026-08-07 17:43:46
+#>     fup    fup      3      3 2026-08-07 17:43:46
 ```
+
+`pulled_at` is wall-clock time at pull, so it will differ on your machine.
+`print.pull_result()` (dispatched automatically for `result`) never prints
+row-level data, only the manifest shape — no identifiers to redact.
 
 `dw_pull()` is **read-only**. It never writes to the warehouse — the cohort
 write-back the SAS templates perform (`libsql`) is deliberately not ported in

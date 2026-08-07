@@ -406,6 +406,13 @@ Three resolutions are therefore permitted:
 | `r_defect` | R is wrong. Fix R; the entry is temporary and must disappear. |
 | `intentional_divergence` | **SAS was wrong.** R is correct and deliberately differs. Requires a description of the SAS defect and its effect on published results. |
 
+A fourth value, `pending`, is not a resolution — it is the absence of one. It
+records that a divergence has been found and described but not yet
+adjudicated: `decided_by` and `decided_on` stay empty because no one has
+decided. **No entry may still be `pending` at a release.** A `pending` entry
+is an open question, and shipping one silently converts "we have not decided"
+into "we accepted it."
+
 Without the third category the harness silently pressures the port to reproduce
 SAS defects in order to show green, which inverts the purpose of the exercise.
 Every `intentional_divergence` is a finding the group needs to see, because it
