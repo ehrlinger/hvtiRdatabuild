@@ -32,6 +32,9 @@
 - **No site-specific infrastructure identifier in the repository.** No server hostname, port, database name, schema name, or fully-qualified view name. This repo is public. The spec's placeholders (`<DW-SERVER>`, `<PORT>`, `<DW-DB>`, `<SCHEMA>`, `<AD-DOMAIN>`) are the only permitted forms in prose; in code, these values arrive from `study.yaml` at runtime. Commit `7562a08` did this redaction once already — do not undo it.
 - **Preserve SAS variable names exactly.** S0–S4 are under the naming freeze (spec § Variable naming policy). `compare_built()` joins by variable name; renaming destroys the ruler.
 - **No test requires warehouse access.** Every DB path is mocked with `testthat::local_mocked_bindings()`. The gated real-study test in Task 6 skips unless an environment variable points at real data.
+- **`lintr::lint_package()` must be clean.** CI runs it with `LINTR_ERROR_ON_LINT: true`, so a single lint fails the build. The repo's `.lintr` is `linters_with_defaults(line_length_linter(100))` — defaults plus a 100-character line limit. Run `Rscript -e 'lintr::lint_package()'` before every commit and expect no output.
+- **Every new exported topic must be added to `_pkgdown.yml`'s `reference:` index in the same task that exports it.** The index is explicit, and pkgdown fails the build on a topic that exists but is not listed. The `pkgdown.yaml` workflow runs on every push.
+- **Documentation must be committed in sync with its roxygen sources.** The `docs-current` CI job runs `roxygen2::roxygenise()` and then `git diff --exit-code man/ NAMESPACE DESCRIPTION`. Always `devtools::document()` and commit `man/` and `NAMESPACE` alongside the code. Local roxygen2 must be **8.1.0** — CI pins it, and roxygen stamps its own version into `Config/roxygen2/version`, so a mismatched local version fails the check on a version line rather than a doc change.
 - **Plain `R CMD check` must finish 0 errors / 0 warnings / 0 notes** before each commit that touches package code. **Not `--as-cran`** — that runs CRAN incoming feasibility, which emits an unavoidable "New submission" NOTE. `hvtiRdatasets` is not a CRAN target.
 - **Put LaTeX on `PATH` before checking: `export PATH="/Library/TeX/texbin:$PATH"`.** A non-interactive shell does not inherit it, and without it the PDF-manual step fails with `1 ERROR, 1 WARNING` that looks like a package defect and is not. **Do not reach for `--no-manual`** — the manual build is what catches raw Unicode in `.Rd`.
 - Work happens on branch `feat/s1-pull`. Never commit to `main`.
@@ -55,6 +58,22 @@
 | `tests/testthat/test-dw_modules.R` | Module data integrity, SQL interpolation. |
 | `tests/testthat/test-dw_pull.R` | Pull behaviour against a mocked DBI. |
 | `tests/testthat/test-integration-real-study.R` | *Modify* — extend the gated harness to pull-stage datasets. |
+| `_pkgdown.yml` | *Modify* — add a "Pull: Warehouse to R" reference section. Every task that exports a topic adds it here in the same commit. |
+
+**New reference section.** Tasks 1, 3, 4, and 5 each export at least one topic. Add this section to `_pkgdown.yml` under `reference:`, after the existing "Verify: R Build vs. SAS Oracle" block, growing its `contents:` as each task lands:
+
+```yaml
+- title: "Pull: Warehouse to R"
+  desc: >
+    Read a study's configuration, open a credentialed warehouse connection,
+    and pull the modules the study declares. The pull is read-only.
+  contents:
+  - read_study_config
+  - dw_connect
+  - dw_modules
+  - dw_pull
+  - print.pull_result
+```
 
 Module SQL lives in `inst/extdata/modules/` rather than in R source for the same reason the variable-list fragments do (spec § The corpus is three populations): it is data with a provenance, it changes independently of the code that executes it, and keeping it out of R source is what lets the repo stay free of site identifiers.
 
@@ -313,16 +332,19 @@ Expected: PASS, 6 tests.
 
 - [ ] **Step 6: Document and check**
 
+First add this task's newly exported topic(s) to the `Pull: Warehouse to R` section of `_pkgdown.yml` (create the section on the first task that needs it, using the YAML in the File Structure block above). pkgdown fails the build on a topic that exists but is not in the index, and the index in this repo is explicit.
+
 ```bash
 Rscript -e 'devtools::document()'
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0 errors, 0 warnings, 0 notes.
+Expected: no lint output, then 0 errors, 0 warnings, 0 notes.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add DESCRIPTION NAMESPACE R/study_config.R man/ tests/testthat/test-study_config.R
+git add DESCRIPTION NAMESPACE _pkgdown.yml R/study_config.R man/ tests/testthat/test-study_config.R
 git commit -m "feat: read_study_config(), where an unknown key is an error"
 ```
 
@@ -547,9 +569,10 @@ Expected: PASS, 8 tests.
 - [ ] **Step 5: Check**
 
 ```bash
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0/0/0.
+Expected: no lint output, then 0/0/0.
 
 - [ ] **Step 6: Commit**
 
@@ -754,7 +777,7 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
 
   # tryCatch, not a bare call: a driver error can quote the connection string
   # back at us, and that string may hold a password.
-  withCallingHandlers(
+  tryCatch(
     do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
     error = function(e) {
       stop("Could not connect to the warehouse. The driver reported a ",
@@ -826,16 +849,19 @@ Expected: PASS, 7 tests.
 
 - [ ] **Step 6: Document and check**
 
+First add this task's newly exported topic(s) to the `Pull: Warehouse to R` section of `_pkgdown.yml` (create the section on the first task that needs it, using the YAML in the File Structure block above). pkgdown fails the build on a topic that exists but is not in the index, and the index in this repo is explicit.
+
 ```bash
 Rscript -e 'devtools::document()'
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0/0/0.
+Expected: no lint output, then 0/0/0.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add DESCRIPTION NAMESPACE R/dw_connect.R man/ tests/testthat/test-dw_connect.R
+git add DESCRIPTION NAMESPACE _pkgdown.yml R/dw_connect.R man/ tests/testthat/test-dw_connect.R
 git commit -m "feat: dw_connect(), carrying the driver-18 certificate setting forward"
 ```
 
@@ -1150,16 +1176,19 @@ Expected: PASS, 6 tests.
 
 - [ ] **Step 6: Document and check**
 
+First add this task's newly exported topic(s) to the `Pull: Warehouse to R` section of `_pkgdown.yml` (create the section on the first task that needs it, using the YAML in the File Structure block above). pkgdown fails the build on a topic that exists but is not in the index, and the index in this repo is explicit.
+
 ```bash
 Rscript -e 'devtools::document()'
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0/0/0.
+Expected: no lint output, then 0/0/0.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add NAMESPACE R/dw_modules.R inst/extdata/modules/ man/ tests/testthat/test-dw_modules.R
+git add NAMESPACE _pkgdown.yml R/dw_modules.R inst/extdata/modules/ man/ tests/testthat/test-dw_modules.R
 git commit -m "feat: warehouse modules as data, with the echo window logged as a divergence"
 ```
 
@@ -1173,7 +1202,9 @@ git commit -m "feat: warehouse modules as data, with the echo window logged as a
 
 **Interfaces:**
 - Consumes: `read_study_config()` (Task 1), `dw_connect()` (Task 3), `dw_modules()` and `.module_sql()` (Task 4).
-- Produces: `dw_pull(config, conn, manifest = NULL)` → object of class `pull_result`: a named list with element `tables` (named list of data frames, one per enabled module, named by the module's `output`) and element `manifest` (a data frame with columns `module`, `output`, `n_rows`, `n_cols`, `pulled_at`). Task 6 consumes `$tables`.
+- Produces: `dw_pull(config, conn)` → object of class `pull_result`: a named list with element `tables` (named list of data frames, one per enabled module, named by the module's `output`) and element `manifest` (a data frame with columns `module`, `output`, `n_rows`, `n_cols`, `pulled_at`). Task 6 consumes `$tables`.
+
+**The pull manifest is provenance, not a checksum registry.** It is returned as a data frame and nothing is written to disk. `hvtiRutilities::update_manifest()` is deliberately **not** called here: it begins with `if (!file.exists(file)) stop(...)` and takes a SHA-256 of that file, so it only makes sense for something that exists on disk. `dw_pull()` returns in-memory tables. `snapshot_oracle()` remains the one place this package uses `update_manifest()`, because a parquet oracle *is* a file. Decision taken by the maintainer 2026-08-06.
 
 **Read-only.** `dw_pull()` executes `SELECT` statements and nothing else. The cohort write-back in the SAS templates is deferred to a later slice by an explicit scope decision.
 
@@ -1326,8 +1357,6 @@ Create `R/dw_pull.R`:
 #'
 #' @param config A `study_config` from [read_study_config()].
 #' @param conn A [DBI::DBIConnection-class], typically from [dw_connect()].
-#' @param manifest Optional path to a manifest YAML. When supplied, each
-#'   pulled module is recorded with [hvtiRutilities::update_manifest()].
 #'
 #' @return An object of class `pull_result`: a list with `tables`, a named
 #'   list of data frames keyed by each module's `output` name, and `manifest`,
@@ -1343,7 +1372,7 @@ Create `R/dw_pull.R`:
 #' }
 #'
 #' @export
-dw_pull <- function(config, conn, manifest = NULL) {
+dw_pull <- function(config, conn) {
   if (!inherits(config, "study_config")) {
     stop("'config' must be a study_config from read_study_config().",
          call. = FALSE)
@@ -1397,18 +1426,6 @@ dw_pull <- function(config, conn, manifest = NULL) {
 
   man <- do.call(rbind, rows)
 
-  if (!is.null(manifest)) {
-    for (i in seq_len(nrow(man))) {
-      hvtiRutilities::update_manifest(
-        file          = man$output[i],
-        manifest_path = manifest,
-        n_rows        = man$n_rows[i],
-        source        = paste0("Warehouse pull, module '", man$module[i],
-                               "', study ", config$study)
-      )
-    }
-  }
-
   structure(list(tables = tables, manifest = man), class = "pull_result")
 }
 
@@ -1434,16 +1451,19 @@ Expected: PASS, 7 tests.
 
 - [ ] **Step 5: Document and check**
 
+First add this task's newly exported topic(s) to the `Pull: Warehouse to R` section of `_pkgdown.yml` (create the section on the first task that needs it, using the YAML in the File Structure block above). pkgdown fails the build on a topic that exists but is not in the index, and the index in this repo is explicit.
+
 ```bash
 Rscript -e 'devtools::document()'
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0/0/0.
+Expected: no lint output, then 0/0/0.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add NAMESPACE R/dw_pull.R man/ tests/testthat/test-dw_pull.R
+git add NAMESPACE _pkgdown.yml R/dw_pull.R man/ tests/testthat/test-dw_pull.R
 git commit -m "feat: dw_pull(), read-only, where an empty required module is an error"
 ```
 
@@ -1560,9 +1580,10 @@ Add `dw_connect()`, `dw_pull()`, `dw_modules()`, and `read_study_config()` to th
 - [ ] **Step 6: Check**
 
 ```bash
+Rscript -e 'lintr::lint_package()'
 export PATH="/Library/TeX/texbin:$PATH" && Rscript -e 'devtools::check(cran = FALSE)'
 ```
-Expected: 0/0/0.
+Expected: no lint output, then 0/0/0.
 
 - [ ] **Step 7: Commit and open the PR**
 
