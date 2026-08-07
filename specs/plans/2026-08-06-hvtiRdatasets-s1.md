@@ -673,8 +673,14 @@ test_that("dw_connect() passes assembled arguments to DBI::dbConnect", {
 test_that("a failed connection message never contains the password", {
   skip_if_not_installed("odbc")
   withr::local_envvar(c(HVI_DW_UID = "someone", HVI_DW_PWD = "hunter2"))
+  # The stub must embed the password, the way a real driver quoting the
+  # connection string back would. A mock whose message cannot contain the
+  # secret makes this test pass with the tryCatch wrapper deleted -- it
+  # would assert nothing, on the one property that matters most here.
   testthat::local_mocked_bindings(
-    dbConnect = function(drv, ...) stop("login failed for user 'someone'"),
+    dbConnect = function(drv, ...) {
+      stop("login failed; connection string was 'UID=someone;PWD=hunter2'")
+    },
     .package = "DBI"
   )
 
