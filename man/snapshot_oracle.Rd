@@ -7,21 +7,21 @@
 snapshot_oracle(sas_path, out_path, expect = NULL, manifest = NULL)
 }
 \arguments{
-\item{sas_path}{Path to the SAS dataset (`.sas7bdat`).}
+\item{sas_path}{Path to the SAS dataset (\code{.sas7bdat}).}
 
 \item{out_path}{Path to write the parquet file. Must not already exist.}
 
 \item{expect}{Optional named list validating the conversion, with any of
-`n_rows`, `n_cols`, and `variables`. Supply values read from SAS-side
-`PROC CONTENTS`. A mismatch is an error.}
+\code{n_rows}, \code{n_cols}, and \code{variables}. Supply values read from SAS-side
+\verb{PROC CONTENTS}. A mismatch is an error.}
 
 \item{manifest}{Optional path to a manifest YAML. When supplied, the
-snapshot is recorded with [hvtiRutilities::update_manifest()] so that
-[hvtiRutilities::verify_manifest()] can later detect a drifted oracle.}
+snapshot is recorded with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}} so that
+\code{\link[hvtiRutilities:verify_manifest]{hvtiRutilities::verify_manifest()}} can later detect a drifted oracle.}
 }
 \value{
-Invisibly, a list with elements `path`, `n_rows`, `n_cols`,
-  `variables`, and `sha256`.
+Invisibly, a list with elements \code{path}, \code{n_rows}, \code{n_cols},
+\code{variables}, and \code{sha256}.
 }
 \description{
 Reads a SAS dataset once with \pkg{haven}, writes it as parquet, and
@@ -36,8 +36,8 @@ meaningless. A checksummed snapshot is a citable fixed point.
 
 Note that this does not remove \pkg{haven} from the chain of custody — it
 confines it to a single audited step. A misread is faithfully preserved in
-the parquet file. Supply `expect` to validate the conversion against
-SAS-side `PROC CONTENTS` output.
+the parquet file. Supply \code{expect} to validate the conversion against
+SAS-side \verb{PROC CONTENTS} output.
 }
 \examples{
 \donttest{
@@ -50,5 +50,5 @@ if (requireNamespace("arrow", quietly = TRUE)) {
 
 }
 \seealso{
-[compare_built()]
+\code{\link[=compare_built]{compare_built()}}
 }

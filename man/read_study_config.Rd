@@ -7,15 +7,15 @@
 read_study_config(path)
 }
 \arguments{
-\item{path}{Path to a `study.yaml` file.}
+\item{path}{Path to a \code{study.yaml} file.}
 }
 \value{
-An object of class `study_config`: a list with elements `study`,
-  `cohort_table`, `warehouse`, `view_schema`, `pull_date` (a `Date`),
-  `modules`, `varsets`, and `derive` (a named logical vector).
+An object of class \code{study_config}: a list with elements \code{study},
+\code{cohort_table}, \code{warehouse}, \code{view_schema}, \code{pull_date} (a \code{Date}),
+\code{modules}, \code{varsets}, and \code{derive} (a named logical vector).
 }
 \description{
-Loads the `study.yaml` that declares which warehouse modules a study pulls
+Loads the \code{study.yaml} that declares which warehouse modules a study pulls
 and which derivation steps it runs. The SAS templates expressed this as a
 catalogue of optional blocks, commented in or out; this makes it an explicit,
 diffable, committed file.

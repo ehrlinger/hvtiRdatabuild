@@ -148,7 +148,7 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
 #' @param v Variable name.
 #' @param o_common,r_common Row-aligned data frames restricted to shared ids.
 #' @param o_vars,r_vars Variable names on each side, excluding the id.
-#' @param tolerance Numeric tolerance passed to [.compare_vector()].
+#' @param tolerance Numeric tolerance passed to `.compare_vector()`.
 #' @param n_common Integer. Number of rows compared, constant across the
 #'   whole comparison. Recorded on every row so it survives `write.csv()`.
 #'
