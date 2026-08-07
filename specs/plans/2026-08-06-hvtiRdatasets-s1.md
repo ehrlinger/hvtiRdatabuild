@@ -923,13 +923,42 @@ description: >
   Vital-status columns only, from the CardSurg Base view. Ports the second
   PROC SQL block of tp.stXXXX_dwpull.sas. The column list is explicit in SAS
   and stays explicit here.
+divergence: >
+  The SAS source selects `masterid` twice: once from the cohort (c.masterid)
+  and once from the view (s.masterid). The two are equal by construction —
+  the join is `on c.masterid = s.masterid` — so no information is lost
+  either way. SAS PROC SQL pass-through and R's DBI::dbGetQuery() do not
+  resolve a duplicated result-column name the same way: SAS typically
+  suffixes the second occurrence, while R may return duplicate names, mangle
+  them (e.g. via make.unique/check.names), or behave driver-dependently.
+  This port keeps s.masterid in the SQL to stay literally faithful to the
+  SAS source, but the actual name the oracle assigns to the second masterid
+  column is unknown until the Task 6 equivalence run against a real study
+  resolves it. Whoever runs that comparison should look for a second
+  masterid-like column (e.g. masterid.1, masterid_1, or a SAS-generated
+  suffix) in the oracle output, confirm it is value-identical to c.masterid,
+  and record the resolved name in equivalence_signoff.yaml. No rename or
+  dedup rule is applied here — that would guess at an answer only the real
+  oracle can settle.
 sql: >
-  select c.masterid, s.patid, s.dtn_inst,
+  select c.masterid, s.patid, s.masterid, s.dtn_inst,
          s.dt_vstat, s.vit_stat, s.vit_src, s.vstatiss, s.mtdate,
          s.hdeath, s.dt_dthep, s.dt_alive, s.dead30d
   from {cohort} c
   inner join {warehouse}.{view_schema}.vw_CardSurg_Base s on c.masterid = s.masterid
 ```
+
+**Duplicate `masterid` column.** The SAS select list above names `masterid`
+twice — `c.masterid` and `s.masterid` — because it is transcribed verbatim
+from `tp.stXXXX_dwpull.sas` lines 88–92. An earlier draft of this task
+dropped the second occurrence as apparently redundant; that silently
+diverges from the SAS-built oracle, which `compare_built()` would report as
+`absent_in_r`. The two masterid values are equal by construction (the join
+predicate is `c.masterid = s.masterid`), but SAS and R do not name a
+duplicated result column the same way, and this repository has no real
+oracle to check against. The `divergence:` field in `vitalstatus.yaml`
+records the open question for the Task 6 equivalence run rather than
+guessing at a rename or dedup rule.
 
 Create `inst/extdata/modules/echo.yaml`:
 
