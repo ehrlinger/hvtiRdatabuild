@@ -134,6 +134,33 @@ test_that("two modules sharing an output name is an error before any query runs"
   expect_false(queried)
 })
 
+test_that("dw_pull() never calls a DBI write entry point", {
+  called <- character(0)
+  # Each mock records that it fired and returns a harmless value rather than
+  # erroring on a missing S4 method. That way a real write shows up as a
+  # failed assertion below, not as unrelated dispatch noise.
+  testthat::local_mocked_bindings(
+    dbGetQuery = function(conn, statement, ...) .fake_rows(),
+    dbExecute = function(conn, statement, ...) {
+      called <<- c(called, "dbExecute")
+      0L
+    },
+    dbSendStatement = function(conn, statement, ...) {
+      called <<- c(called, "dbSendStatement")
+      structure(list(), class = "FakeResult")
+    },
+    dbWriteTable = function(conn, name, value, ...) {
+      called <<- c(called, "dbWriteTable")
+      TRUE
+    },
+    .package = "DBI"
+  )
+
+  dw_pull(.pull_config(c("base", "vitalstatus", "fup")), .fake_conn())
+
+  expect_identical(called, character(0))
+})
+
 test_that("a query failure names the module and not the SQL", {
   testthat::local_mocked_bindings(
     dbGetQuery = function(conn, statement, ...) stop("driver exploded"),
