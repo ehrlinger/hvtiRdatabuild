@@ -70,6 +70,13 @@ jobs:
             any::roxygen2@8.1.0
             local::.
             github::ehrlinger/hvtiRutilities
+          # roxygenise() only needs this package's Imports loadable. The
+          # action defaults to dependencies: "all", which additionally pulls
+          # every Suggests -- arrow, dplyr, quarto -- and their system
+          # requirements, so a job whose real work is a one-second git diff
+          # sat behind a 30-package apt queue. On 2026-08-07 a degraded
+          # Ubuntu mirror left it stranded there for 32 minutes.
+          dependencies: '"hard"'
 
       - name: Documentation is current
         run: |
