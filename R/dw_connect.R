@@ -15,6 +15,14 @@
 #' installing the institutional CA chain, is a question for whoever
 #' administers the DSN — but changing it silently would break every pull.
 #'
+#' Set the `HVI_DW_KERBEROS` environment variable to enable the top rung of
+#' the credential ladder, Kerberos integrated authentication: no stored
+#' secret is used, and the connection relies on the caller's existing ticket
+#' instead. It is read with [as.logical()], which recognises `"true"`,
+#' `"True"`, `"T"`, and `"TRUE"` (and their `FALSE` counterparts) — set it to
+#' one of those, not `"yes"` or `"1"`, which `as.logical()` does not
+#' recognise and silently reads as `NA`.
+#'
 #' @param server Warehouse host name.
 #' @param database Database name.
 #' @param dsn Optional named ODBC DSN. When supplied, the driver holds the
@@ -86,7 +94,7 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
 .build_connection_args <- function(server, database, dsn = NULL, port = NULL,
                                    encrypt = TRUE,
                                    trust_certificate = TRUE) {
-  cred <- .resolve_credentials(dsn = dsn, interactive_ok = FALSE)
+  cred <- .resolve_credentials(dsn = dsn)
 
   args <- list(
     Driver                 = "ODBC Driver 18 for SQL Server",

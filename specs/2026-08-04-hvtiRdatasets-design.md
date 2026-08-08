@@ -219,7 +219,16 @@ mechanisms available; they are not equally safe.
 3. `HVI_DW_UID` / `HVI_DW_PWD` from `~/.Renviron` (mode `600`).
 4. `keyring`, if configured. Documented, not default: it assumes a Secret
    Service daemon that a headless server does not provide.
-5. Interactive prompt, when the session is interactive.
+
+**DEFERRED 2026-08-07, by the maintainer.** An interactive-prompt rung was
+drafted as a fifth fallback and removed before S1 shipped: `dw_connect()`
+calls `.resolve_credentials()` with prompting always disabled, so the rung
+could never fire, and code advertising a capability it does not have is
+worse than no code. S1's actual execution environment is a headless
+server — a build run, not an analyst watching a console — where the DSN
+and `.Renviron` rungs above are the real paths; a prompt has no terminal to
+prompt into. Revisit only if a genuinely interactive deployment target
+emerges.
 
 **Driver 18 defaults to `Encrypt=yes`.** The development machine has *ODBC
 Driver 18 for SQL Server* (verified 2026-08-05, alongside `odbc` 1.7.0 and

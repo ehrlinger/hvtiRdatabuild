@@ -8,7 +8,6 @@
 #' 3. `HVI_DW_UID` / `HVI_DW_PWD` from `~/.Renviron`.
 #' 4. `keyring`, if configured. Documented, not default: it assumes a Secret
 #'    Service daemon that a headless server does not provide.
-#' 5. An interactive prompt.
 #'
 #' A DSN outranks `.Renviron` because `.Renviron` places the password in the R
 #' process environment, where `Sys.getenv()` prints it and any handler that
@@ -17,7 +16,6 @@
 #' held.
 #'
 #' @param dsn Optional name of an ODBC DSN in `~/.odbc.ini`.
-#' @param interactive_ok Whether prompting is permitted.
 #'
 #' @return A list with element `method`, and for the `renviron` and `keyring`
 #'   methods, `uid` and `pwd`; for the `dsn` method, `dsn`. The `kerberos` and
@@ -25,7 +23,7 @@
 #'
 #' @keywords internal
 #' @noRd
-.resolve_credentials <- function(dsn = NULL, interactive_ok = interactive()) {
+.resolve_credentials <- function(dsn = NULL) {
   if (isTRUE(as.logical(Sys.getenv("HVI_DW_KERBEROS", "false")))) {
     return(list(method = "kerberos"))
   }
@@ -56,14 +54,13 @@
     }
   }
 
-  if (isTRUE(interactive_ok)) {
-    return(list(method = "prompt"))
-  }
-
-  stop("No credential source resolved. Configure one of: a named ODBC DSN ",
-       "in ~/.odbc.ini, or HVI_DW_UID and HVI_DW_PWD in ~/.Renviron ",
-       "(mode 600). Note that .Renviron is read only at session start, so ",
-       "restart R after editing it.", call. = FALSE)
+  stop("No credential source resolved. Configure one of: set ",
+       "HVI_DW_KERBEROS=true if Kerberos integrated auth is available; ",
+       "pass a named ODBC DSN configured in ~/.odbc.ini (mode 600); set ",
+       "HVI_DW_UID and HVI_DW_PWD in ~/.Renviron (mode 600); or configure ",
+       "a 'hvti_dw' entry in keyring for the current HVI_DW_UID. Note that ",
+       ".Renviron is read only at session start, so restart R after ",
+       "editing it.", call. = FALSE)
 }
 
 #' Refuse a credential file more permissive than 600

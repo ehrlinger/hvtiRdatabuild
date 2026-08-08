@@ -34,7 +34,7 @@ test_that("a named DSN outranks .Renviron and carries no secret", {
     HOME = withr::local_tempdir(), HVI_DW_KERBEROS = NA
   ))
 
-  res <- .resolve_credentials(dsn = "HVI_DW", interactive_ok = FALSE)
+  res <- .resolve_credentials(dsn = "HVI_DW")
 
   expect_identical(res$method, "dsn")
   expect_null(res$pwd)
@@ -49,17 +49,17 @@ test_that(".Renviron variables are used when no DSN is given", {
     HOME = withr::local_tempdir(), HVI_DW_KERBEROS = NA
   ))
 
-  res <- .resolve_credentials(dsn = NULL, interactive_ok = FALSE)
+  res <- .resolve_credentials(dsn = NULL)
 
   expect_identical(res$method, "renviron")
   expect_identical(res$uid, "someone")
 })
 
-test_that("no resolvable source in a non-interactive session is an error", {
+test_that("no resolvable credential source is an error", {
   withr::local_envvar(c(HVI_DW_UID = NA, HVI_DW_PWD = NA, HVI_DW_KERBEROS = NA))
 
   expect_error(
-    .resolve_credentials(dsn = NULL, interactive_ok = FALSE),
+    .resolve_credentials(dsn = NULL),
     "No credential source"
   )
 })
