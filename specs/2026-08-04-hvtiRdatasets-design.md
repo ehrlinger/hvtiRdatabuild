@@ -197,6 +197,13 @@ same network position. Three consequences:
    existing access controls apply unchanged.
 3. **`keyring` is not the default credential mechanism.** It assumes a Secret
    Service daemon, which a headless server does not have.
+4. **File-based credential rungs require POSIX file modes.** Windows has no
+   POSIX file mode — `Sys.chmod()` there only toggles the read-only
+   attribute — so a credential file's protection can never be confirmed on
+   that platform, and `.check_file_mode()` refuses rather than assert a
+   guarantee it cannot make. This follows from point 1 above: Windows was
+   never an execution target, so a DSN or `~/.Renviron` being unusable
+   there is expected, not a gap.
 
 ### Credentials
 

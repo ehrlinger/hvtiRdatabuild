@@ -65,13 +65,30 @@
 
 #' Refuse a credential file more permissive than 600
 #'
+#' Windows has no POSIX file mode: `Sys.chmod()` there only toggles the
+#' read-only attribute, so a file "chmod'd" to 600 still reports as
+#' world-readable. Rather than pass a credential file that cannot actually be
+#' confirmed protected, this refuses outright on a platform without POSIX
+#' modes.
+#'
 #' @param path Path to a credential-bearing file.
+#' @param os_type Platform indicator, as returned by `.Platform$OS.type`.
+#'   Exposed as a parameter so the Windows branch can be exercised from a
+#'   test on any platform; callers should not need to pass it.
 #'
 #' @return `NULL`, invisibly. Called for the error it raises.
 #'
 #' @keywords internal
 #' @noRd
-.check_file_mode <- function(path) {
+.check_file_mode <- function(path, os_type = .Platform$OS.type) {
+  if (identical(os_type, "windows")) {
+    stop("Cannot verify credential file permissions on Windows: this ",
+         "platform has no POSIX file mode, so a credential file's ",
+         "protection can never be confirmed here. hvtiRdatasets targets ",
+         "the Linux server described in the design spec; file-based ",
+         "credentials (a DSN or ~/.Renviron) are not supported on Windows.",
+         call. = FALSE)
+  }
   mode <- file.mode(path)
   # Any bit set outside owner read/write is too permissive.
   if (bitwAnd(as.integer(mode), as.integer(as.octmode("077"))) != 0L) {

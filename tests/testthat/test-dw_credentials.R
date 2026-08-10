@@ -7,12 +7,29 @@ test_that("a credential file more permissive than 600 is an error", {
   expect_error(.check_file_mode(path), "600")
 })
 
-test_that("a credential file at 600 passes", {
+test_that("a credential file at 600 passes on a POSIX platform", {
+  path <- withr::local_tempfile()
+  writeLines("HVI_DW_UID=someone", path)
+  Sys.chmod(path, "600")
+  skip_if(file.mode(path) != as.octmode("600"), "Filesystem ignored chmod.")
+
+  # os_type is forced to "unix" so this exercises the POSIX branch
+  # deterministically, independent of the platform actually running it.
+  expect_silent(.check_file_mode(path, os_type = "unix"))
+})
+
+test_that("file mode can never be verified on Windows, so it is refused", {
   path <- withr::local_tempfile()
   writeLines("HVI_DW_UID=someone", path)
   Sys.chmod(path, "600")
 
-  expect_silent(.check_file_mode(path))
+  # os_type is forced to "windows" so the Windows branch is covered here,
+  # on whatever platform the test suite actually runs on.
+  msg <- tryCatch(.check_file_mode(path, os_type = "windows"),
+                  error = conditionMessage)
+
+  expect_match(msg, "Windows")
+  expect_false(grepl("chmod", msg, fixed = TRUE))
 })
 
 test_that("the error for a loose file never shows the file's contents", {

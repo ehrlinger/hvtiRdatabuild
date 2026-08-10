@@ -23,6 +23,12 @@
 #' one of those, not `"yes"` or `"1"`, which `as.logical()` does not
 #' recognise and silently reads as `NA`.
 #'
+#' File-based credentials (a DSN or `~/.Renviron`) are unavailable on
+#' Windows: Windows has no POSIX file mode, so a credential file's
+#' protection can never be confirmed there, and `dw_connect()` refuses
+#' rather than trust it unverified. This package targets the Linux server
+#' described in the design spec.
+#'
 #' @param server Warehouse host name.
 #' @param database Database name.
 #' @param dsn Optional named ODBC DSN. When supplied, the driver holds the

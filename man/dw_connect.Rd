@@ -58,6 +58,12 @@ instead. It is read with \code{\link[=as.logical]{as.logical()}}, which recognis
 \code{"True"}, \code{"T"}, and \code{"TRUE"} (and their \code{FALSE} counterparts) — set it to
 one of those, not \code{"yes"} or \code{"1"}, which \code{as.logical()} does not
 recognise and silently reads as \code{NA}.
+
+File-based credentials (a DSN or \verb{~/.Renviron}) are unavailable on
+Windows: Windows has no POSIX file mode, so a credential file's
+protection can never be confirmed there, and \code{dw_connect()} refuses
+rather than trust it unverified. This package targets the Linux server
+described in the design spec.
 }
 \examples{
 \donttest{
