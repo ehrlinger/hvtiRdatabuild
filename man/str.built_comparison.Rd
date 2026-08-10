@@ -7,27 +7,27 @@
 \method{str}{built_comparison}(object, ...)
 }
 \arguments{
-\item{object}{An object of class `built_comparison`.}
+\item{object}{An object of class \code{built_comparison}.}
 
-\item{...}{Passed to the underlying [utils::str()] call.}
+\item{...}{Passed to the underlying \code{\link[utils:str]{utils::str()}} call.}
 }
 \value{
-`NULL`, invisibly. Called for its side effect.
+\code{NULL}, invisibly. Called for its side effect.
 }
 \description{
-`str()` dispatches on the object rather than routing through
-[print.built_comparison()], so the default method would print the `rows`
+\code{str()} dispatches on the object rather than routing through
+\code{\link[=print.built_comparison]{print.built_comparison()}}, so the default method would print the \code{rows}
 attribute verbatim — including the identifier vectors. In this group's data
 an identifier is a medical record number concatenated with a date of
 surgery.
 }
 \details{
-The hazard here is *incidental* disclosure, not retrieval. `str()` is what
+The hazard here is \emph{incidental} disclosure, not retrieval. \code{str()} is what
 people type reflexively to inspect an object, and its output is routinely
 pasted into issues, chat, and logs, so PHI arrives without anyone having
 asked for it. Deliberate retrieval stays available and unchanged:
-`attr(x, "rows")$only_oracle` and `$only_r`.
+\code{attr(x, "rows")$only_oracle} and \verb{$only_r}.
 }
 \seealso{
-[print.built_comparison()]
+\code{\link[=print.built_comparison]{print.built_comparison()}}
 }

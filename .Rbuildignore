@@ -2,10 +2,12 @@
 ^\.Rproj\.user$
 ^\.github$
 ^specs$
+^equivalence_signoff\.yaml$
 ^LICENSE\.md$
 ^data-raw$
 ^\.vscode$
 ^\.superpowers$
+^\.git$
 ^codecov\.yml$
 ^\.lintr$
 ^_pkgdown\.yml$

@@ -8,30 +8,30 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
 }
 \arguments{
 \item{oracle}{Data frame read from the parquet oracle. See
-[snapshot_oracle()].}
+\code{\link[=snapshot_oracle]{snapshot_oracle()}}.}
 
 \item{r}{Data frame produced by the R pipeline.}
 
 \item{id}{Name of the identifier column present in both. Must be unique
 within each.}
 
-\item{tolerance}{Numeric. **Absolute** numeric differences at or below
-this are reported as `"within_tolerance"`. A single absolute threshold
+\item{tolerance}{Numeric. \strong{Absolute} numeric differences at or below
+this are reported as \code{"within_tolerance"}. A single absolute threshold
 cannot serve columns of very different magnitude; see the "Coming from
-SAS" vignette for how to read `max_rel_diff` alongside it.}
+SAS" vignette for how to read \code{max_rel_diff} alongside it.}
 }
 \value{
-An object of class `built_comparison`: a data frame with one row per
-  variable and columns `variable`, `n_common`, `verdict`, `n_differ`,
-  `max_abs_diff`, `max_rel_diff`, and `detail`. `n_common` is the number of
-  rows compared (constant across all rows, so it survives `write.csv()` or
-  `as.data.frame()`, unlike the `rows` attribute). `verdict` is one of
-  `"identical"`, `"within_tolerance"`, `"differs"`, `"absent_in_r"`,
-  `"absent_in_sas"`, or `"type_mismatch"`. The `rows` attribute holds a
-  list with `n_oracle`, `n_r`, `n_common`, `only_oracle`, and `only_r`.
+An object of class \code{built_comparison}: a data frame with one row per
+variable and columns \code{variable}, \code{n_common}, \code{verdict}, \code{n_differ},
+\code{max_abs_diff}, \code{max_rel_diff}, and \code{detail}. \code{n_common} is the number of
+rows compared (constant across all rows, so it survives \code{write.csv()} or
+\code{as.data.frame()}, unlike the \code{rows} attribute). \code{verdict} is one of
+\code{"identical"}, \code{"within_tolerance"}, \code{"differs"}, \code{"absent_in_r"},
+\code{"absent_in_sas"}, or \code{"type_mismatch"}. The \code{rows} attribute holds a
+list with \code{n_oracle}, \code{n_r}, \code{n_common}, \code{only_oracle}, and \code{only_r}.
 }
 \description{
-Joins `r` to `oracle` on `id` and classifies every variable. Row-set
+Joins \code{r} to \code{oracle} on \code{id} and classifies every variable. Row-set
 differences are reported separately from value differences: an identifier
 present on one side only is a cohort discrepancy, a different class of
 problem from a miscomputed variable, and conflating the two hides both.
@@ -42,9 +42,9 @@ Collapsing several hundred variables into one boolean launders real
 differences into a green check. Read the table.
 
 A difference does not automatically mean the R code is wrong. SAS orders
-missing numerics below all values, so `if bmi < 18.5` classifies a missing
-BMI as underweight where R yields `NA`. Record such cases as
-`intentional_divergence` in `equivalence_signoff.yaml`.
+missing numerics below all values, so \verb{if bmi < 18.5} classifies a missing
+BMI as underweight where R yields \code{NA}. Record such cases as
+\code{intentional_divergence} in \code{equivalence_signoff.yaml}.
 }
 \examples{
 o <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70))
@@ -53,5 +53,5 @@ compare_built(o, r, id = "ccfidu")
 
 }
 \seealso{
-[snapshot_oracle()]
+\code{\link[=snapshot_oracle]{snapshot_oracle()}}
 }

@@ -1,0 +1,27 @@
+module: events
+output: bdevents
+join_key: patid
+optional: true
+description: >
+  Reoperation events — CardSurg Base records occurring strictly after the
+  index operation, with sp_ columns renamed to rp_. Ports the fifth PROC SQL
+  block of tp.stXXXX_dwpull.sas. The commented-out columns in the SAS source
+  (sp_vadio, sp_nocar, sp_ocard) are omitted here, matching SAS.
+sql: >
+  select c.mrn, c.dtn_inst, c.patid,
+         s.dtn_inst dtn_evst,
+         s.sp_cabg  rp_cabg,
+         s.sp_valve rp_valve,
+         s.sp_avrpl rp_avrpl,
+         s.sp_avrpr rp_avrpr,
+         s.sp_mvrpl rp_mvrpl,
+         s.sp_mvrpr rp_mvrpr,
+         s.sp_tvrpl rp_tvrpl,
+         s.sp_tvrpr rp_tvrpr,
+         s.sp_tx    rp_tx,
+         s.sp_aorta rp_aorta,
+         s.sp_aotic rp_aotic,
+         s.sp_dscao rp_dscao
+  from {cohort} c
+  inner join {warehouse}.{view_schema}.vw_CardSurg_Base s
+    on c.patid = s.patid and c.dtn_inst < s.dtn_inst

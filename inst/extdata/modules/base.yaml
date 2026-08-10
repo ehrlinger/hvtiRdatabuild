@@ -1,0 +1,13 @@
+module: base
+output: bdbase
+join_key: masterid
+optional: false
+description: >
+  Cohort joined to the CardSurg Base, Valve, and Cabg views. Ports the first
+  PROC SQL block of tp.stXXXX_dwpull.sas.
+sql: >
+  select c.*, s.*, v.*, w.*
+  from {cohort} c
+  inner join {warehouse}.{view_schema}.vw_CardSurg_Base  s on c.masterid = s.masterid
+  inner join {warehouse}.{view_schema}.vw_CardSurg_Valve v on c.masterid = v.masterid
+  inner join {warehouse}.{view_schema}.vw_CardSurg_Cabg  w on c.masterid = w.masterid

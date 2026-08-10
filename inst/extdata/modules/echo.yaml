@@ -1,0 +1,24 @@
+module: echo
+output: echo
+join_key: patid
+optional: true
+description: >
+  Echocardiography records for the cohort. Ports the third PROC SQL block of
+  tp.stXXXX_dwpull.sas.
+divergence: >
+  The SAS window reads
+  `where (datediff(day, e.dtn_echo, c.dtn_inst) <= 180 or
+          datediff(day, c.dtn_inst, e.dtn_echo) >= 0)`.
+  The second disjunct is a strict subset of the first, so under OR it is dead
+  code, and the effective filter is "echo no more than 180 days before
+  surgery" with no upper bound after surgery. Whether that was the intent is
+  unresolved. This port reproduces the SAS behaviour exactly so that S1
+  equivalence is measurable; the question is recorded in
+  equivalence_signoff.yaml for a human decision, not silently corrected here.
+sql: >
+  select c.patid, c.dtn_inst, c.mrn, e.*
+  from {cohort} c
+  inner join {warehouse}.{view_schema}.vw_Echo_Base e on e.patid = c.patid
+  where (datediff(day, e.dtn_echo, c.dtn_inst) <= 180
+         or datediff(day, c.dtn_inst, e.dtn_echo) >= 0)
+  order by c.mrn, c.dtn_inst

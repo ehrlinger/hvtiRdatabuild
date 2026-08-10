@@ -1,8 +1,8 @@
 Package: hvtiRdatasets
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
-Version: 0.1.0
-Date: 2026-08-04
+Version: 0.1.1
+Date: 2026-08-07
 Authors@R: c(
     person(
       "John", "Ehrlinger",
@@ -21,21 +21,25 @@ Description: Builds analysis-ready clinical datasets for the clinical
 Depends:
     R (>= 4.1.0)
 Imports:
+    DBI,
     digest,
     haven,
     hvtiRutilities,
     tools,
-    utils
+    utils,
+    yaml
 Remotes:
     ehrlinger/hvtiRutilities
 Suggests:
     arrow,
     dplyr,
+    keyring,
     knitr,
+    odbc,
     quarto,
     testthat (>= 3.0.0),
-    withr,
-    yaml
+    withr
 VignetteBuilder: quarto
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0
+Roxygen: list(markdown = TRUE)

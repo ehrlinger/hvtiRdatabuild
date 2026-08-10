@@ -7,27 +7,27 @@
 \method{print}{built_comparison}(x, ..., show_ids = getOption("hvtiRdatasets.show_ids", FALSE))
 }
 \arguments{
-\item{x}{An object of class `built_comparison`.}
+\item{x}{An object of class \code{built_comparison}.}
 
 \item{...}{Ignored.}
 
 \item{show_ids}{Logical. Print the identifiers that appear on only one
-side. Defaults to the `hvtiRdatasets.show_ids` option, itself `FALSE`.
-**Enabling this may emit PHI.** Only do so in a session whose output is
+side. Defaults to the \code{hvtiRdatasets.show_ids} option, itself \code{FALSE}.
+\strong{Enabling this may emit PHI.} Only do so in a session whose output is
 not being logged or shared.}
 }
 \value{
-`x`, invisibly.
+\code{x}, invisibly.
 }
 \description{
 Reports row-set differences and a count per verdict, then lists every
-variable that is not `"identical"`. No overall pass/fail is printed, by
-design: see [compare_built()].
+variable that is not \code{"identical"}. No overall pass/fail is printed, by
+design: see \code{\link[=compare_built]{compare_built()}}.
 }
 \details{
-Identifiers are **not** printed by default. In this group's datasets
-`ccfidu` is a medical record number concatenated with a date of surgery,
+Identifiers are \strong{not} printed by default. In this group's datasets
+\code{ccfidu} is a medical record number concatenated with a date of surgery,
 which is PHI; printing it would place PHI in terminals, logs, and captured
-test failures. The identifiers remain available in the `rows` attribute for
+test failures. The identifiers remain available in the \code{rows} attribute for
 a caller who needs them to chase a discrepancy.
 }

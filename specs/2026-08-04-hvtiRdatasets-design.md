@@ -197,6 +197,13 @@ same network position. Three consequences:
    existing access controls apply unchanged.
 3. **`keyring` is not the default credential mechanism.** It assumes a Secret
    Service daemon, which a headless server does not have.
+4. **File-based credential rungs require POSIX file modes.** Windows has no
+   POSIX file mode — `Sys.chmod()` there only toggles the read-only
+   attribute — so a credential file's protection can never be confirmed on
+   that platform, and `.check_file_mode()` refuses rather than assert a
+   guarantee it cannot make. This follows from point 1 above: Windows was
+   never an execution target, so a DSN or `~/.Renviron` being unusable
+   there is expected, not a gap.
 
 ### Credentials
 
@@ -219,7 +226,16 @@ mechanisms available; they are not equally safe.
 3. `HVI_DW_UID` / `HVI_DW_PWD` from `~/.Renviron` (mode `600`).
 4. `keyring`, if configured. Documented, not default: it assumes a Secret
    Service daemon that a headless server does not provide.
-5. Interactive prompt, when the session is interactive.
+
+**DEFERRED 2026-08-07, by the maintainer.** An interactive-prompt rung was
+drafted as a fifth fallback and removed before S1 shipped: `dw_connect()`
+calls `.resolve_credentials()` with prompting always disabled, so the rung
+could never fire, and code advertising a capability it does not have is
+worse than no code. S1's actual execution environment is a headless
+server — a build run, not an analyst watching a console — where the DSN
+and `.Renviron` rungs above are the real paths; a prompt has no terminal to
+prompt into. Revisit only if a genuinely interactive deployment target
+emerges.
 
 **Driver 18 defaults to `Encrypt=yes`.** The development machine has *ODBC
 Driver 18 for SQL Server* (verified 2026-08-05, alongside `odbc` 1.7.0 and
@@ -406,6 +422,13 @@ Three resolutions are therefore permitted:
 | `r_defect` | R is wrong. Fix R; the entry is temporary and must disappear. |
 | `intentional_divergence` | **SAS was wrong.** R is correct and deliberately differs. Requires a description of the SAS defect and its effect on published results. |
 
+A fourth value, `pending`, is not a resolution — it is the absence of one. It
+records that a divergence has been found and described but not yet
+adjudicated: `decided_by` and `decided_on` stay empty because no one has
+decided. **No entry may still be `pending` at a release.** A `pending` entry
+is an open question, and shipping one silently converts "we have not decided"
+into "we accepted it."
+
 Without the third category the harness silently pressures the port to reproduce
 SAS defects in order to show green, which inverts the purpose of the exercise.
 Every `intentional_divergence` is a finding the group needs to see, because it
@@ -465,6 +488,17 @@ discovering it at slice 6.
 
 **S3 must first resolve the `%vars` divergence** between `tp.vars.sas` and
 `tp.vars_base_only.sas`.
+
+**S1's pull-stage equivalence is partial by construction.** `compare_built()`
+requires one row per identifier on both sides. `bdbase` and `bdstat` are one
+row per patient (join key `masterid`) and are measurable against the oracle
+today. `echo`, `fup`, and `bdevents` are one row per *event* — echocardiogram,
+follow-up visit, reoperation — so `patid` legitimately repeats within each,
+and a direct per-identifier comparison errors by design. The eventual fix is
+shaped like a composite-key comparison (e.g. `patid` plus an event date), not
+a change to `compare_built()`'s single-identifier contract; the maintainer has
+deferred designing it to a later slice rather than have S1 quietly overclaim
+coverage it does not have.
 
 ### Documentation
 

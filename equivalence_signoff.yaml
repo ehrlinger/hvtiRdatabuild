@@ -1,0 +1,81 @@
+# Human decision record for known SAS/R divergences surfaced while porting
+# the S1 (pull) slice. Schema per
+# specs/2026-08-04-hvtiRdatasets-design.md, "A signoff carries a
+# `resolution`, not just a reason.":
+#
+#   resolution: one of
+#     matches                - difference is cosmetic or within tolerance.
+#     r_defect                - R is wrong; fix R, entry is temporary.
+#     intentional_divergence  - SAS was wrong; R is correct and deliberately
+#                                differs.
+#     pending                 - NOT one of the three above. A placeholder
+#                                used only while a divergence awaits a human
+#                                decision. No entry may ship a real release
+#                                with `resolution: pending` unresolved.
+#
+# Every entry below is `pending`. Neither carries a `decided_by` or
+# `decided_on` value, because no one has decided yet -- do not fill those in
+# without an actual decision.
+
+- module: echo
+  output: echo
+  variable: null
+  resolution: pending
+  sas_behaviour: >
+    tp.stXXXX_dwpull.sas's third PROC SQL block (the echo module) filters on
+    `where (datediff(day, e.dtn_echo, c.dtn_inst) <= 180 or
+            datediff(day, c.dtn_inst, e.dtn_echo) >= 0)`. The second
+    disjunct (echo on or after the day of surgery) is a strict subset of the
+    first (echo within 180 days before surgery, up to and including the day
+    of surgery), so under OR it is dead code. The effective filter is "echo
+    no more than 180 days before surgery," with no upper bound on how long
+    after surgery a qualifying echo may have been performed.
+  r_behaviour: >
+    inst/extdata/modules/echo.yaml reproduces the SAS WHERE clause verbatim,
+    dead disjunct and unbounded post-surgery window included, so R and SAS
+    are equivalent to each other by construction. Whether that shared
+    behaviour is itself correct is the open question -- this is not a case
+    of R diverging from SAS, but of both potentially sharing a defect.
+  affects_published: unknown, not yet evaluated
+  decided_by: null
+  decided_on: null
+  evidence_needed: >
+    A decision from whoever owns tp.stXXXX_dwpull.sas on whether the
+    unbounded post-surgery window was intentional (e.g. "any echo on file
+    counts as a match, however long after surgery") or a copy/paste defect
+    that should instead have bounded the post-surgery side symmetrically
+    (e.g. `datediff(day, c.dtn_inst, e.dtn_echo) <= N`). Until that is
+    answered this stays `pending`; do not guess at a fix.
+
+- module: vitalstatus
+  output: bdstat
+  variable: masterid (second occurrence, s.masterid)
+  resolution: pending
+  sas_behaviour: >
+    tp.stXXXX_dwpull.sas's second PROC SQL block (bdstat) selects `masterid`
+    twice: once from the cohort table (`c.masterid`) and once from the vital
+    status view (`s.masterid`), joined `on c.masterid = s.masterid`. SAS
+    PROC SQL pass-through typically disambiguates a duplicated result-column
+    name by suffixing the second occurrence, but the exact form is
+    driver/pass-through-version dependent and has not been observed against
+    a real study.
+  r_behaviour: >
+    inst/extdata/modules/vitalstatus.yaml keeps `s.masterid` in the SQL to
+    stay literally faithful to the SAS source. DBI::dbGetQuery() is not
+    guaranteed to disambiguate the duplicate the same way SAS does -- R may
+    return duplicate names, mangle them (e.g. via make.unique()/
+    check.names), or behave driver-dependently. The actual name the oracle
+    assigns to the second masterid column is unknown until this harness
+    runs against a real study.
+  affects_published: unknown, not yet evaluated
+  decided_by: null
+  decided_on: null
+  evidence_needed: >
+    Run the Task 6 harness (tests/testthat/test-integration-real-study.R)
+    against a real study's bdstat oracle, locate the second masterid-like
+    column (candidates: `masterid.1`, `masterid_1`, or a SAS-generated
+    suffix), confirm by row count and join predicate that its values are
+    identical to `c.masterid` for every row (expected, since the join is
+    `c.masterid = s.masterid`, but not yet confirmed against real data), and
+    record the resolved column name here. No rename or dedup rule is applied
+    in the module SQL until this is settled.
