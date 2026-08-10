@@ -27,3 +27,19 @@ for every R rebuild you want to verify against it.
   : Print a dataset comparison
 - [`str(`*`<built_comparison>`*`)`](https://ehrlinger.github.io/hvtiRdatasets/reference/str.built_comparison.md)
   : Structure of a dataset comparison, without identifiers
+
+## Pull: Warehouse to R
+
+Read a study’s configuration, open a credentialed warehouse connection,
+and pull the modules the study declares. The pull is read-only.
+
+- [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatasets/reference/read_study_config.md)
+  : Read and validate a study configuration
+- [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md)
+  : Open a connection to the data warehouse
+- [`dw_modules()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_modules.md)
+  : List the available warehouse modules
+- [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.md)
+  : Pull the enabled warehouse modules for a study
+- [`print(`*`<pull_result>`*`)`](https://ehrlinger.github.io/hvtiRdatasets/reference/print.pull_result.md)
+  : Print a pull result

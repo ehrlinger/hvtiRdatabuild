@@ -31,7 +31,7 @@ doing: what used to be invisible becomes reviewable.
 
 | SAS | R |
 |----|----|
-| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | `dw_connect()` (S1) |
+| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md) (S1) |
 | `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` (S1) |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
 | `%macro skip; ... %mend skip;` | `modules:` / `derive:` toggles in `study.yaml` |

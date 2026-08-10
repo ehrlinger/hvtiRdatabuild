@@ -11,7 +11,7 @@ parquet file."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatasets</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -59,7 +59,7 @@ parquet file.</p>
 
 
 <dl><dt id="arg-sas-path">sas_path<a class="anchor" aria-label="anchor" href="#arg-sas-path"></a></dt>
-<dd><p>Path to the SAS dataset (`.sas7bdat`).</p></dd>
+<dd><p>Path to the SAS dataset (<code>.sas7bdat</code>).</p></dd>
 
 
 <dt id="arg-out-path">out_path<a class="anchor" aria-label="anchor" href="#arg-out-path"></a></dt>
@@ -68,20 +68,20 @@ parquet file.</p>
 
 <dt id="arg-expect">expect<a class="anchor" aria-label="anchor" href="#arg-expect"></a></dt>
 <dd><p>Optional named list validating the conversion, with any of
-`n_rows`, `n_cols`, and `variables`. Supply values read from SAS-side
-`PROC CONTENTS`. A mismatch is an error.</p></dd>
+<code>n_rows</code>, <code>n_cols</code>, and <code>variables</code>. Supply values read from SAS-side
+<code>PROC CONTENTS</code>. A mismatch is an error.</p></dd>
 
 
 <dt id="arg-manifest">manifest<a class="anchor" aria-label="anchor" href="#arg-manifest"></a></dt>
 <dd><p>Optional path to a manifest YAML. When supplied, the
-snapshot is recorded with [hvtiRutilities::update_manifest()] so that
-[hvtiRutilities::verify_manifest()] can later detect a drifted oracle.</p></dd>
+snapshot is recorded with <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html" class="external-link">hvtiRutilities::update_manifest()</a></code> so that
+<code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/verify_manifest.html" class="external-link">hvtiRutilities::verify_manifest()</a></code> can later detect a drifted oracle.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Invisibly, a list with elements `path`, `n_rows`, `n_cols`,
-  `variables`, and `sha256`.</p>
+    <p>Invisibly, a list with elements <code>path</code>, <code>n_rows</code>, <code>n_cols</code>,
+<code>variables</code>, and <code>sha256</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -91,12 +91,12 @@ changes mid-migration, every previously passing comparison silently becomes
 meaningless. A checksummed snapshot is a citable fixed point.</p>
 <p>Note that this does not remove <span class="pkg">haven</span> from the chain of custody — it
 confines it to a single audited step. A misread is faithfully preserved in
-the parquet file. Supply `expect` to validate the conversion against
-SAS-side `PROC CONTENTS` output.</p>
+the parquet file. Supply <code>expect</code> to validate the conversion against
+SAS-side <code>PROC CONTENTS</code> output.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
-    <div class="dont-index"><p>[compare_built()]</p></div>
+    <div class="dont-index"><p><code><a href="compare_built.html">compare_built()</a></code></p></div>
     </div>
 
     <div class="section level2">

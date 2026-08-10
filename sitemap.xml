@@ -6,9 +6,14 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/authors.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/index.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/dw_modules.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/hvtiRdatasets-package.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/index.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/print.built_comparison.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/print.pull_result.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/read_study_config.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatasets/reference/str.built_comparison.html</loc></url>
 </urlset>

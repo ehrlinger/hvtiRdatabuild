@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">hvtiRdatasets</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,7 +65,7 @@
 <div class="section level2">
 <h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>
 </h2>
-<p>Slice S0 (Verify) only. <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code> and <code><a href="reference/compare_built.html">compare_built()</a></code> are implemented. The pipeline itself — <code>dw_pull()</code>, <code>build_dataset()</code>, <code>derive_vars()</code> — arrives in S1–S3.</p>
+<p>Slices S0 (Verify) and S1 (Pull). <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code> and <code><a href="reference/compare_built.html">compare_built()</a></code> verify an R-built dataset against its SAS oracle. <code><a href="reference/read_study_config.html">read_study_config()</a></code>, <code><a href="reference/dw_connect.html">dw_connect()</a></code>, <code><a href="reference/dw_modules.html">dw_modules()</a></code>, <code><a href="reference/dw_pull.html">dw_pull()</a></code>, and <code><a href="reference/print.pull_result.html">print.pull_result()</a></code> read a study’s warehouse modules into R. The rest of the pipeline — <code>build_dataset()</code>, <code>derive_vars()</code> — arrives in S2–S3.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -77,9 +77,34 @@
 <p><code>arrow</code> is an optional dependency, required only for writing oracle snapshots.</p>
 </div>
 <div class="section level2">
-<h2 id="verifying-an-r-build-against-sas">Verifying an R build against SAS<a class="anchor" aria-label="anchor" href="#verifying-an-r-build-against-sas"></a>
+<h2 id="pulling-warehouse-modules-for-a-study">Pulling warehouse modules for a study<a class="anchor" aria-label="anchor" href="#pulling-warehouse-modules-for-a-study"></a>
 </h2>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatasets" class="external-link">hvtiRdatasets</a></span><span class="op">)</span></span>
+<span></span>
+<span><span class="co"># What modules exist, and what each one requires.</span></span>
+<span><span class="fu"><a href="reference/dw_modules.html">dw_modules</a></span><span class="op">(</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">config</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/read_study_config.html">read_study_config</a></span><span class="op">(</span><span class="st">"study.yaml"</span><span class="op">)</span></span>
+<span><span class="va">conn</span>   <span class="op">&lt;-</span> <span class="fu"><a href="reference/dw_connect.html">dw_connect</a></span><span class="op">(</span>server <span class="op">=</span> <span class="st">"&lt;DW-SERVER&gt;"</span>, database <span class="op">=</span> <span class="st">"&lt;DW-DB&gt;"</span>, dsn <span class="op">=</span> <span class="st">"HVI_DW"</span><span class="op">)</span></span>
+<span><span class="va">result</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/dw_pull.html">dw_pull</a></span><span class="op">(</span><span class="va">config</span>, <span class="va">conn</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">tables</span>    <span class="co"># named list of raw tables, keyed by each module's `output`</span></span>
+<span><span class="va">result</span><span class="op">$</span><span class="va">manifest</span>  <span class="co"># module, output, n_rows, n_cols, pulled_at</span></span>
+<span></span>
+<span><span class="va">result</span></span>
+<span><span class="co">#&gt; Warehouse pull: 2 module(s)</span></span>
+<span><span class="co">#&gt;</span></span>
+<span><span class="co">#&gt;  module output n_rows n_cols           pulled_at</span></span>
+<span><span class="co">#&gt;    base bdbase      3      3 2026-08-07 17:43:46</span></span>
+<span><span class="co">#&gt;     fup    fup      3      3 2026-08-07 17:43:46</span></span></code></pre></div>
+<p><code>pulled_at</code> is wall-clock time at pull, so it will differ on your machine. <code><a href="reference/print.pull_result.html">print.pull_result()</a></code> (dispatched automatically for <code>result</code>) never prints row-level data, only the manifest shape — no identifiers to redact.</p>
+<p><code><a href="reference/dw_pull.html">dw_pull()</a></code> is <strong>read-only</strong>. It never writes to the warehouse — the cohort write-back the SAS templates perform (<code>libsql</code>) is deliberately not ported in this slice. The re-pull variants (<code>snapshotpull</code>, <code>ccfpull</code>), which take an existing built dataset and remap keys because <code>masterid</code> stopped being stable in April 2023, need that write path and arrive in a later slice.</p>
+</div>
+<div class="section level2">
+<h2 id="verifying-an-r-build-against-sas">Verifying an R build against SAS<a class="anchor" aria-label="anchor" href="#verifying-an-r-build-against-sas"></a>
+</h2>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatasets" class="external-link">hvtiRdatasets</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Freeze the SAS-built dataset once.</span></span>
@@ -92,12 +117,13 @@
 <span><span class="va">oracle</span> <span class="op">&lt;-</span> <span class="fu">arrow</span><span class="fu">::</span><span class="fu"><a href="https://arrow.apache.org/docs/r/reference/read_parquet.html" class="external-link">read_parquet</a></span><span class="op">(</span><span class="st">"oracle/st1234_built.parquet"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/compare_built.html">compare_built</a></span><span class="op">(</span><span class="va">oracle</span>, <span class="va">my_rebuild</span>, id <span class="op">=</span> <span class="st">"ccfidu"</span><span class="op">)</span></span></code></pre></div>
 <p>There is no overall pass/fail. Read the table, and record a resolution for every variable that is not <code>identical</code>.</p>
+<p><code><a href="reference/compare_built.html">compare_built()</a></code> requires exactly one row per identifier on both sides. Of the five warehouse modules, only <code>bdbase</code> and <code>bdstat</code> are one row per patient and so are measurable against the SAS oracle today. <code>echo</code>, <code>fup</code>, and <code>bdevents</code> are one row per <em>event</em> (echocardiogram, follow-up visit, reoperation) — a given <code>patid</code> legitimately repeats — so a direct per-identifier comparison errors on them by design, not by oversight. Verifying those three needs a composite-key comparison, deferred to a later slice.</p>
 </div>
 <div class="section level2">
 <h2 id="local-integration-testing">Local integration testing<a class="anchor" aria-label="anchor" href="#local-integration-testing"></a>
 </h2>
 <p>The committed fixtures are synthetic. To exercise the read path against real SAS output, point <code>HVTI_ORACLE_DIR</code> at a study directory:</p>
-<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
 <p>That directory holds PHI. It must live outside this repository, and nothing in the test suite copies from it. With the variable unset — the default, and what CI sees — these tests skip.</p>
 <p><code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> never emits identifiers unless <code>show_ids = TRUE</code>, because <code>ccfidu</code> is a medical record number combined with a date of surgery. Do not enable it in a session whose output is logged or shared.</p>
 </div>
