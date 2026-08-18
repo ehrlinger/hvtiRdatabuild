@@ -461,6 +461,46 @@ Therefore:
   applied *after* `compare_built()` is green, so the mapping is auditable and
   the equivalence result stays reproducible.
 
+#### Transformed variables: do not truncate the stem, and carry the label
+
+Added 2026-08-17, from downstream evidence. Two requirements on the transform
+step `%vars` performs, both cheap here and expensive to work around anywhere
+else.
+
+**1. A derived name must be its parent's name plus an affix, with the parent's
+name intact.** SAS could not do this at 8 characters, so `%vars` truncates:
+`effic` becomes `ln_effi`, `area_int` becomes `in_arin`. The parent is then
+unrecoverable by any mechanical rule, because stripping `ln_` yields `effi`,
+which is not a variable. Without the cap, `effic` should yield `ln_effic` and
+`area_int` should yield `ln_area_int`.
+
+**2. A derived variable must carry a label derived from its parent's.** Today
+every transformed variable arrives with no label at all, while its parent has
+one (`effic` is "Efficiency: EOA/Internal area"; `ln_effi`, `in_effi` and
+`effi2` are unlabelled). A label such as "log of Efficiency: EOA/Internal
+area" costs nothing at build time.
+
+**Why this matters downstream, measured rather than argued.** A bootstrap
+variable-selection screen must group competing transformations of one variable
+or it reports them as separate findings. On the 2026-08-17 AVR/LV-function
+screen (500 replicates, 230 candidates per phase), the grouping rule could not
+reach the truncated families, and the report presented **12 retained variables
+that were 9 distinct concepts**: `effic` 86.4% and `ln_effi` 60.8% both
+retained at r = 0.9988, `size` 87.8% with `sizee` 81.2% at r = 0.9908, and in
+the late phase `agee` 95.8% with `age` 80.4% at r = 0.9904. A published
+"Reliability (%)" column built from that table would double-count.
+
+Recovering the grouping downstream required a prefix-matching shim plus a
+hand-maintained alias table for the contractions no rule can find
+(`arin` for `area_int`). Both requirements above delete that shim. Requirement
+2 also restores the diagnostic that made the problem findable: today the only
+signal distinguishing a derived variable from a real one is that the derived
+one has no label.
+
+Neither requirement conflicts with the S0–S4 rule that SAS names are preserved
+exactly: it binds only variables `%vars` **creates**, which have no SAS
+counterpart to compare against, so `compare_built()` is unaffected.
+
 ### Slice sequence
 
 Each slice ends with `compare_built()` green — or every difference explained and
@@ -676,6 +716,11 @@ Critical assertions:
 - Disposition of `tp.bd.snipits.sas` (225 lines of miscellany) and
   `tp.bd_sgroups.sas` (669 lines, `%bdsgroups`) — neither is clearly in or out
   of a slice.
+- **Which slice owns the transform-naming and label requirements** added under
+  "Variable naming policy" on 2026-08-17? They bind the step that creates
+  derived variables, so S3 (`%vars` canonicalisation) is the obvious home, but
+  they are a behaviour change rather than a port and may need to land after
+  equivalence is signed off.
 
 ## Amendments to the Phase 0 spec
 
