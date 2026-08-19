@@ -5,7 +5,14 @@
 # actually built. That step is what catches raw Unicode in .Rd files
 # (Greek letters, combining marks) that --no-manual skips in silence.
 on:
+  # A commit that only touches the generated house-style artifact cannot change
+  # the package: .claude is in .Rbuildignore, so it is excluded from the built
+  # package, and no step in this workflow reads it from the checkout. Running
+  # this on such a commit burns runner minutes and queues ahead of checks that
+  # can actually fail.
   push:
+    paths-ignore:
+      - '.claude/**'
     branches: [main]
   release:
     types: [published]
