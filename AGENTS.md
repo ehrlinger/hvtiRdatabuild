@@ -98,7 +98,9 @@ imports this file.
 - **Patch-digit bumps only**, as fixes land. Minor and major are the maintainer's decision.
 - **A change that ships bumps the version.** Bump `DESCRIPTION`, refresh its `Date`, and add
   the matching `NEWS.md` entry in the same commit. "Ships" means the file lands in the built
-  tarball: `R/`, `man/`, `NAMESPACE`, `inst/`, `tests/`, `vignettes/`, `README.md`.
+  tarball, which is more than code: `R/`, `man/`, `NAMESPACE`, `inst/`, `tests/`,
+  `vignettes/`, `README.md` and `NEWS.md` itself all ship. Treat that as illustration, not an
+  inventory. `R CMD build` output is the authority when a case is unclear, not this list.
 - **Repo-governance files do not bump the version.** `AGENTS.md`, `CLAUDE.md`, `.github/`,
   `specs/`, `.lintr`, `_pkgdown.yml` and `equivalence_signoff.yaml` are all listed in
   `.Rbuildignore`, so they never reach an installed package, and a bump would announce a
