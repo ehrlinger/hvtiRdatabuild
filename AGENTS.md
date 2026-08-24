@@ -96,8 +96,17 @@ imports this file.
   because no repository in the family has a `CODEOWNERS` file, so a PR can merge unreviewed.
 - Versions are **straight three digits** (`0.1.1`). Never a `.9000` suffix or a fourth digit.
 - **Patch-digit bumps only**, as fixes land. Minor and major are the maintainer's decision.
-- Bump `DESCRIPTION`, refresh its `Date`, and add the matching `NEWS.md` entry in the same
-  commit.
+- **A change that ships bumps the version.** Bump `DESCRIPTION`, refresh its `Date`, and add
+  the matching `NEWS.md` entry in the same commit. "Ships" means the file lands in the built
+  tarball, which is more than code: `R/`, `man/`, `NAMESPACE`, `inst/`, `tests/`,
+  `vignettes/`, `README.md` and `NEWS.md` itself all ship. Treat that as illustration, not an
+  inventory. `R CMD build` output is the authority when a case is unclear, not this list.
+- **Repo-governance files do not bump the version.** `AGENTS.md`, `CLAUDE.md`, `.github/`,
+  `specs/`, `.lintr`, `_pkgdown.yml` and `equivalence_signoff.yaml` are all listed in
+  `.Rbuildignore`, so they never reach an installed package, and a bump would announce a
+  change no user can observe. The test is mechanical, so read `.Rbuildignore` rather than
+  judging by feel: if the file is excluded there, no bump and no `NEWS.md` entry. The
+  docs-only commits already on `main` (`6ca1faa`, `ee28201`, `1f7d99a`) follow this.
 
 ## Change discipline
 
