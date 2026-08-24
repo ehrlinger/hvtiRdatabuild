@@ -9,16 +9,14 @@ reached. See "What the session established", below.
 **Extends:** `2026-08-04-hvtiRdatasets-design.md`, "Slice sequence" (S2, S3) and
 "Open questions". Does not supersede it.
 
-> **Redacted for public release.** This repository is public. The session below was
-> recorded; **this document paraphrases it and quotes no one verbatim**, because
-> participants did not agree to be quoted in a public repository. The recording and the
-> quotations live in internal notes.
+> **Redacted for public release.** This repository is public, so — following the convention
+> of the design spec this extends — internal infrastructure identifiers are placeholders,
+> and **individuals are referred to by role, not by name**. Ownership of specific master
+> tables and registries is recorded internally, not here.
 >
-> This repository is public. Following the
-> convention of the design spec this extends, internal infrastructure
-> identifiers are placeholders, and **individuals are referred to by role, not
-> by name**. Ownership of specific master tables and registries is recorded
-> internally, not here.
+> The 2026-08-24 session was recorded. **This document paraphrases it and quotes no one
+> verbatim**, because participants did not agree to be quoted in a public repository; the
+> recording and the quotations live in internal notes.
 
 ## Why this document exists
 
@@ -168,6 +166,11 @@ route back at all.
 
 ### Two positions this package should hold
 
+> ⚠️ **Still correct, but no longer this package's to hold.** The amendment establishes
+> that both positions are already carried by the warehouse-replacement design, so
+> `hvtiRdatasets` should consume that layer rather than implement one. Keep the reasoning;
+> drop the ownership.
+
 **1. Rules and facts are different objects and need different homes.**
 
 - A **rule** is systematic and reproducible — *a negative length of stay is a
@@ -268,7 +271,7 @@ covers four structurally different things:
 
 | Shape | How it is built | What it means for the design |
 |---|---|---|
-| **Warehouse rollup** | A cardiac-surgery master assembled from warehouse views, carrying 700–800 adjudicated variables. Rebuilt periodically; five months between rebuilds at the time of the session. | The only shape the current module layer fits. |
+| **Warehouse rollup** | A cardiac-surgery master assembled from warehouse views, carrying 700–800 adjudicated variables. Rebuilt **annually**. (Five months had elapsed at the time of the session, which is not the interval.) | The only shape the current module layer fits. |
 | **Child of a master** | A mitral master built *on top of* the cardiac-surgery master, adding domain derivations, corrections, and refreshed follow-up. | The chain is at least two deep. A study's provenance is not one pull; it is a pull plus a rebuild plus a rebuild. |
 | **External-system master** | Device and mechanical-support masters assembled from Intermacs, Phoenix, a sunset system still readable, and REDCap. **No warehouse pull at any point.** | `dw_pull()` is irrelevant here. Nothing in S1 reaches these sources. |
 | **Submission-file master** | A quality-group training dataset built from STS submission files and a de-identified multi-site extract, not from the warehouse. | Different variable names, an owner-written mapping, and no join key back to the cardiac-surgery master. |
@@ -331,6 +334,13 @@ Any pipeline that produces a built dataset without producing that report has rem
 step where the data actually gets checked.
 
 ### Corrections: the door is bolted, not missing
+
+> 🔴 **This heading is wrong and is kept deliberately.** "The door is bolted" was the
+> conclusion drawn in this section, and it was reversed the same day once the
+> warehouse-replacement design was read — the alternative to writing into the source of
+> record was already decided. The section is left standing as the record of a wrong turn;
+> read **"The corrections layer already exists on paper"** in the amendment for what
+> replaces it.
 
 This document previously described the write-back gap as a half-built mechanism. **That
 understates it.** Corrections accumulate in the master datasets specifically so they do
@@ -421,10 +431,15 @@ implemented, not after.
 
 ## Open questions, revised 2026-08-24
 
-Superseding the list above.
+> ⚠️ **Itself superseded** by "Revised open questions" at the end of the amendment below.
+> Kept for the record; do not work from this list.
 
-- [ ] 🔴 **Escalate:** may corrections return to the source of record? A standing decision
-      says no. Everything else about write-back is downstream of it.
+Superseding the pre-session list.
+
+- [ ] ~~🔴 **Escalate:** may corrections return to the source of record? A standing decision
+      says no.~~ **Reversed in the amendment** — the alternative is already designed
+      (append-only layer, adjudicated at query time). What remains is a date for it and the
+      backfill decision.
 - [ ] What does S2 accept as input, given that a *master dataset of unknown provenance* is
       the real starting point rather than freshly pulled warehouse tables?
 - [ ] How is a master refreshed without overwriting cleaned values — and can it be done in
@@ -546,7 +561,10 @@ discarding exactly what it exists to preserve. Neither is free, and **the choice
 more expensive once the masters are retired** — which makes this a sequencing question, not
 a later one.
 
-### Revised open questions, superseding the list above
+### Revised open questions
+
+**This is the live list.** It supersedes both "Open questions, revised 2026-08-24" and the
+pre-session list; neither of those should be worked from.
 
 - [ ] Date for the corrections layer; and **backfill or abandon** the existing history —
       decided *before* the SAS masters are retired.
