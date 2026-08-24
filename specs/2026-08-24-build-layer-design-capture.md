@@ -348,9 +348,10 @@ That reframes the problem entirely:
 - The corrections currently living in the master datasets are therefore **the only copy**.
   A migration that loses them loses adjudication work measured in years.
 
-**Recommendation:** treat "may corrections return to the source of record, and under what
-governance" as a **question to be escalated, not designed around**. It gates the value of
-everything else here.
+> 🔴 **Corrected below.** This recommendation was written before checking the
+> warehouse-replacement design, and it is wrong in an important way. The prohibition is
+> not an obstruction to escalate; the replacement programme already carries the right
+> answer. See "The corrections layer already exists on paper", below.
 
 ### Updating a master is the hard part, and there is a number
 
@@ -454,3 +455,112 @@ Superseding the list above.
 - [ ] `echo` window — close the `pending` entry in `equivalence_signoff.yaml`.
 - [ ] Registry attachment position, if registries come into scope at all.
 - [ ] Target language, before S2/S3 implementation begins.
+
+---
+
+## Amendment, 2026-08-24 (later the same day)
+
+Three corrections and one addition, from reading the warehouse-replacement design and from
+follow-up with the maintainer. Two of them change conclusions stated above.
+
+### 🔴 The corrections layer already exists on paper
+
+The section above treats the write-back prohibition as a standing decision to escalate.
+**That reading is wrong.** Refusing to let analysts overwrite a source of record in place is
+*correct*, and the replacement programme decided the alternative in May 2026:
+
+- a **corrections layer, append-only**, with **adjudication at query time**;
+- per-correction lineage recording **who, when, and on what evidence**;
+- per-cohort lineage recording **data, crosswalk and correction state at freeze time**.
+
+So the gap is not the decision and not the design. **The gap is that the layer does not
+exist yet**, which is why the honest answer to the owners has always been "not yet" and why
+the corrections kept accumulating in private files.
+
+⚠️ **What this document derived independently maps onto that design almost exactly** —
+append-only against overwriting a cleaned value, query-time adjudication against two
+parties correcting the same field, evidence against a correction being indistinguishable
+from a typo, and freeze-time state against a correction going stale. Two efforts, no
+coordination, the same four requirements.
+
+**Consequence for this package, and it is a scope reduction:** `hvtiRdatasets` should
+**consume** that layer, not implement one. Nothing here should grow a private corrections
+store. What the package owes the design is the *cohort freeze* half — recording which
+correction state a build saw — which is the same mechanism `snapshot_oracle()` already uses
+for a SAS oracle.
+
+### 🔴 The masters are in scope for the migration, not inputs to it
+
+The "four topologies" section describes the masters as what a study starts from. It does
+not say the obvious next thing: **each one is itself a SAS dataset, assembled by a person on
+a cadence.** They do not survive the migration; they are part of it.
+
+- The cardiac-surgery master is rebuilt **annually**. So is the mitral master built on top
+  of it. (An earlier draft of this document said roughly five months for the first; that was
+  elapsed time when the session happened, not the interval.)
+- ⚠️ **A master is not one version.** The annual rebuild is a baseline, and individual
+  pieces — follow-up, vital status, events, post-operative imaging — are refreshed
+  off-cadence whenever a study brings new abstraction back. **"Which build of the master" is
+  therefore not answerable by a date**, and provenance has to be recorded **per piece**.
+  That is a materially stronger requirement than an annual cadence implies, and it lands
+  squarely on the cohort-freeze record.
+
+The stated target is to replace them with **continually updated database views**. That
+removes staleness and the hand-assembly cost, and introduces the opposite problem — the
+data now moves under a running analysis. The freeze record is what makes that safe, and it
+should be presented together with the change rather than after it.
+
+### The submission-file round trip, and a capture point nobody uses
+
+The document above records that the same field can differ between the warehouse and the STS
+submission files, and frames it as a question of which source to trust. The mechanism is
+worse than that framing suggests:
+
+1. The registries team abstracts surgical data out of the EMR — patient variables,
+   operative notes — into a registry abstraction tool.
+2. That tool produces a transfer file, which is sent to STS and the other national
+   registries.
+3. STS builds its database from it, and **we extract from that** to populate the warehouse,
+   which is what studies read.
+
+**We produce the input and consume the output, and the two disagree in ways that are
+neither expected nor understood.** This is not a preference between sources; it is an
+unexplained transformation inside a pipeline whose first two steps are ours.
+
+⚠️ **The transfer file at step 2 is a capture point, and it is currently discarded.** It is
+our own abstraction at full fidelity, and it is only ever seen again after a round trip
+through an external registry. Harvesting it requires no new abstraction effort and no
+external agreement. **The cheapest available fix and the open investigation are the same
+piece of work**: capture the file, and the delta becomes measurable rather than folkloric.
+
+### The migration question nobody has asked
+
+An append-only corrections layer built from today forward **starts empty**. The corrections
+already made are the only copy, and they sit inside SAS master datasets that the migration
+retires.
+
+**Is the existing correction history backfilled into the layer, or abandoned?** Backfilling
+means recovering who-corrected-what-and-why from files that were never designed to record
+it, and much of that evidence was never written down. Abandoning it means the layer opens by
+discarding exactly what it exists to preserve. Neither is free, and **the choice becomes far
+more expensive once the masters are retired** — which makes this a sequencing question, not
+a later one.
+
+### Revised open questions, superseding the list above
+
+- [ ] Date for the corrections layer; and **backfill or abandon** the existing history —
+      decided *before* the SAS masters are retired.
+- [ ] What does S2 accept, given a master dataset whose provenance is an annual build plus
+      an unknown set of off-cadence partial refreshes?
+- [ ] What does this package record so a build can be pinned to a correction state, given
+      that it consumes rather than owns the corrections layer?
+- [ ] Capture the transfer file at the abstraction step, and measure the delta against what
+      returns through STS.
+- [ ] Add the field needed to join submission-file data to the cardiac-surgery master.
+      Blocking a study now.
+- [ ] How is a master refreshed without overwriting cleaned values, in well under 100 hours?
+- [ ] Varset **grouping**. Lifetime is settled; grouping is not.
+- [ ] Fork 1, re-asked per owner.
+- [ ] A follow-up delta operation, to replace full re-pulls done only to compare status.
+- [ ] Target language, before S2 is implemented.
+- [ ] `echo` window — still open in `equivalence_signoff.yaml`.
