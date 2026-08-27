@@ -1,13 +1,13 @@
-# hvtiRdatasets
+# hvtiRdatabuild
 <!-- badges: start -->
-[![R-CMD-check](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/R-CMD-check.yaml)
-[![Codecov test coverage](https://codecov.io/gh/ehrlinger/hvtiRdatasets/graph/badge.svg)](https://app.codecov.io/gh/ehrlinger/hvtiRdatasets)
+[![R-CMD-check](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/R-CMD-check.yaml)
+[![Codecov test coverage](https://codecov.io/gh/ehrlinger/hvtiRdatabuild/graph/badge.svg)](https://app.codecov.io/gh/ehrlinger/hvtiRdatabuild)
 [![active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/badges/latest/active.svg)
-[![pkgdown](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/pkgdown.yaml)
+[![pkgdown](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/pkgdown.yaml)
 
-[![R package version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatasets)](https://github.com/ehrlinger/hvtiRdatasets)
+[![R package version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatabuild)](https://github.com/ehrlinger/hvtiRdatabuild)
 
-[![lint](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml)
+[![lint](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/lint.yaml)
 <!-- badges: end -->
 
 Builds analysis-ready clinical datasets for the HVTI CORR group, and verifies
@@ -25,7 +25,7 @@ study's warehouse modules into R. The rest of the pipeline — `build_dataset()`
 
 ```r
 # install.packages("remotes")
-remotes::install_github("ehrlinger/hvtiRdatasets")
+remotes::install_github("ehrlinger/hvtiRdatabuild")
 ```
 
 This package imports `hvtiRutilities`, which is **not on CRAN**. The `Remotes:`
@@ -38,7 +38,7 @@ the command above pulls it in automatically. Installing with plain
 ## Pulling warehouse modules for a study
 
 ```r
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 
 # What modules exist, and what each one requires.
 dw_modules()
@@ -71,7 +71,7 @@ in April 2023, need that write path and arrive in a later slice.
 ## Verifying an R build against SAS
 
 ```r
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 
 # Freeze the SAS-built dataset once.
 snapshot_oracle(
