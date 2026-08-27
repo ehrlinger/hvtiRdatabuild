@@ -3,7 +3,7 @@ pkgdown: 2.2.1
 pkgdown_sha: ~
 articles:
   coming-from-sas: coming-from-sas.html
-last_built: 2026-08-27T14:27Z
+last_built: 2026-08-27T14:38Z
 urls:
   reference: https://ehrlinger.github.io/hvtiRdatabuild/reference
   article: https://ehrlinger.github.io/hvtiRdatabuild/articles
