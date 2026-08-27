@@ -1,7 +1,9 @@
 # HVTI R Package Family: Naming Convention
 
 **Date:** 2026-08-27
-**Status:** Approved design, pending implementation plan
+**Status:** Approved. Wave 1 is planned in
+[`specs/plans/2026-08-27-hvtiRdatabuild-rename.md`](plans/2026-08-27-hvtiRdatabuild-rename.md)
+and implemented in this PR. Waves 2–4 are not yet planned.
 **Scope:** Family-wide — 12 `hvti*` repos plus two roster members outside the prefix
 **Drafted in:** `hvtiRdatasets/specs`, because Wave 1 is this repo's own rename. The
 normative text migrates to `house-style/sources/r-package-structure.md` in Wave 4, which

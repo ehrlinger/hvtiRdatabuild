@@ -50,7 +50,7 @@ Twenty-seven files outside `specs/` carry the old name, 72 occurrences total.
 | Prose | `README.md`, `vignettes/coming-from-sas.qmd`, `AGENTS.md`, `CLAUDE.md` | Task 3 |
 | Config and CI | `_pkgdown.yml`, `codecov.yml`, `equivalence_signoff.yaml`, six `.github/workflows/*.yaml` | Task 4 |
 | Release | `DESCRIPTION` (`Version`, `Date`), `NEWS.md` | Task 5 |
-| Composed artifact | `.claude/house-style.md` (7 occurrences; two fixed by recompose, five deferred to Wave 4) | Task 6 |
+| Composed artifact | `.claude/house-style.md` (7 occurrences; two fixed by recompose, five deferred to Wave 4) | Wave 1, after Task 5 |
 | Out of repo | GitHub repo name, `house-style-v1` tag, local clone directory | Task 6 |
 
 ---
@@ -444,14 +444,17 @@ historical filename."
 **Expect a red check on this PR, for two distinct reasons.** After this task, the
 house-style job greps the published registry for `path: ~/Documents/GitHub/hvtiRdatabuild`.
 The `house-style-v1` tag still points at the old entry until Task 6 moves it, so the
-`grep -qF` guard fails first, with the workflow's own explicit error. Once that tag moves,
-the job still fails, one step later, at the `--check` step: this repo's committed
-`.claude/house-style.md` is a composed artifact, recomposition is blocked until Task 6
-renames the local clone directory, and `--check` compares the committed artifact against a
-fresh recompose byte-for-byte. **Both failures are expected and correct.** Do not "fix"
-either by reverting this task or by loosening the grep or the check — they exist precisely
-so a registry mismatch and a stale artifact are both loud. The check stays red until both
-Task 6's tag move and its recompose step have landed.
+`grep -qF` guard fails with the workflow's own explicit error. **That failure is expected
+and correct.** Do not "fix" it by reverting this task or by loosening the grep — the guard
+exists precisely so a registry mismatch is loud rather than checking nothing silently.
+
+Observed on the Wave 1 PR: nine of ten checks pass and only `house-style` fails, at the
+"Point the registry at this checkout" step, with the message *"repos.yml no longer contains
+'path: ~/Documents/GitHub/hvtiRdatabuild'"*. That is the guard working, not a defect.
+
+The stale composed artifact would have been a **second** cause of failure at the later
+`--check` step, but it was fixed within Wave 1 (see Task 6 Step 6). So the tag move is now
+the only thing standing between this PR and a green house-style check.
 
 - [ ] **Step 1: Replace in config and workflows**
 
@@ -601,10 +604,9 @@ cd ~/Documents/GitHub/hvtiRdatasets && git add DESCRIPTION NEWS.md && git commit
 cd ~/Documents/GitHub/hvtiRdatasets && gh pr create --fill
 ```
 
-In the PR body, state explicitly that the house-style check is expected to fail for two
-reasons until Task 6 resolves both — the `house-style-v1` tag not yet pointing at the
-renamed registry entry, and the composed `.claude/house-style.md` in this repo being stale
-until Task 6 recomposes it — and why. The version needs no flagging — `0.2.0` was the
+In the PR body, state explicitly that the house-style check is expected to fail — because
+the `house-style-v1` tag does not yet point at the renamed registry entry — and why nobody
+should resolve it by loosening the guard. The version needs no flagging: `0.2.0` was the
 maintainer's decision, not a default.
 
 ---
@@ -658,9 +660,9 @@ memory directory at
 `~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatasets/`, which is keyed to the
 project path and will no longer be found under the new one. The memory files are not lost —
 they are still on disk under the old key — but they must be moved to be picked up again.
-This step also has to happen before Step 6: the renamed registry entry (Task 1) points
-`compose-house-style.R` at `~/Documents/GitHub/hvtiRdatabuild`, and that path does not
-exist until this `mv` runs.
+After this `mv`, the renamed registry entry's `path` resolves without any repointing, so a
+later recompose needs no workaround. The Wave 1 recompose did not wait for that — see
+Step 6 — but every recompose from here on is straightforward.
 
 ```bash
 cd ~/Documents/GitHub && mv hvtiRdatasets hvtiRdatabuild && ls -d hvtiRdatabuild
@@ -670,34 +672,33 @@ cd ~/Documents/GitHub && mv hvtiRdatasets hvtiRdatabuild && ls -d hvtiRdatabuild
 mv ~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatasets ~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatabuild
 ```
 
-- [ ] **Step 6: Recompose the house-style artifact and commit it**
+- [x] **Step 6: Recompose the house-style artifact — DONE IN WAVE 1, not here**
 
 `.claude/house-style.md` is a composed artifact and is never hand-edited (Task 4 Step 1's
 `sed` deliberately does not touch it). Two of its seven `hvtiRdatasets` occurrences — line 9
-(`repo:`) and line 19 (the heading) — are written from the registry entry's `name` field, so
-Task 1's rename fixes them only once this repo is recomposed against the published registry.
+(`repo:`) and line 19 (the heading) — are written from the registry entry's `name` field.
 `house-style.yaml:74` runs `compose-house-style.R --check --repo hvtiRdatabuild`, which
-recomposes the document fresh and compares it byte-for-byte against what is committed; a
+recomposes the document fresh and compares it byte-for-byte against what is committed, so a
 stale artifact fails that comparison even after the tag has moved. The other five
 occurrences (lines 301, 351, 458, 599, 618) come from the shared source
-`house-style/sources/r-package-structure.md`, are identical across all nine governed repos'
-composed artifacts, do not cause drift here, and are deferred to Wave 4.
+`r-package-structure.md`, are identical across all nine governed repos' composed artifacts,
+do not cause drift here, and are deferred to Wave 4.
 
-```bash
-cd ~/Documents/GitHub/house-style && Rscript compose-house-style.R --repo hvtiRdatabuild
-```
+**An earlier draft of this step claimed the recompose had to wait for the directory rename,
+because the renamed registry entry points at a path that does not exist yet. That was
+wrong, and the correction matters because it is what lets the Wave 1 PR merge green.**
+`compose_house_style()` writes `entry$name` into the artifact and uses `entry$path` only to
+locate the file on disk. Repointing the path at the current directory — exactly what
+`house-style.yaml` does with its own `sed` on the CI runner — produces byte-identical
+output. So the recompose was done during Wave 1 and committed to the rename branch.
 
-```bash
-cd ~/Documents/GitHub/hvtiRdatabuild && git checkout -b chore/recompose-house-style && git add .claude/house-style.md && git commit -m "chore: recompose house-style.md for the hvtiRdatabuild rename"
-```
+Verified before committing: `check_repo()` reported `OK hvtiRdatabuild`; the diff was the
+two expected lines and nothing else; and all four sources are byte-identical between
+`house-style/sources/` (which CI reads) and the vault's `memory/` (which a local compose
+reads), so CI cannot compose different bytes. `.claude/` is in `.Rbuildignore`, so per
+`AGENTS.md` the commit takes no version bump and no `NEWS.md` entry.
 
-```bash
-cd ~/Documents/GitHub/hvtiRdatabuild && gh pr create --fill
-```
-
-`.claude/` is listed in `.Rbuildignore`, so per `AGENTS.md` this commit ships nothing the
-built package carries and takes no version bump and no `NEWS.md` entry. Do not merge it
-yourself; report the PR URL and continue once it merges — Step 7's check depends on it.
+Nothing to do here. Proceed to the next step.
 
 - [ ] **Step 7: Re-run the house-style check and confirm it now passes**
 
