@@ -182,13 +182,18 @@ After this, every non-archived repo in the family is governed.
 Four waves, ordered so nothing is broken between them. GitHub keeps rename redirects
 indefinitely, so `pak::pak("ehrlinger/hvtiverse")` continues to resolve after Wave 2.
 
-**Wave 1 — this repo.** `hvtiRdatasets` → `hvtiRdatabuild`. 65 references across 26 files
-change; the five dated documents under `specs/` are left alone as historical record, per
-*Not done* below. The 26: `DESCRIPTION` (`Package`, `URL`, `BugReports`), `git mv
-R/hvtiRdatasets-package.R`, re-`document()`, `tests/testthat.R`, four test files, four
-roxygen blocks, `README.md`, `NEWS.md`, `_pkgdown.yml`, `codecov.yml`,
-`equivalence_signoff.yaml`, `vignettes/coming-from-sas.qmd`, six workflow files,
-`AGENTS.md`, `CLAUDE.md`. Branch, then PR.
+**Wave 1 — this repo.** `hvtiRdatasets` → `hvtiRdatabuild`. 72 references across 27 files
+carry the old name; the five dated documents under `specs/` are left alone as historical
+record, per *Not done* below. The 27: `DESCRIPTION` (`Package`, `URL`, `BugReports`, and
+later `Version`/`Date`), `git mv R/hvtiRdatasets-package.R`, four further `R/` files
+carrying the name in code or roxygen, `tests/testthat.R` and three sibling test files,
+three regenerated `man/` files, `README.md`, `NEWS.md`, `vignettes/coming-from-sas.qmd`,
+`AGENTS.md`, `CLAUDE.md`, `_pkgdown.yml`, `codecov.yml`, six workflow files, and the
+composed `.claude/house-style.md`. The last of these is never hand-edited — two of its
+seven occurrences are written from the registry entry's `name` field, so they are fixed by
+recomposing after the directory rename, not by search-and-replace. `equivalence_signoff.yaml`
+also carries the name, in a citation of a historical filename, and is deliberately left
+unchanged, the same way as the specs citation in `README.md`. Branch, then PR.
 
 **Wave 2 — repo-only renames.** No package name changes, so no namespace breaks:
 `hvtiverse`→`hvtiR`, `hvtiPropensityScores`→`hvtiRpropensity`,
@@ -272,4 +277,9 @@ carry that. But renaming the package is the most breaking change it can undergo,
 - Every pkgdown site resolves at its new URL, verified by fetch rather than by badge.
 - `hvtiR::status()` and `hvtiR::doctor()` run clean against the renamed roster.
 - `house-style` `check_repo()` passes for all thirteen governed repos.
-- No file outside `specs/` still refers to `hvtiRdatasets` or `hvtiBoostmtree`.
+- No file outside `specs/` still refers to `hvtiRdatasets` or `hvtiBoostmtree`, excepting
+  historical citations of a real filename (for example `README.md`'s pointer to
+  `specs/2026-08-04-hvtiRdatasets-design.md`, and `equivalence_signoff.yaml`'s citation of
+  the same document) and changelog records — a `NEWS.md` heading for a release made under
+  the old name, and prose describing what changed in a release, both of which must name the
+  old package to remain useful to a reader.

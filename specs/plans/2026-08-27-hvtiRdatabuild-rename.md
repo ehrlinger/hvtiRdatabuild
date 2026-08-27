@@ -39,7 +39,7 @@ vignettes, pkgdown, GitHub Actions, the `house-style` composer.
 
 ## File Structure
 
-Twenty-six files outside `specs/` carry the old name, 65 occurrences total.
+Twenty-seven files outside `specs/` carry the old name, 72 occurrences total.
 
 | Group | Files | Handled in |
 |---|---|---|
@@ -50,6 +50,7 @@ Twenty-six files outside `specs/` carry the old name, 65 occurrences total.
 | Prose | `README.md`, `vignettes/coming-from-sas.qmd`, `AGENTS.md`, `CLAUDE.md` | Task 3 |
 | Config and CI | `_pkgdown.yml`, `codecov.yml`, `equivalence_signoff.yaml`, six `.github/workflows/*.yaml` | Task 4 |
 | Release | `DESCRIPTION` (`Version`, `Date`), `NEWS.md` | Task 5 |
+| Composed artifact | `.claude/house-style.md` (7 occurrences; two fixed by recompose, five deferred to Wave 4) | Task 6 |
 | Out of repo | GitHub repo name, `house-style-v1` tag, local clone directory | Task 6 |
 
 ---
@@ -440,12 +441,17 @@ historical filename."
 - Consumes: the registry strings produced by Task 1 — `name: hvtiRdatabuild` and
   `path: ~/Documents/GitHub/hvtiRdatabuild`. `house-style.yaml` hard-codes both.
 
-**Expect one red check on this PR.** After this task, the house-style job greps the
-published registry for `path: ~/Documents/GitHub/hvtiRdatabuild`. The `house-style-v1` tag
-still points at the old entry until Task 6 moves it, so the job fails with the workflow's
-own explicit error. **That failure is expected and correct.** Do not "fix" it by reverting
-this task or by loosening the grep — the check exists precisely so a registry mismatch is
-loud. It clears when Task 6 moves the tag and the job is re-run.
+**Expect a red check on this PR, for two distinct reasons.** After this task, the
+house-style job greps the published registry for `path: ~/Documents/GitHub/hvtiRdatabuild`.
+The `house-style-v1` tag still points at the old entry until Task 6 moves it, so the
+`grep -qF` guard fails first, with the workflow's own explicit error. Once that tag moves,
+the job still fails, one step later, at the `--check` step: this repo's committed
+`.claude/house-style.md` is a composed artifact, recomposition is blocked until Task 6
+renames the local clone directory, and `--check` compares the committed artifact against a
+fresh recompose byte-for-byte. **Both failures are expected and correct.** Do not "fix"
+either by reverting this task or by loosening the grep or the check — they exist precisely
+so a registry mismatch and a stale artifact are both loud. The check stays red until both
+Task 6's tag move and its recompose step have landed.
 
 - [ ] **Step 1: Replace in config and workflows**
 
@@ -506,8 +512,12 @@ publish the renamed registry entry. That failure is expected."
 ## Task 5: Bump the version and write the changelog
 
 `AGENTS.md` requires that a change which ships bumps the version, refreshes `Date`, and adds
-the matching `NEWS.md` entry **in the same commit** — a test greps `NEWS.md` for the exact
-`DESCRIPTION` version.
+the matching `NEWS.md` entry **in the same commit**. `AGENTS.md` states this is checked by a
+test that greps `NEWS.md` for the exact `DESCRIPTION` version — that claim is inherited from
+the family-wide convention documented there, and does not hold in this repo:
+`tests/testthat/` holds 14 files and none of them reads `DESCRIPTION` or `NEWS.md`. In this
+repo the match is verified by hand, at Step 4 below, not by a test. Adding that test is out
+of scope for this plan.
 
 **Files:**
 - Modify: `DESCRIPTION` (`Version`, `Date`)
@@ -563,14 +573,14 @@ Version: 0.2.0
 Date: 2026-08-27
 ```
 
-- [ ] **Step 4: Verify the NEWS-versus-DESCRIPTION grep the test relies on**
+- [ ] **Step 4: Verify the NEWS-versus-DESCRIPTION match by hand**
 
 ```bash
 cd ~/Documents/GitHub/hvtiRdatasets && grep -m1 "^Version:" DESCRIPTION && grep -m1 "^# hvtiRdatabuild" NEWS.md
 ```
 
 Expected: `Version: 0.2.0` and `# hvtiRdatabuild 0.2.0` — the version strings must match
-exactly.
+exactly. This grep, not a test, is what enforces the match in this repo.
 
 - [ ] **Step 5: Run the tests**
 
@@ -578,7 +588,8 @@ exactly.
 cd ~/Documents/GitHub/hvtiRdatasets && Rscript -e 'devtools::test()'
 ```
 
-Expected: PASS, including any version-consistency test.
+Expected: PASS. There is no version-consistency test to include — Step 4 is the only check
+of the `NEWS.md`/`DESCRIPTION` match.
 
 - [ ] **Step 6: Commit and open the PR**
 
@@ -590,8 +601,10 @@ cd ~/Documents/GitHub/hvtiRdatasets && git add DESCRIPTION NEWS.md && git commit
 cd ~/Documents/GitHub/hvtiRdatasets && gh pr create --fill
 ```
 
-In the PR body, state explicitly that the house-style check is expected to fail until the
-`house-style-v1` tag moves, and why. The version needs no flagging — `0.2.0` was the
+In the PR body, state explicitly that the house-style check is expected to fail for two
+reasons until Task 6 resolves both — the `house-style-v1` tag not yet pointing at the
+renamed registry entry, and the composed `.claude/house-style.md` in this repo being stale
+until Task 6 recomposes it — and why. The version needs no flagging — `0.2.0` was the
 maintainer's decision, not a default.
 
 ---
@@ -637,16 +650,7 @@ cd ~/Documents/GitHub/hvtiRdatasets && git remote set-url origin git@github.com:
 cd ~/Documents/GitHub/house-style && git tag -f -a house-style-v1 -m "Publish hvtiRdatabuild rename" main && git push --force origin house-style-v1
 ```
 
-- [ ] **Step 5: Re-run the failed house-style check and confirm it now passes**
-
-```bash
-cd ~/Documents/GitHub/hvtiRdatasets && gh run list --workflow=house-style.yaml --limit 3
-```
-
-Expected: a green run. If it still fails on the `grep -qF` guard, the tag did not move or
-the two path strings differ — compare Task 4 Step 4's output against `repos.yml`.
-
-- [ ] **Step 6: Rename the local clone directory**
+- [ ] **Step 5: Rename the local clone directory**
 
 **Read this before running it.** Renaming the working directory invalidates every absolute
 path that points at the old one: any open shell's working directory, and the Claude project
@@ -654,6 +658,9 @@ memory directory at
 `~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatasets/`, which is keyed to the
 project path and will no longer be found under the new one. The memory files are not lost —
 they are still on disk under the old key — but they must be moved to be picked up again.
+This step also has to happen before Step 6: the renamed registry entry (Task 1) points
+`compose-house-style.R` at `~/Documents/GitHub/hvtiRdatabuild`, and that path does not
+exist until this `mv` runs.
 
 ```bash
 cd ~/Documents/GitHub && mv hvtiRdatasets hvtiRdatabuild && ls -d hvtiRdatabuild
@@ -663,7 +670,50 @@ cd ~/Documents/GitHub && mv hvtiRdatasets hvtiRdatabuild && ls -d hvtiRdatabuild
 mv ~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatasets ~/.claude/projects/-Users-ehrlinj-Documents-GitHub-hvtiRdatabuild
 ```
 
-- [ ] **Step 7: Verify the pkgdown site is actually served, not merely deployed**
+- [ ] **Step 6: Recompose the house-style artifact and commit it**
+
+`.claude/house-style.md` is a composed artifact and is never hand-edited (Task 4 Step 1's
+`sed` deliberately does not touch it). Two of its seven `hvtiRdatasets` occurrences — line 9
+(`repo:`) and line 19 (the heading) — are written from the registry entry's `name` field, so
+Task 1's rename fixes them only once this repo is recomposed against the published registry.
+`house-style.yaml:74` runs `compose-house-style.R --check --repo hvtiRdatabuild`, which
+recomposes the document fresh and compares it byte-for-byte against what is committed; a
+stale artifact fails that comparison even after the tag has moved. The other five
+occurrences (lines 301, 351, 458, 599, 618) come from the shared source
+`house-style/sources/r-package-structure.md`, are identical across all nine governed repos'
+composed artifacts, do not cause drift here, and are deferred to Wave 4.
+
+```bash
+cd ~/Documents/GitHub/house-style && Rscript compose-house-style.R --repo hvtiRdatabuild
+```
+
+```bash
+cd ~/Documents/GitHub/hvtiRdatabuild && git checkout -b chore/recompose-house-style && git add .claude/house-style.md && git commit -m "chore: recompose house-style.md for the hvtiRdatabuild rename"
+```
+
+```bash
+cd ~/Documents/GitHub/hvtiRdatabuild && gh pr create --fill
+```
+
+`.claude/` is listed in `.Rbuildignore`, so per `AGENTS.md` this commit ships nothing the
+built package carries and takes no version bump and no `NEWS.md` entry. Do not merge it
+yourself; report the PR URL and continue once it merges — Step 7's check depends on it.
+
+- [ ] **Step 7: Re-run the house-style check and confirm it now passes**
+
+```bash
+cd ~/Documents/GitHub/hvtiRdatabuild && gh run list --workflow=house-style.yaml --limit 3
+```
+
+Expected: a green run, once Step 6's PR has merged. This check fails for two distinct
+reasons, surfacing at two different steps of the workflow, and a pass at one is not evidence
+of the other. If the `grep -qF` guard (`house-style.yaml:56`) fails, the tag did not move or
+the two path strings differ — compare Task 4 Step 4's output against `repos.yml`, and revisit
+Step 4 above. If the guard passes but the job fails later, at the `--check` step
+(`house-style.yaml:74`), the composed artifact is stale — Step 6 has not merged, or was run
+before the tag moved.
+
+- [ ] **Step 8: Verify the pkgdown site is actually served, not merely deployed**
 
 ```bash
 gh api repos/ehrlinger/hvtiRdatabuild/pages --jq '.html_url, .status'
@@ -678,7 +728,21 @@ not evidence the site is served** — that exact failure has already occurred in
 If the fetch returns 404, re-run the pkgdown workflow and check the Pages API again; the
 `gh-pages` branch follows the repo rename but Pages sometimes needs a rebuild to pick it up.
 
-- [ ] **Step 8: Verify the family roster still resolves**
+**Verify the Codecov badge, not just the upload.** `test-coverage.yaml` hard-codes no repo
+slug — it infers the slug from the GitHub Actions context — so the coverage upload itself is
+unaffected by the rename. But `README.md`'s badge now points at
+`codecov.io/gh/ehrlinger/hvtiRdatabuild`, and Codecov generally needs the renamed repository
+re-synced on its side before that slug resolves.
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://codecov.io/gh/ehrlinger/hvtiRdatabuild
+```
+
+Expected: `200`. A non-200 here does not mean coverage stopped uploading — check the
+`test-coverage.yaml` run itself for that. It means the badge may sit at "unknown" until
+Codecov re-syncs the rename; do not misread an unknown badge as a broken upload.
+
+- [ ] **Step 9: Verify the family roster still resolves**
 
 ```bash
 cd ~/Documents/GitHub/hvtiverse && Rscript -e 'devtools::load_all(); print(status())'
@@ -694,15 +758,18 @@ output and do not change `members.R` here.
 
 **Spec coverage.** Wave 1 of the design covers `DESCRIPTION`, the package roxygen file,
 tests, four roxygen blocks, `README.md`, `NEWS.md`, `_pkgdown.yml`, `codecov.yml`,
-`equivalence_signoff.yaml`, the vignette, six workflows, `AGENTS.md` and `CLAUDE.md`. All
-appear in Tasks 2–5. The spec's *Not done* clause — leave `specs/` alone — is enforced in
-the Global Constraints and re-checked at Task 3 Step 2 and Task 4 Step 2. The spec's pkgdown
-risk is Task 6 Step 7; its version-bump open question is Task 5's preamble.
+`equivalence_signoff.yaml`, the vignette, six workflows, `AGENTS.md`, `CLAUDE.md`, and the
+composed `.claude/house-style.md`. All appear in Tasks 2–6. The spec's *Not done* clause —
+leave `specs/` alone — is enforced in the Global Constraints and re-checked at Task 3 Step 2
+and Task 4 Step 2. The spec's pkgdown risk is Task 6 Step 8; its version-bump open question
+is Task 5's preamble.
 
-**Two items the spec did not anticipate, added here.** The PHI-gated option rename
-(Task 2), which no plain search-and-replace would have flagged as an API change; and the
+**Three items the spec did not anticipate, added here.** The PHI-gated option rename
+(Task 2), which no plain search-and-replace would have flagged as an API change; the
 `house-style-v1` tag coupling (Tasks 1, 4 and 6), which makes a second repository a hard
-prerequisite and produces one expected red check.
+prerequisite; and the composed `.claude/house-style.md` (Task 6 Step 6), which cannot be
+fixed by search-and-replace and needs the local directory renamed first. Together the tag
+and the stale artifact produce one red check with two distinct causes, not one.
 
 **Not in scope.** `hvtiR::members()`, `house-style` governance additions, the archive of
 `hvtiEDAreports` and the sibling repos' prose references are Wave 4. The roxygen
