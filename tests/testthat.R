@@ -1,4 +1,4 @@
 library(testthat)
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 
-test_check("hvtiRdatasets")
+test_check("hvtiRdatabuild")

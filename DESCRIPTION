@@ -1,4 +1,4 @@
-Package: hvtiRdatasets
+Package: hvtiRdatabuild
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
 Version: 0.1.2
@@ -12,8 +12,8 @@ Authors@R: c(
   )
 License: GPL (>= 3)
 Encoding: UTF-8
-URL: https://github.com/ehrlinger/hvtiRdatasets, https://ehrlinger.github.io/hvtiRdatasets/
-BugReports: https://github.com/ehrlinger/hvtiRdatasets/issues
+URL: https://github.com/ehrlinger/hvtiRdatabuild, https://ehrlinger.github.io/hvtiRdatabuild/
+BugReports: https://github.com/ehrlinger/hvtiRdatabuild/issues
 Description: Builds analysis-ready clinical datasets for the clinical
   investigations statistics group within The Heart and Vascular Institute at
   the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets

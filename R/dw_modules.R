@@ -33,7 +33,7 @@ dw_modules <- function() {
 #' @keywords internal
 #' @noRd
 .read_module_specs <- function() {
-  dir <- system.file("extdata", "modules", package = "hvtiRdatasets")
+  dir <- system.file("extdata", "modules", package = "hvtiRdatabuild")
   files <- list.files(dir, pattern = "\\.yaml$", full.names = TRUE)
   if (length(files) == 0L) {
     stop("No module definitions found in ", dir,
