@@ -3,8 +3,9 @@
 **Date:** 2026-08-27
 **Status:** Approved. Wave 1 is planned in
 [`specs/plans/2026-08-27-hvtiRdatabuild-rename.md`](plans/2026-08-27-hvtiRdatabuild-rename.md)
-and implemented in this PR; it shipped 2026-08-27. Wave 2 shipped 2026-08-27. Wave 4 is
-replanned in [`specs/plans/2026-08-27-wave-4-governance.md`](plans/2026-08-27-wave-4-governance.md),
+and implemented in [PR #19](https://github.com/ehrlinger/hvtiRdatabuild/pull/19); it shipped
+2026-08-27. Wave 2 shipped 2026-08-27. Wave 4 is replanned in
+[`specs/plans/2026-08-27-wave-4-governance.md`](plans/2026-08-27-wave-4-governance.md),
 because the one-paragraph description below understates it — a survey after Wave 2 found
 11 `AGENTS.md`-class files rather than four, and two defects that are functional rather
 than prose. Wave 3 is postponed by maintainer decision, still behind the upstream
