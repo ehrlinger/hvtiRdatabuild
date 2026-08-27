@@ -36,7 +36,7 @@ test_that("no shipped module file carries a site-specific identifier", {
   # The repository is public. Real host, port, database, and schema names
   # arrive from study.yaml at runtime and must never be committed.
   files <- list.files(
-    system.file("extdata", "modules", package = "hvtiRdatasets"),
+    system.file("extdata", "modules", package = "hvtiRdatabuild"),
     full.names = TRUE
   )
   text <- paste(unlist(lapply(files, readLines)), collapse = "\n")
@@ -54,7 +54,7 @@ test_that(".module_sql() errors on a leftover placeholder, naming it", {
   # because .read_module_specs() always reads from the package's shipped
   # module directory. The shipped module files are not touched: a temporary
   # fixture is written into that directory and removed when the test ends.
-  dir <- system.file("extdata", "modules", package = "hvtiRdatasets")
+  dir <- system.file("extdata", "modules", package = "hvtiRdatabuild")
   fixture <- file.path(dir, "zzz_leftover_placeholder.yaml")
   writeLines(c(
     "module: zzz_leftover_placeholder",
@@ -75,7 +75,7 @@ test_that(".module_sql() errors on a leftover placeholder, naming it", {
 
 test_that("the echo module records the SAS window as a known divergence", {
   path <- system.file("extdata", "modules", "echo.yaml",
-                      package = "hvtiRdatasets")
+                      package = "hvtiRdatabuild")
   spec <- yaml::read_yaml(path)
 
   expect_true(nzchar(spec$divergence))

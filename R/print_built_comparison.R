@@ -13,7 +13,7 @@
 #' @param x An object of class `built_comparison`.
 #' @param ... Ignored.
 #' @param show_ids Logical. Print the identifiers that appear on only one
-#'   side. Defaults to the `hvtiRdatasets.show_ids` option, itself `FALSE`.
+#'   side. Defaults to the `hvtiRdatabuild.show_ids` option, itself `FALSE`.
 #'   **Enabling this may emit PHI.** Only do so in a session whose output is
 #'   not being logged or shared.
 #'
@@ -22,7 +22,7 @@
 #' @export
 print.built_comparison <- function(x, ...,
                                    show_ids = getOption(
-                                     "hvtiRdatasets.show_ids", FALSE
+                                     "hvtiRdatabuild.show_ids", FALSE
                                    )) {
   rows <- attr(x, "rows")
 

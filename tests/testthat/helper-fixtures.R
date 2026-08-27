@@ -16,5 +16,5 @@
 # Resolves whether the package is loaded via pkgload (devtools::test) or
 # installed (R CMD check).
 .fixture_path <- function() {
-  system.file("extdata", "oracle_small.sas7bdat", package = "hvtiRdatasets")
+  system.file("extdata", "oracle_small.sas7bdat", package = "hvtiRdatabuild")
 }

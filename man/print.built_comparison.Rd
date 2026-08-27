@@ -4,7 +4,7 @@
 \alias{print.built_comparison}
 \title{Print a dataset comparison}
 \usage{
-\method{print}{built_comparison}(x, ..., show_ids = getOption("hvtiRdatasets.show_ids", FALSE))
+\method{print}{built_comparison}(x, ..., show_ids = getOption("hvtiRdatabuild.show_ids", FALSE))
 }
 \arguments{
 \item{x}{An object of class \code{built_comparison}.}
@@ -12,7 +12,7 @@
 \item{...}{Ignored.}
 
 \item{show_ids}{Logical. Print the identifiers that appear on only one
-side. Defaults to the \code{hvtiRdatasets.show_ids} option, itself \code{FALSE}.
+side. Defaults to the \code{hvtiRdatabuild.show_ids} option, itself \code{FALSE}.
 \strong{Enabling this may emit PHI.} Only do so in a session whose output is
 not being logged or shared.}
 }

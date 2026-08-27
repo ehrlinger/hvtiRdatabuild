@@ -1,4 +1,4 @@
-# codecov.yml — coverage thresholds for hvtiRdatasets
+# codecov.yml — coverage thresholds for hvtiRdatabuild
 #
 # Releases are held to a hard floor; development branches report only.
 

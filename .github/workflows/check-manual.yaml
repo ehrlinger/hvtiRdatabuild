@@ -42,7 +42,7 @@ jobs:
           r-version: 'release'
           use-public-rspm: true
 
-      # hvtiRdatasets Imports hvtiRutilities, which is not on CRAN. Pull it
+      # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
       - uses: r-lib/actions/setup-r-dependencies@v2
@@ -55,7 +55,7 @@ jobs:
       - uses: r-lib/actions/setup-tinytex@v2
 
       # Install the package into the user library so that Quarto's subprocess
-      # can resolve library(hvtiRdatasets) during vignette rendering.
+      # can resolve library(hvtiRdatabuild) during vignette rendering.
       - name: Install package for vignette rendering
         run: Rscript -e "install.packages('.', repos = NULL, type = 'source')"
 

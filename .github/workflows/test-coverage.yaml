@@ -31,7 +31,7 @@ jobs:
         with:
           use-public-rspm: true
 
-      # hvtiRdatasets Imports hvtiRutilities, which is not on CRAN. Pull it
+      # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
       - uses: r-lib/actions/setup-r-dependencies@v2

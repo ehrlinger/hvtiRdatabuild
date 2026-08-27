@@ -43,7 +43,7 @@ SAS-side \verb{PROC CONTENTS} output.
 \donttest{
 if (requireNamespace("arrow", quietly = TRUE)) {
   src <- system.file("extdata", "oracle_small.sas7bdat",
-                     package = "hvtiRdatasets")
+                     package = "hvtiRdatabuild")
   snapshot_oracle(src, tempfile(fileext = ".parquet"))
 }
 }

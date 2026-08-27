@@ -1,4 +1,4 @@
-# hvtiRdatasets
+# hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and verifies them against
 the legacy SAS datasets they replace. Six exports: `dw_connect()`, `dw_modules()`, `dw_pull()`,

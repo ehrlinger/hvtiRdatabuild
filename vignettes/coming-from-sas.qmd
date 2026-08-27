@@ -11,7 +11,7 @@ format: html
 #| label: setup
 #| include: false
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 ```
 
 ## Who this is for
@@ -102,7 +102,7 @@ empty string. Read a SAS dataset and every missing character comes back as
 
 ```{r}
 f <- system.file("extdata", "oracle_small.sas7bdat",
-                 package = "hvtiRdatasets")
+                 package = "hvtiRdatabuild")
 surgeon <- haven::read_sas(f)$surgeon
 surgeon                 # the fourth value was written as NA
 is.na(surgeon)          # ... and is not NA any more

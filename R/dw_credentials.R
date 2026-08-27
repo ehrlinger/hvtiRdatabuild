@@ -84,7 +84,7 @@
   if (identical(os_type, "windows")) {
     stop("Cannot verify credential file permissions on Windows: this ",
          "platform has no POSIX file mode, so a credential file's ",
-         "protection can never be confirmed here. hvtiRdatasets targets ",
+         "protection can never be confirmed here. hvtiRdatabuild targets ",
          "the Linux server described in the design spec; file-based ",
          "credentials (a DSN or ~/.Renviron) are not supported on Windows.",
          call. = FALSE)

@@ -73,3 +73,20 @@ test_that("compare_built returns no scalar verdict field", {
   expect_false(any(c("passed", "ok", "equivalent") %in% names(attributes(res))))
   expect_true(is.data.frame(res))
 })
+
+test_that("show_ids defaults to the hvtiRdatabuild.show_ids option", {
+  o <- data.frame(ccfidu = c("1234567820200115", "A2"), age = c(65, 70))
+  r <- data.frame(ccfidu = "A2", age = 70)
+
+  res <- compare_built(o, r, id = "ccfidu")
+
+  withr::with_options(list(hvtiRdatabuild.show_ids = TRUE), {
+    out <- paste(capture.output(print(res)), collapse = "\n")
+    expect_match(out, "1234567820200115", fixed = TRUE)
+  })
+
+  withr::with_options(list(hvtiRdatabuild.show_ids = FALSE), {
+    out <- paste(capture.output(print(res)), collapse = "\n")
+    expect_false(grepl("1234567820200115", out, fixed = TRUE))
+  })
+})

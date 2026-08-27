@@ -10,7 +10,7 @@ affordances live here.
 
 `AGENTS.md` says to orient before editing. In Claude Code the way to do that is the codemap:
 it lives in the Obsidian vault under `Claude/repomaps/` and is read via the `read-codemap`
-skill (`/codemap hvtiRdatasets`). If the codemap looks stale, say so and offer to refresh it
+skill (`/codemap hvtiRdatabuild`). If the codemap looks stale, say so and offer to refresh it
 (`/regenerate-codemap`) rather than working from a guess.
 
 If the vault is not available, say so rather than staying quiet about it, then orient from the
