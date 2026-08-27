@@ -29,7 +29,9 @@ vignettes, pkgdown, GitHub Actions, the `house-style` composer.
 - **Never push to `main`.** Branch, open a PR, let the maintainer merge. `main` is
   protected by a server-side ruleset; a rejected push is not a local hook.
 - **Versions are straight three digits.** Never a `.9000` suffix or a fourth digit. Patch
-  digit only — minor and major are the maintainer's decision.
+  digit only — minor and major are the maintainer's decision. **For this plan the
+  maintainer has already made that decision: the release is `0.2.0`.** Do not substitute a
+  patch bump.
 - **The exact new name is `hvtiRdatabuild`.** The exact old name is `hvtiRdatasets`.
 - **Do not rewrite anything under `specs/`.** Five documents there carry the old name as
   historical record. They are deliberately excluded from every search-and-replace in this
@@ -514,10 +516,11 @@ the matching `NEWS.md` entry **in the same commit** — a test greps `NEWS.md` f
 **Interfaces:**
 - Consumes: the option rename from Task 2, which this entry documents.
 
-**On the version number.** This plan writes `0.1.3`, the patch bump the house rule
-prescribes. **Flag it to the maintainer at PR time rather than assuming it is settled.**
-Renaming the package is the most breaking change it can undergo and `0.2.0` would say so,
-but minor digits are the maintainer's call and must not be rolled by an implementer.
+**On the version number.** `0.2.0`, **decided by the maintainer on 2026-08-27**. This is a
+*minor* bump, not the patch bump the standing house rule prescribes, because renaming the
+package is the most breaking change it can undergo and the minor digit says so. Minor
+digits are the maintainer's call and were exercised here — an implementer must **not** treat
+this as licence to roll a minor digit elsewhere, and must not "correct" it back to `0.1.3`.
 
 **On the historical headings.** `NEWS.md` lines 13 and 68 read `# hvtiRdatasets 0.1.1` and
 `# hvtiRdatasets 0.1.0`. Leave them. They record what the package was called at those
@@ -536,7 +539,7 @@ would. Line 6 is different — it is instructional prose telling a reader how to
 - [ ] **Step 2: Add the new entry at the top of `NEWS.md`**
 
 ```markdown
-# hvtiRdatabuild 0.1.3
+# hvtiRdatabuild 0.2.0
 
 ## Breaking Changes
 
@@ -556,7 +559,7 @@ No function changed behaviour, so results are identical to 0.1.2.
 - [ ] **Step 3: Bump `DESCRIPTION`**
 
 ```
-Version: 0.1.3
+Version: 0.2.0
 Date: 2026-08-27
 ```
 
@@ -566,7 +569,7 @@ Date: 2026-08-27
 cd ~/Documents/GitHub/hvtiRdatasets && grep -m1 "^Version:" DESCRIPTION && grep -m1 "^# hvtiRdatabuild" NEWS.md
 ```
 
-Expected: `Version: 0.1.3` and `# hvtiRdatabuild 0.1.3` — the version strings must match
+Expected: `Version: 0.2.0` and `# hvtiRdatabuild 0.2.0` — the version strings must match
 exactly.
 
 - [ ] **Step 5: Run the tests**
@@ -580,16 +583,16 @@ Expected: PASS, including any version-consistency test.
 - [ ] **Step 6: Commit and open the PR**
 
 ```bash
-cd ~/Documents/GitHub/hvtiRdatasets && git add DESCRIPTION NEWS.md && git commit -m "chore: release 0.1.3 with the hvtiRdatabuild rename"
+cd ~/Documents/GitHub/hvtiRdatasets && git add DESCRIPTION NEWS.md && git commit -m "chore: release 0.2.0 with the hvtiRdatabuild rename"
 ```
 
 ```bash
 cd ~/Documents/GitHub/hvtiRdatasets && gh pr create --fill
 ```
 
-In the PR body, state two things explicitly: that the house-style check is expected to fail
-until the `house-style-v1` tag moves, and that `0.1.3` is a patch bump the maintainer may
-wish to make `0.2.0`.
+In the PR body, state explicitly that the house-style check is expected to fail until the
+`house-style-v1` tag moves, and why. The version needs no flagging — `0.2.0` was the
+maintainer's decision, not a default.
 
 ---
 
