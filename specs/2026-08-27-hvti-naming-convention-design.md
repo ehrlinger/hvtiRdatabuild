@@ -77,10 +77,28 @@ the family, shorter than `hvtiRlifetables`, `hvtiRpropensity` and `hvtiRboostmtr
 `databuild` is the same two-word lowercase compound shape as `lifetables` — so it keeps
 the family's noun rhythm rather than breaking it as a bare verb would.
 
-The name deliberately encodes the durable half of the job. `snapshot_oracle()` and
-`compare_built()` exist to prove the R build matches the legacy SAS datasets, which is a
-migration-era concern; `dw_pull()` and `read_study_config()` are permanent. A name
-encoding "verify" would age out.
+The name encodes the action every user performs. It does **not** imply that verification
+is secondary or temporary, and an earlier draft of this document argued exactly that —
+wrongly. Studies are revisited for reproducibility long after their original analysis, and
+proving that a rebuild matches the original is both durable and, today, the hard part.
+`snapshot_oracle()` and `compare_built()` are permanent, first-class API, not migration
+scaffolding, and nothing here contemplates splitting them out.
+
+The name is chosen on discoverability instead: `databuild` keeps `data` as the term
+someone hunting for their study data would search, while `build` disambiguates against the
+"ships a payload" reading. It undersells verification, which is a real and accepted cost —
+package names rarely carry a guarantee, and no candidate covered both halves without
+either re-inviting the payload misreading or going abstract enough to be unsearchable.
+
+Two consequences follow, both outside this document's scope and recorded as follow-on
+work. The roxygen prose is written as if the window closes — `snapshot_oracle()` is titled
+"Freeze a *SAS-built* dataset" and warns about drift "*mid-migration*" — and needs
+re-framing around reproducibility. And `snapshot_oracle()` takes a `sas_path` and calls
+`.read_sas_dataset()`, so an R-built data frame cannot be frozen as a future reference.
+That signature is the only real gap: `compare_built()` takes two data frames and is
+already oracle-source-agnostic, and the `manifest` hook already registers snapshots with
+`hvtiRutilities::update_manifest()` so `verify_manifest()` can "later detect a drifted
+oracle" — the longitudinal case is anticipated in the code even where the prose denies it.
 
 ## The rename map
 
@@ -99,7 +117,8 @@ encoding "verify" would age out.
 
 `hvtiBoostmtree` is renamed despite being a fork of CRAN's `boostmtree` with
 Ishwaran/Pande/Kogalur retained as `aut`. The fork itself is not on CRAN, so Clause 3 does
-not reach it, and the decision was taken explicitly rather than by default.
+not reach it, and the decision was taken explicitly rather than by default. Its rename is
+sequenced behind an upstream sync — see Wave 3.
 
 `hvti_graphics` becomes `hvtiGraphics`, not `hvtiRgraphics`. It is a Quarto book, and the
 bare `hvti` prefix is the signal that the `R` in `hvtiR` means "an R package you can
@@ -176,7 +195,35 @@ roxygen blocks, `README.md`, `NEWS.md`, `_pkgdown.yml`, `codecov.yml`,
 `hvti_graphics`→`hvtiGraphics`, `temporal_hazard`→`TemporalHazard`. Each is a
 `gh repo rename` plus its own `URL:`, `BugReports:` and `_pkgdown.yml` update.
 
-**Wave 3 — `hvtiBoostmtree` → `hvtiRboostmtree`.** Same shape as Wave 1.
+**Wave 3 — `hvtiBoostmtree` → `hvtiRboostmtree`. Blocked on an upstream sync, and the
+rename must come second.** The repo carries an `upstream` remote at `cran/boostmtree`, and
+the fork was taken at upstream **1.5.1 (2022-03-10)**. Upstream has since released
+**boostmtree 2.0.0 (2026-04-08)**, which the fork has never merged. The gap is a
+substantial refactor, not a patch — 25 files and roughly +4,175/−5,928 lines across `R/`
+and `src/`, with files split apart (`boostmtree_math.R`, `boostmtree_object.R`,
+`boostmtree_preprocess.R`, `boostmtree_response.R` are new upstream) and renamed
+(`marginalPlot.R`→`marginal_plot.boostmtree.R`, `partialPlot.R`→
+`partial_plot.boostmtree.R`, `vimpPlot.R`→`plot.vimp.boostmtree.R`).
+
+Sync first, rename second. A rename touches `DESCRIPTION`, `NAMESPACE`, `man/`, `tests/`
+and every `R/` file that names the package — precisely the files the upstream refactor
+rewrites — so renaming first maximises the conflict surface against the merge, and renames
+code that is about to be replaced wholesale.
+
+Two things must be checked rather than assumed during that sync, and neither is a naming
+question:
+
+- **The fork's own 2.0.1 fixes may not survive.** They are in `vimpPlot()` and
+  `plot.boostmtree()`; upstream *deleted* `vimpPlot.R` and rewrote `plot.boostmtree.R`.
+  Each fix is either already handled upstream, or needs re-porting into the new layout.
+- **The version numbers collide and mean different things.** The fork's `2.0.0` was its
+  own rename release, built on upstream `1.5.1`; upstream's `2.0.0` is unrelated content.
+  So `hvtiBoostmtree 2.0.1` reads as newer than `boostmtree 2.0.0` while actually sitting
+  four years behind it. Post-sync numbering cannot reuse a taken number, and choosing it
+  rolls a minor or major digit — the maintainer's call, not to be taken by default.
+
+The sync gets its own design and plan. This document records only that Wave 3 depends on
+it and follows it.
 
 **Wave 4 — the umbrella and the cross-references.** Add the `## Naming` section to the
 house-style source and recompose; update `members()` and `repos.yml`, including the three
