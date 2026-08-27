@@ -52,7 +52,7 @@ jobs:
           use-public-rspm: true
           rtools-version: '44'
 
-      # hvtiRdatasets Imports hvtiRutilities, which is not on CRAN. Pull it
+      # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
       - uses: r-lib/actions/setup-r-dependencies@v2
@@ -63,7 +63,7 @@ jobs:
           needs: check
 
       # Install the package into the user library so that Quarto's subprocess
-      # can resolve library(hvtiRdatasets) during vignette rendering on Windows.
+      # can resolve library(hvtiRdatabuild) during vignette rendering on Windows.
       - name: Install package for vignette rendering
         run: Rscript -e "install.packages('.', repos = NULL, type = 'source')"
 

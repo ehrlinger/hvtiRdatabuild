@@ -1,4 +1,4 @@
-url: https://ehrlinger.github.io/hvtiRdatasets/
+url: https://ehrlinger.github.io/hvtiRdatabuild/
 
 template:
   bootstrap: 5
@@ -10,7 +10,7 @@ reference:
     Package-level documentation: what the package builds, who it's for,
     and how the verify workflow fits together.
   contents:
-  - hvtiRdatasets-package
+  - hvtiRdatabuild-package
 
 - title: "Verify: R Build vs. SAS Oracle"
   desc: >
