@@ -87,8 +87,22 @@ files from them. Editing `man/` directly would revert on the next `roxygenise()`
 | `hvtiR` | `R/install.R` | 1 reference |
 | `hvtiR` | `tests/testthat/test-members.R`, `test-install.R`, `test-install-helpers.R` | 7 hits total; these pin the roster |
 | `hvtiPlotR` | 22 files under `R/` | book URLs in roxygen |
+| `hvtiPlotR` | `README.md`, `_pkgdown.yml`, `DESCRIPTION`, `vignettes/plot-functions.qmd` | same dead book URLs — see the note below |
 | `hvtiGraphics` | `.github/workflows/version-check.yml:56` | the mapping `TemporalHazard:temporal_hazard` |
 | `hvtiGraphics` | `packages.bib:161` | citation URL, now 404 |
+
+#### A README is not prose
+
+An earlier draft of this plan filed hvtiPlotR's `README.md`, `_pkgdown.yml`, `DESCRIPTION`
+and vignette under "config and prose". That was wrong, and the same misjudgement had
+already caused a live defect: `TemporalHazard/README.md` was deferred as prose during
+Wave 2, and pkgdown then rendered 16 stale references onto the front page of the published
+docs — the site badge plus **all eight vignette links**, every one a 404
+([TemporalHazard#188](https://github.com/ehrlinger/TemporalHazard/pull/188)).
+
+A README's badges and links are live, and pkgdown publishes them. Treat any file
+containing a URL as functional, regardless of how much prose surrounds it. Prose is text
+that names a thing; a link is text that has to resolve.
 
 ### B. Generated — regenerate, never hand-edit
 
@@ -108,8 +122,11 @@ neither durably.
   `hvtiRlifetables` (4), `hvtiBoostmtree` (3), `hvtiR` (3), `hvtiRtables` (2),
   `hvtiRbootstrap/.claude/CLAUDE.md` (2), `TemporalHazard` (1+1), `hvtiGraphics` (1),
   `hvtiRtemplates` (1).
-- `hvtiR`: `README.md` (3), `vignettes/hvtiR.qmd` (4).
-- `hvtiPlotR`: `DESCRIPTION`, `README.md`, `_pkgdown.yml`, `vignettes/plot-functions.qmd`.
+- `hvtiR`: `README.md` (3), `vignettes/hvtiR.qmd` (4) — check both for links before
+  treating either as prose.
+
+hvtiPlotR's `README.md`, `_pkgdown.yml`, `DESCRIPTION` and vignette were listed here in an
+earlier draft; they carry dead links and have moved to section A.
 
 ### D. The convention's home
 
