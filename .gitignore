@@ -12,6 +12,7 @@
 *.csv
 *.rds
 .superpowers/
+.remember/
 !inst/extdata/oracle_small.sas7bdat
 oracle/
 docs
