@@ -6,7 +6,7 @@
   recompose. Editing this file directly will be reverted by the next
   compose and flagged by --check.
 
-  repo:            hvtiRdatasets
+  repo:            hvtiRdatabuild
   profile:         package-internal
   default persona: (a)
   sources:
@@ -16,7 +16,7 @@
     r-package-structure.md         sha256:0b90e3e645fd
 -->
 
-# House Style — hvtiRdatasets
+# House Style — hvtiRdatabuild
 
 Default reader persona for this repository: **(a)**. Write for one persona at a time.
 
