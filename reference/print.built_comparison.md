@@ -3,13 +3,13 @@
 Reports row-set differences and a count per verdict, then lists every
 variable that is not `"identical"`. No overall pass/fail is printed, by
 design: see
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md).
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md).
 
 ## Usage
 
 ``` r
 # S3 method for class 'built_comparison'
-print(x, ..., show_ids = getOption("hvtiRdatasets.show_ids", FALSE))
+print(x, ..., show_ids = getOption("hvtiRdatabuild.show_ids", FALSE))
 ```
 
 ## Arguments
@@ -25,7 +25,7 @@ print(x, ..., show_ids = getOption("hvtiRdatasets.show_ids", FALSE))
 - show_ids:
 
   Logical. Print the identifiers that appear on only one side. Defaults
-  to the `hvtiRdatasets.show_ids` option, itself `FALSE`. **Enabling
+  to the `hvtiRdatabuild.show_ids` option, itself `FALSE`. **Enabling
   this may emit PHI.** Only do so in a session whose output is not being
   logged or shared.
 

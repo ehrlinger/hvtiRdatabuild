@@ -14,7 +14,7 @@ print(x, ...)
 - x:
 
   A `pull_result` from
-  [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.md).
+  [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md).
 
 - ...:
 

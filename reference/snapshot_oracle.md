@@ -54,7 +54,7 @@ SAS-side `PROC CONTENTS` output.
 
 ## See also
 
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 
 ## Examples
 
@@ -62,7 +62,7 @@ SAS-side `PROC CONTENTS` output.
 # \donttest{
 if (requireNamespace("arrow", quietly = TRUE)) {
   src <- system.file("extdata", "oracle_small.sas7bdat",
-                     package = "hvtiRdatasets")
+                     package = "hvtiRdatabuild")
   snapshot_oracle(src, tempfile(fileext = ".parquet"))
 }
 # }

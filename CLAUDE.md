@@ -2,7 +2,7 @@
 
 @AGENTS.md
 
-[`AGENTS.md`](https://ehrlinger.github.io/hvtiRdatasets/AGENTS.md),
+[`AGENTS.md`](https://ehrlinger.github.io/hvtiRdatabuild/AGENTS.md),
 imported above, is the operational contract and applies in full. It is
 written to be tool neutral so that Codex and other agents read the same
 rules. Only the Claude Code affordances live here.
@@ -12,8 +12,9 @@ rules. Only the Claude Code affordances live here.
 `AGENTS.md` says to orient before editing. In Claude Code the way to do
 that is the codemap: it lives in the Obsidian vault under
 `Claude/repomaps/` and is read via the `read-codemap` skill
-(`/codemap hvtiRdatasets`). If the codemap looks stale, say so and offer
-to refresh it (`/regenerate-codemap`) rather than working from a guess.
+(`/codemap hvtiRdatabuild`). If the codemap looks stale, say so and
+offer to refresh it (`/regenerate-codemap`) rather than working from a
+guess.
 
 If the vault is not available, say so rather than staying quiet about
 it, then orient from the repo itself — `NAMESPACE`, `R/`, and the README
@@ -32,7 +33,7 @@ session prints tool output into a transcript that is stored, so:
 - Do not echo `Sys.getenv("HVI_DW_PWD")`, or any command that dumps the
   environment, to check whether a credential resolved. Check the
   **method** —
-  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md)
+  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md)
   reports which rung of the ladder it used — never the secret.
 - If a debugging step genuinely needs real data, say what you need and
   why, and let the maintainer run it rather than pulling it into the

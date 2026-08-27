@@ -1,14 +1,14 @@
-# hvtiRdatasets
+# hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and
 verifies them against the legacy SAS datasets they replace. Six exports:
-[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md),
-[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_modules.md),
-[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.md),
-[`read_study_config()`](https://ehrlinger.github.io/hvtiRdatasets/reference/read_study_config.md),
-[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
+[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
+[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md),
+[`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 and
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md).
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md).
 
 **This is the package that touches PHI and warehouse credentials.** Most
 of its rules are about not leaking either, and they are not negotiable
@@ -60,7 +60,7 @@ affordances live in `CLAUDE.md`, which imports this file.
   what it compares.
 - **The credential ladder order is fixed by design, and the reason is
   subtle.**
-  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md)
+  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md)
   stops at the first resolvable source: **Kerberos** (no stored secret
   at all) → **ODBC DSN** (the driver holds the credential) →
   **`HVI_DW_UID`/`HVI_DW_PWD` in `~/.Renviron`** → **`keyring`**
@@ -76,7 +76,7 @@ affordances live in `CLAUDE.md`, which imports this file.
 ## Rules for this repo
 
 - **A SAS oracle must be a checksummed snapshot, not a live path.**
-  [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+  [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
   reads a SAS dataset once with haven, writes parquet, and records a
   SHA-256. The reason: a SAS dataset on a shared volume can be
   regenerated at any time, and if it changes mid-migration **every

@@ -1,9 +1,9 @@
-# hvtiRdatasets
+# hvtiRdatabuild
 
 [![R package
-version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatasets)](https://github.com/ehrlinger/hvtiRdatasets)
+version](https://img.shields.io/github/r-package/v/ehrlinger/hvtiRdatabuild)](https://github.com/ehrlinger/hvtiRdatabuild)
 
-[![lint](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatasets/actions/workflows/lint.yaml)
+[![lint](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/lint.yaml/badge.svg)](https://github.com/ehrlinger/hvtiRdatabuild/actions/workflows/lint.yaml)
 
 Builds analysis-ready clinical datasets for the HVTI CORR group, and
 verifies them against the legacy SAS datasets they replace.
@@ -11,16 +11,16 @@ verifies them against the legacy SAS datasets they replace.
 ## Status
 
 Slices S0 (Verify) and S1 (Pull).
-[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 and
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 verify an R-built dataset against its SAS oracle.
-[`read_study_config()`](https://ehrlinger.github.io/hvtiRdatasets/reference/read_study_config.md),
-[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md),
-[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_modules.md),
-[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.md),
+[`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
+[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
+[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
+[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md),
 and
-[`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatasets/reference/print.pull_result.md)
+[`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
 read a study’s warehouse modules into R. The rest of the pipeline —
 `build_dataset()`, `derive_vars()` — arrives in S2–S3.
 
@@ -29,7 +29,7 @@ read a study’s warehouse modules into R. The rest of the pipeline —
 ``` r
 
 # install.packages("remotes")
-remotes::install_github("ehrlinger/hvtiRdatasets")
+remotes::install_github("ehrlinger/hvtiRdatabuild")
 ```
 
 This package imports `hvtiRutilities`, which is **not on CRAN**. The
@@ -46,7 +46,7 @@ snapshots.
 
 ``` r
 
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 
 # What modules exist, and what each one requires.
 dw_modules()
@@ -68,11 +68,11 @@ result
 
 `pulled_at` is wall-clock time at pull, so it will differ on your
 machine.
-[`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatasets/reference/print.pull_result.md)
+[`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
 (dispatched automatically for `result`) never prints row-level data,
 only the manifest shape — no identifiers to redact.
 
-[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_pull.md)
+[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md)
 is **read-only**. It never writes to the warehouse — the cohort
 write-back the SAS templates perform (`libsql`) is deliberately not
 ported in this slice. The re-pull variants (`snapshotpull`, `ccfpull`),
@@ -84,7 +84,7 @@ later slice.
 
 ``` r
 
-library(hvtiRdatasets)
+library(hvtiRdatabuild)
 
 # Freeze the SAS-built dataset once.
 snapshot_oracle(
@@ -100,7 +100,7 @@ compare_built(oracle, my_rebuild, id = "ccfidu")
 There is no overall pass/fail. Read the table, and record a resolution
 for every variable that is not `identical`.
 
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 requires exactly one row per identifier on both sides. Of the five
 warehouse modules, only `bdbase` and `bdstat` are one row per patient
 and so are measurable against the SAS oracle today. `echo`, `fup`, and
@@ -130,7 +130,7 @@ output is logged or shared.
 
 ## Documentation
 
-- [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatasets/articles/coming-from-sas.md)
+- [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md)
   — migration guide for SAS users. Start here.
 
 ## Design

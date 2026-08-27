@@ -31,7 +31,7 @@ doing: what used to be invisible becomes reviewable.
 
 | SAS | R |
 |----|----|
-| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md) (S1) |
+| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) (S1) |
 | `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` (S1) |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
 | `%macro skip; ... %mend skip;` | `modules:` / `derive:` toggles in `study.yaml` |
@@ -46,7 +46,7 @@ doing: what used to be invisible becomes reviewable.
 
 Each of these produces a wrong number rather than an error. They are the
 reason
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 exists.
 
 ### Missing sorts low
@@ -84,7 +84,7 @@ trimws("Smith   ") == "Smith"
 ```
 
 This bites hardest on merges keyed by a character id.
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 trims before comparing, for exactly this reason.
 
 ### SAS has no missing character value
@@ -96,7 +96,7 @@ comes back as `""`:
 ``` r
 
 f <- system.file("extdata", "oracle_small.sas7bdat",
-                 package = "hvtiRdatasets")
+                 package = "hvtiRdatabuild")
 surgeon <- haven::read_sas(f)$surgeon
 surgeon                 # the fourth value was written as NA
 #> [1] "Smith" "Jones" "Smith" ""
@@ -106,7 +106,7 @@ is.na(surgeon)          # ... and is not NA any more
 
 So a faithful R rebuild holding `NA` disagrees with the oracle holding
 `""` on every missing value.
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 folds `""` to `NA` for character columns so this does not flood the
 report with false differences.
 
@@ -151,7 +151,7 @@ SAS never gave you.
 
 SAS counts days from 1960-01-01; R from 1970-01-01. The gap is 3,653
 days. `haven` converts correctly, so a value read through
-[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 is already right. A hand-rolled conversion is where this goes wrong.
 
 ``` r
@@ -176,7 +176,7 @@ produced wrong counts.
 A SAS numeric written with `length 4` loses precision on disk. A value
 read back from an old dataset may not equal a freshly computed R value,
 and **the SAS side is the lossy one**. `tolerance` in
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 is what catches this — but it is an **absolute** threshold, not a
 relative one. A single absolute threshold cannot serve columns of mixed
 magnitude: a value large enough to be at risk of `length 4` truncation

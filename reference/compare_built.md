@@ -17,7 +17,7 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
 - oracle:
 
   Data frame read from the parquet oracle. See
-  [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md).
+  [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md).
 
 - r:
 
@@ -61,7 +61,7 @@ missing BMI as underweight where R yields `NA`. Record such cases as
 
 ## See also
 
-[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatasets/reference/snapshot_oracle.md)
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 
 ## Examples
 

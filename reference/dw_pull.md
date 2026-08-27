@@ -15,14 +15,14 @@ dw_pull(config, conn)
 - config:
 
   A `study_config` from
-  [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatasets/reference/read_study_config.md).
+  [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md).
 
 - conn:
 
   A
   [DBI::DBIConnection](https://dbi.r-dbi.org/reference/DBIConnection-class.html),
   typically from
-  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md).
+  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md).
 
 ## Value
 
@@ -43,9 +43,9 @@ incomplete dataset, which is the failure this package exists to prevent.
 
 ## See also
 
-[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_connect.md),
-[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatasets/reference/dw_modules.md),
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatasets/reference/compare_built.md)
+[`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
+[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 
 ## Examples
 
