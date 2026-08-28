@@ -119,4 +119,4 @@ session whose output is logged or shared.
 
 ## Design
 
-See `specs/2026-08-04-hvtiRdatasets-design.md`.
+See `dev/specs/2026-08-04-hvtiRdatasets-design.md`.
