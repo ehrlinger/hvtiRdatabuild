@@ -136,7 +136,7 @@ affordances live in `CLAUDE.md`, which imports this file.
   not an inventory. `R CMD build` output is the authority when a case is
   unclear, not this list.
 - **Repo-governance files do not bump the version.** `AGENTS.md`,
-  `CLAUDE.md`, `.github/`, `specs/`, `.lintr`, `_pkgdown.yml` and
+  `CLAUDE.md`, `.github/`, `dev/`, `.lintr`, `_pkgdown.yml` and
   `equivalence_signoff.yaml` are all listed in `.Rbuildignore`, so they
   never reach an installed package, and a bump would announce a change
   no user can observe. The test is mechanical, so read `.Rbuildignore`
