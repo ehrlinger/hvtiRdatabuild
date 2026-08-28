@@ -8,7 +8,7 @@
 `devtools::check()` at 0/0/0 and every CI workflow green.
 
 **Architecture:** Wave 1 of
-[`specs/2026-08-27-hvti-naming-convention-design.md`](../2026-08-27-hvti-naming-convention-design.md).
+[`dev/specs/2026-08-27-hvti-naming-convention-design.md`](2026-08-27-hvti-naming-convention-design.md).
 Six tasks. Task 1 lands in a *different repository* and is a hard prerequisite. Tasks 2–5
 are ordinary branch commits here. Task 6 is out-of-repo GitHub and filesystem work that
 cannot be done on a branch and needs maintainer authorisation.
@@ -33,13 +33,13 @@ vignettes, pkgdown, GitHub Actions, the `house-style` composer.
   maintainer has already made that decision: the release is `0.2.0`.** Do not substitute a
   patch bump.
 - **The exact new name is `hvtiRdatabuild`.** The exact old name is `hvtiRdatasets`.
-- **Do not rewrite anything under `specs/`.** Five documents there carry the old name as
+- **Do not rewrite anything under `dev/specs/`.** Five documents there carry the old name as
   historical record. They are deliberately excluded from every search-and-replace in this
   plan.
 
 ## File Structure
 
-Twenty-seven files outside `specs/` carry the old name, 72 occurrences total.
+Twenty-seven files outside `dev/specs/` carry the old name, 72 occurrences total.
 
 | Group | Files | Handled in |
 |---|---|---|
@@ -391,7 +391,7 @@ cd ~/Documents/GitHub/hvtiRdatasets && sed -i '' 's/hvtiRdatasets/hvtiRdatabuild
 corrupted it. Set that line back to:
 
 ```markdown
-See `specs/2026-08-04-hvtiRdatasets-design.md`.
+See `dev/specs/2026-08-04-hvtiRdatasets-design.md`.
 ```
 
 - [ ] **Step 3: Verify the badge URLs and the citation**
@@ -537,7 +537,7 @@ this as licence to roll a minor digit elsewhere, and must not "correct" it back 
 
 **On the historical headings.** `NEWS.md` lines 13 and 68 read `# hvtiRdatasets 0.1.1` and
 `# hvtiRdatasets 0.1.0`. Leave them. They record what the package was called at those
-releases, and rewriting them would falsify the changelog the same way rewriting `specs/`
+releases, and rewriting them would falsify the changelog the same way rewriting `dev/specs/`
 would. Line 6 is different — it is instructional prose telling a reader how to call
 `utils::news()`, and it is now wrong.
 
@@ -761,7 +761,7 @@ output and do not change `members.R` here.
 tests, four roxygen blocks, `README.md`, `NEWS.md`, `_pkgdown.yml`, `codecov.yml`,
 `equivalence_signoff.yaml`, the vignette, six workflows, `AGENTS.md`, `CLAUDE.md`, and the
 composed `.claude/house-style.md`. All appear in Tasks 2–6. The spec's *Not done* clause —
-leave `specs/` alone — is enforced in the Global Constraints and re-checked at Task 3 Step 2
+leave `dev/specs/` alone — is enforced in the Global Constraints and re-checked at Task 3 Step 2
 and Task 4 Step 2. The spec's pkgdown risk is Task 6 Step 8; its version-bump open question
 is Task 5's preamble.
 

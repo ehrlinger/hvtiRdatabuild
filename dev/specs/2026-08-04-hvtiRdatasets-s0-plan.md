@@ -8,7 +8,7 @@
 
 **Tech Stack:** R (>= 4.1.0), haven, arrow (Suggests), digest, dplyr, testthat edition 3, quarto vignettes, roxygen2.
 
-**Spec:** `specs/2026-08-04-hvtiRdatasets-design.md`
+**Spec:** `dev/specs/2026-08-04-hvtiRdatasets-design.md`
 
 ## Global Constraints
 
@@ -1694,7 +1694,7 @@ every variable that is not `identical`.
 
 ## Design
 
-See `specs/2026-08-04-hvtiRdatasets-design.md`.
+See `dev/specs/2026-08-04-hvtiRdatasets-design.md`.
 ```
 
 - [ ] **Step 2: Copy the check workflow**

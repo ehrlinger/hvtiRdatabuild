@@ -8,7 +8,7 @@
 
 **Tech Stack:** R (>= 4.1.0), DBI, yaml, odbc (Suggests), testthat edition 3, roxygen2.
 
-**Spec:** `specs/2026-08-04-hvtiRdatasets-design.md`
+**Spec:** `dev/specs/2026-08-04-hvtiRdatasets-design.md`
 
 **Scope decisions taken 2026-08-06, by the maintainer:**
 
