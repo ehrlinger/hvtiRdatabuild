@@ -1,6 +1,6 @@
 # Human decision record for known SAS/R divergences surfaced while porting
 # the S1 (pull) slice. Schema per
-# specs/2026-08-04-hvtiRdatasets-design.md, "A signoff carries a
+# dev/specs/2026-08-04-hvtiRdatasets-design.md, "A signoff carries a
 # `resolution`, not just a reason.":
 #
 #   resolution: one of

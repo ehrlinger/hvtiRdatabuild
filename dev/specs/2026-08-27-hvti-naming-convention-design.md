@@ -2,10 +2,10 @@
 
 **Date:** 2026-08-27
 **Status:** Approved. Wave 1 is planned in
-[`specs/plans/2026-08-27-hvtiRdatabuild-rename.md`](plans/2026-08-27-hvtiRdatabuild-rename.md)
+[`dev/specs/2026-08-27-hvtiRdatabuild-rename-plan.md`](2026-08-27-hvtiRdatabuild-rename-plan.md)
 and implemented in [PR #19](https://github.com/ehrlinger/hvtiRdatabuild/pull/19); it shipped
 2026-08-27. Wave 2 shipped 2026-08-27. Wave 4 is replanned in
-[`specs/plans/2026-08-27-wave-4-governance.md`](plans/2026-08-27-wave-4-governance.md),
+[`dev/specs/2026-08-27-wave-4-governance-plan.md`](2026-08-27-wave-4-governance-plan.md),
 because the one-paragraph description below understates it — a survey after Wave 2 found
 11 `AGENTS.md`-class files rather than four, and two defects that are functional rather
 than prose. Wave 3 is postponed by maintainer decision, still behind the upstream
@@ -191,7 +191,7 @@ Four waves, ordered so nothing is broken between them. GitHub keeps rename redir
 indefinitely, so `pak::pak("ehrlinger/hvtiverse")` continues to resolve after Wave 2.
 
 **Wave 1 — this repo.** `hvtiRdatasets` → `hvtiRdatabuild`. 72 references across 27 files
-carry the old name; the five dated documents under `specs/` are left alone as historical
+carry the old name; the five dated documents under `dev/specs/` are left alone as historical
 record, per *Not done* below. The 27: `DESCRIPTION` (`Package`, `URL`, `BugReports`, and
 later `Version`/`Date`), `git mv R/hvtiRdatasets-package.R`, four further `R/` files
 carrying the name in code or roxygen, `tests/testthat.R` and three sibling test files,
@@ -250,9 +250,9 @@ paper over. They are separated so Wave 2 can move fast and Wave 3 gets the care.
 
 ### Not done
 
-Five documents under `specs/` keep the old name and are not rewritten:
+Five documents under `dev/specs/` keep the old name and are not rewritten:
 `2026-08-04-hvtiRdatasets-design.md`, `2026-08-24-build-layer-design-capture.md`,
-`plans/2026-08-04-hvtiRdatasets-s0.md`, `plans/2026-08-06-hvtiRdatasets-s1.md`, and this
+`dev/specs/2026-08-04-hvtiRdatasets-s0-plan.md`, `dev/specs/2026-08-06-hvtiRdatasets-s1-plan.md`, and this
 document. The first four are dated records of what was decided on those days; rewriting
 them would falsify the record, and this document supersedes them by reference. This one
 names the old package because that is its subject.
@@ -285,9 +285,9 @@ carry that. But renaming the package is the most breaking change it can undergo,
 - Every pkgdown site resolves at its new URL, verified by fetch rather than by badge.
 - `hvtiR::status()` and `hvtiR::doctor()` run clean against the renamed roster.
 - `house-style` `check_repo()` passes for all thirteen governed repos.
-- No file outside `specs/` still refers to `hvtiRdatasets` or `hvtiBoostmtree`, excepting
+- No file outside `dev/specs/` still refers to `hvtiRdatasets` or `hvtiBoostmtree`, excepting
   historical citations of a real filename (for example `README.md`'s pointer to
-  `specs/2026-08-04-hvtiRdatasets-design.md`, and `equivalence_signoff.yaml`'s citation of
+  `dev/specs/2026-08-04-hvtiRdatasets-design.md`, and `equivalence_signoff.yaml`'s citation of
   the same document) and changelog records — a `NEWS.md` heading for a release made under
   the old name, and prose describing what changed in a release, both of which must name the
   old package to remain useful to a reader.

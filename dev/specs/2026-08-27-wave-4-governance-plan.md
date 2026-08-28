@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-27
 **Status:** Planned, not started.
-**Design:** [`specs/2026-08-27-hvti-naming-convention-design.md`](../2026-08-27-hvti-naming-convention-design.md)
+**Design:** [`dev/specs/2026-08-27-hvti-naming-convention-design.md`](2026-08-27-hvti-naming-convention-design.md)
 **Depends on:** Waves 1 and 2 (both landed). **Not** blocked by Wave 3.
 
 ## Why this plan exists
@@ -19,7 +19,9 @@ substantially incomplete. It is not wrong about what Wave 4 must do; it is wrong
 how much there is, and it classifies two **functional defects** as prose.
 
 Measured, over live files only (excluding `specs/`, `design/`, `docs/superpowers/`,
-`inst/dev/`, `NEWS.md`, and generated `.claude/house-style.md`):
+`inst/dev/`, `NEWS.md`, and generated `.claude/house-style.md`) — the three
+development-record directories named here were the portfolio's conventions at
+the time of measurement, and all three are `dev/specs/` now:
 
 | Spec says | Survey finds |
 |---|---|
@@ -168,10 +170,10 @@ was needed belong together.
 
 Left carrying old names, deliberately:
 
-- `hvtiRdatabuild/README.md:122` — the `specs/2026-08-04-hvtiRdatasets-design.md` citation.
+- `hvtiRdatabuild/README.md:122` — the `dev/specs/2026-08-04-hvtiRdatasets-design.md` citation.
 - `hvtiRdatabuild/equivalence_signoff.yaml` — a historical filename citation.
 - `hvtiRutilities/.github/workflows/lint.yaml:65` — a comment recording past behaviour.
-- Every `NEWS.md`, and everything under `specs/`, `design/`, `dev/`, `inst/dev/`,
+- Every `NEWS.md`, and everything under `dev/specs/`, `design/`, `dev/`, `inst/dev/`,
   `docs/superpowers/` — dated records of what was decided when.
 - `TemporalHazard/R/parity-helpers.R` — `temporal_hazard.binary`,
   `temporal_hazard.hazpred_binary`, `TEMPORAL_HAZARD_BIN` are user-facing API. Renaming
