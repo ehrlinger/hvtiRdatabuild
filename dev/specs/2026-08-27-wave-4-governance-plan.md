@@ -1,9 +1,51 @@
 # Wave 4 — the umbrella, the cross-references, and the governance gap
 
 **Date:** 2026-08-27
-**Status:** Planned, not started.
+**Status:** Nearly landed. Steps 1, 2, 3, 5 and 6 are done; step 4 has one line left.
+Verified 2026-09-01 — see "Where this stands", below.
 **Design:** [`dev/specs/2026-08-27-hvti-naming-convention-design.md`](2026-08-27-hvti-naming-convention-design.md)
 **Depends on:** Waves 1 and 2 (both landed). **Not** blocked by Wave 3.
+
+## Where this stands
+
+Checked 2026-09-01, against the artifacts rather than the branch names. Five of the six
+steps are merged, and the branch list hid four of them: `chore/govern-three-repos`,
+`chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and `chore/badge-count-conflict`
+are all merged but never deleted, so they still read as pending work.
+`git branch -r --merged origin/main` separates the two.
+
+**Landed.** Step 1 — the `## Naming` section sits at `sources/r-package-structure.md:635`,
+`repos.yml` carries the three new entries, and `hvtiEDAreports` reports `archived: true`.
+Step 2 — `house-style-v1` points at `be0837c`, the tip of `origin/main`. Step 3 — the
+`hvtiR` roster and catalog name `hvtiRdatabuild`. Step 5 — [hvtiGraphics#55], which
+also fixed two references the scope table below had missed. Step 6 — no `AGENTS.md` or
+`CLAUDE.md` in any of the nine repos still names `hvtiRdatasets`. `tools/status.R`
+reports OK and committed for all 13 governed repos.
+
+[hvtiGraphics#55]: https://github.com/ehrlinger/hvtiGraphics/pull/55
+
+**Outstanding.** One line, in one file:
+
+| Repo | File | What |
+|---|---|---|
+| `hvtiPlotR` | `README.md:184` | link text and URL still say `hvtiRdatasets`; GitHub redirects, so it resolves under the wrong name |
+
+Only one of the four hvtiGraphics references step 5 fixed was actually broken.
+GitHub redirects a renamed *repository*, so `github.com/` and
+`raw.githubusercontent.com/` URLs kept working; GitHub Pages does not redirect a
+renamed *project site*, so the book's `packages.bib` citation was a genuine 404. One
+rename produces two classes of stale link and only one of them shows as a failure. The
+hvtiPlotR line above is in the surviving class: it resolves, under the wrong name.
+
+Step 4's larger body is done and verified the way this plan asks: the 22 `R/` files were
+regenerated, and two of the resulting book URLs were fetched and returned 200 rather than
+merely differing from the old string.
+
+**Not adopted, deliberately.** Section F's Clause 2 derivation. `hvtiR/R/members.R:6-10`
+documents a decision against it, and the reason survives the renames — a derived repo
+fails silently the next time a name moves. That the mapping is derivable today is not the
+same as it being safe to derive, so the parallel vectors stay until the maintainer decides
+otherwise. Section F stands as a proposal, not as work that was skipped.
 
 ## Why this plan exists
 
@@ -195,20 +237,29 @@ add a stub at the old path; or leave the filename and fix only the URLs inside i
 convention, which governs repos and packages. Renaming it buys tidiness and costs a dead
 URL, and this wave already has two dead-link defects to clean up.
 
+**Resolved by events, 2026-09-01.** There is no `temporal_hazard.qmd`. The chapter is
+`hazard.qmd`, and `hvtiGraphics/hazard.html` returns 200. The decision was already taken
+somewhere else, before this plan described it as open — which is the same failure the
+`Status:` line had, read from the other end.
+
 ## Order of work
 
-Nothing here is blocked by Wave 3. Suggested sequence, each its own PR:
+Nothing here is blocked by Wave 3. Suggested sequence, each its own PR. Status as of
+2026-09-01 is in brackets; the detail is under "Where this stands", above.
 
-1. **house-style** — `## Naming` source section, three governance entries, archive
+1. [landed] **house-style** — `## Naming` source section, three governance entries, archive
    `hvtiEDAreports`. Land first: it is what the rest is checked against.
-2. **Move the `house-style-v1` tag.** Merging (1) does not publish it. Consumers pin the
-   tag, not `main`. Verify by reading `HEAD is now at <sha>` in a runner's checkout log —
-   the `[new tag]` line appears either way and proves nothing.
-3. **hvtiR** — roster, catalog, `install.R`, tests, Clause 2 derivation, then regenerate
-   `man/`. This closes the live install defect; do it before the cosmetic passes.
-4. **hvtiPlotR** — 22 `R/` files, then `roxygenise()`, then `DESCRIPTION`/README/pkgdown/vignette.
-5. **hvtiGraphics** — `version-check.yml`, `packages.bib`, and the chapter decision.
-6. **Prose sweep** — the 11 `AGENTS.md`/`CLAUDE.md` files, then recompose the family.
+2. [landed] **Move the `house-style-v1` tag.** Merging (1) does not publish it.
+   Consumers pin the tag, not `main`. Verify by reading `HEAD is now at <sha>` in a
+   runner's checkout log — the `[new tag]` line appears either way and proves nothing.
+3. [landed, less section F] **hvtiR** — roster, catalog, `install.R`, tests, Clause 2
+   derivation, then regenerate `man/`. This closes the live install defect; do it before
+   the cosmetic passes.
+4. [all but README.md:184] **hvtiPlotR** — 22 `R/` files, then `roxygenise()`, then
+   `DESCRIPTION`/README/pkgdown/vignette.
+5. [landed] **hvtiGraphics** — `version-check.yml`, `packages.bib`, and the chapter
+   decision, plus `README.md` and `deep-render.yml`, which this table had missed.
+6. [landed] **Prose sweep** — the 11 `AGENTS.md`/`CLAUDE.md` files, then recompose the family.
 
 ## Verification
 
