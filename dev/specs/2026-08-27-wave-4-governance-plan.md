@@ -11,8 +11,8 @@ left between them. Verified 2026-09-01 — see "Where this stands", below.
 Checked 2026-09-01, against the artifacts rather than the branch names. Four of the six
 steps are merged, which the branch list hides: `chore/govern-three-repos`,
 `chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and `chore/badge-count-conflict`
-are all merged but never deleted, so they still read as pending work. `git branch -r
---merged origin/main` separates the two.
+are all merged but never deleted, so they still read as pending work.
+`git branch -r --merged origin/main` separates the two.
 
 **Landed.** Step 1 — the `## Naming` section sits at `sources/r-package-structure.md:635`,
 `repos.yml` carries the three new entries, and `hvtiEDAreports` reports `archived: true`.
