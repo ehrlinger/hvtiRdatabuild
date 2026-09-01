@@ -9,10 +9,10 @@ below as a standing proposal rather than as work skipped.
 ## Where this stands
 
 Checked 2026-09-01, against the artifacts rather than the branch names. All six steps are
-merged. Four were already done when this check began, and the branch list hid them: `chore/govern-three-repos`,
-`chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and `chore/badge-count-conflict`
-are all merged but never deleted, so they still read as pending work.
-`git branch -r --merged origin/main` separates the two.
+merged. Four were already done when this check began, and the branch list hid them:
+`chore/govern-three-repos`, `chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and
+`chore/badge-count-conflict` are all merged but never deleted, so they still read as
+pending work. `git branch -r --merged origin/main` separates the two.
 
 **Landed.** Step 1 — the `## Naming` section sits at `sources/r-package-structure.md:635`,
 `repos.yml` carries the three new entries, and `hvtiEDAreports` reports `archived: true`.
@@ -34,8 +34,9 @@ plan documents, and issue references that still resolve.
 That sweep is also the correction this plan most needs. Its own scope table was built by
 grepping for `hvtiRdatasets` alone, so a sibling that had gone stale under a *different*
 old name was invisible to it. Both files the survey missed were found that way —
-`hvtiGraphics/deep-render.yml:72` and `hvtiPlotR/README.md:183`, the latter stale since
-Wave 2. One grep per rename samples the problem; a wave changes several names at once.
+`hvtiGraphics/.github/workflows/deep-render.yml:72` and `hvtiPlotR/README.md:183`, the
+latter stale since Wave 2. One grep per rename samples the problem; a wave changes
+several names at once.
 
 Only one of the four hvtiGraphics references step 5 fixed was actually broken.
 GitHub redirects a renamed *repository*, so `github.com/` and
