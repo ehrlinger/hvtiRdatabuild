@@ -1,34 +1,42 @@
 # Wave 4 — the umbrella, the cross-references, and the governance gap
 
 **Date:** 2026-08-27
-**Status:** Nearly landed. Steps 1, 2, 3, 5 and 6 are done; step 4 has one line left.
-Verified 2026-09-01 — see "Where this stands", below.
+**Status:** Complete. All six steps landed 2026-09-01, less section F, which is recorded
+below as a standing proposal rather than as work skipped.
 **Design:** [`dev/specs/2026-08-27-hvti-naming-convention-design.md`](2026-08-27-hvti-naming-convention-design.md)
 **Depends on:** Waves 1 and 2 (both landed). **Not** blocked by Wave 3.
 
 ## Where this stands
 
-Checked 2026-09-01, against the artifacts rather than the branch names. Five of the six
-steps are merged, and the branch list hid four of them: `chore/govern-three-repos`,
-`chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and `chore/badge-count-conflict`
-are all merged but never deleted, so they still read as pending work.
-`git branch -r --merged origin/main` separates the two.
+Checked 2026-09-01, against the artifacts rather than the branch names. All six steps are
+merged. Four were already done when this check began, and the branch list hid them:
+`chore/govern-three-repos`, `chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and
+`chore/badge-count-conflict` are all merged but never deleted, so they still read as
+pending work. `git branch -r --merged origin/main` separates the two.
 
 **Landed.** Step 1 — the `## Naming` section sits at `sources/r-package-structure.md:635`,
 `repos.yml` carries the three new entries, and `hvtiEDAreports` reports `archived: true`.
 Step 2 — `house-style-v1` points at `be0837c`, the tip of `origin/main`. Step 3 — the
-`hvtiR` roster and catalog name `hvtiRdatabuild`. Step 5 — [hvtiGraphics#55], which
-also fixed two references the scope table below had missed. Step 6 — no `AGENTS.md` or
+`hvtiR` roster and catalog name `hvtiRdatabuild`. Step 4 — [hvtiPlotR#126], which also
+fixed the sibling one line above it. Step 5 — [hvtiGraphics#55], which fixed two
+references the scope table below had missed. Step 6 — no `AGENTS.md` or
 `CLAUDE.md` in any of the nine repos still names `hvtiRdatasets`. `tools/status.R`
 reports OK and committed for all 13 governed repos.
 
 [hvtiGraphics#55]: https://github.com/ehrlinger/hvtiGraphics/pull/55
+[hvtiPlotR#126]: https://github.com/ehrlinger/hvtiPlotR/pull/126
 
-**Outstanding.** One line, in one file:
+**Nothing outstanding.** A closing sweep of all twelve repos for all three old names at
+once — `hvtiRdatasets`, `hvtiPropensityScores`, `ehrlinger/temporal_hazard` — leaves only
+the occurrences the "Explicitly not done" list keeps: dated incident records, `inst/dev/`
+plan documents, and issue references that still resolve.
 
-| Repo | File | What |
-|---|---|---|
-| `hvtiPlotR` | `README.md:184` | link text and URL still say `hvtiRdatasets`; GitHub redirects, so it resolves under the wrong name |
+That sweep is also the correction this plan most needs. Its own scope table was built by
+grepping for `hvtiRdatasets` alone, so a sibling that had gone stale under a *different*
+old name was invisible to it. Both files the survey missed were found that way —
+`hvtiGraphics/.github/workflows/deep-render.yml:72` and `hvtiPlotR/README.md:183`, the
+latter stale since Wave 2. One grep per rename samples the problem; a wave changes
+several names at once.
 
 Only one of the four hvtiGraphics references step 5 fixed was actually broken.
 GitHub redirects a renamed *repository*, so `github.com/` and
@@ -255,7 +263,7 @@ Nothing here is blocked by Wave 3. Suggested sequence, each its own PR. Status a
 3. [landed, less section F] **hvtiR** — roster, catalog, `install.R`, tests, Clause 2
    derivation, then regenerate `man/`. This closes the live install defect; do it before
    the cosmetic passes.
-4. [all but README.md:184] **hvtiPlotR** — 22 `R/` files, then `roxygenise()`, then
+4. [landed] **hvtiPlotR** — 22 `R/` files, then `roxygenise()`, then
    `DESCRIPTION`/README/pkgdown/vignette.
 5. [landed] **hvtiGraphics** — `version-check.yml`, `packages.bib`, and the chapter
    decision, plus `README.md` and `deep-render.yml`, which this table had missed.
