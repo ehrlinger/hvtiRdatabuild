@@ -1,15 +1,15 @@
 # Wave 4 — the umbrella, the cross-references, and the governance gap
 
 **Date:** 2026-08-27
-**Status:** Mostly landed. Steps 1-3 and 6 are done; steps 4 and 5 have three lines
-left between them. Verified 2026-09-01 — see "Where this stands", below.
+**Status:** Nearly landed. Steps 1, 2, 3, 5 and 6 are done; step 4 has one line left.
+Verified 2026-09-01 — see "Where this stands", below.
 **Design:** [`dev/specs/2026-08-27-hvti-naming-convention-design.md`](2026-08-27-hvti-naming-convention-design.md)
 **Depends on:** Waves 1 and 2 (both landed). **Not** blocked by Wave 3.
 
 ## Where this stands
 
-Checked 2026-09-01, against the artifacts rather than the branch names. Four of the six
-steps are merged, which the branch list hides: `chore/govern-three-repos`,
+Checked 2026-09-01, against the artifacts rather than the branch names. Five of the six
+steps are merged, and the branch list hid four of them: `chore/govern-three-repos`,
 `chore/sync-mirror-naming`, `chore/copilot-fixes-naming` and `chore/badge-count-conflict`
 are all merged but never deleted, so they still read as pending work.
 `git branch -r --merged origin/main` separates the two.
@@ -17,17 +17,25 @@ are all merged but never deleted, so they still read as pending work.
 **Landed.** Step 1 — the `## Naming` section sits at `sources/r-package-structure.md:635`,
 `repos.yml` carries the three new entries, and `hvtiEDAreports` reports `archived: true`.
 Step 2 — `house-style-v1` points at `be0837c`, the tip of `origin/main`. Step 3 — the
-`hvtiR` roster and catalog name `hvtiRdatabuild`. Step 6 — no `AGENTS.md` or `CLAUDE.md`
-in any of the nine repos still names `hvtiRdatasets`. `tools/status.R` reports OK and
-committed for all 13 governed repos.
+`hvtiR` roster and catalog name `hvtiRdatabuild`. Step 5 — [hvtiGraphics#55], which
+also fixed two references the scope table below had missed. Step 6 — no `AGENTS.md` or
+`CLAUDE.md` in any of the nine repos still names `hvtiRdatasets`. `tools/status.R`
+reports OK and committed for all 13 governed repos.
 
-**Outstanding.** Three lines in two files:
+[hvtiGraphics#55]: https://github.com/ehrlinger/hvtiGraphics/pull/55
+
+**Outstanding.** One line, in one file:
 
 | Repo | File | What |
 |---|---|---|
 | `hvtiPlotR` | `README.md:184` | link text and URL still say `hvtiRdatasets`; GitHub redirects, so it resolves under the wrong name |
-| `hvtiGraphics` | `packages.bib:161` | `https://ehrlinger.github.io/temporal_hazard/` returns 404; `.../TemporalHazard/` returns 200 |
-| `hvtiGraphics` | `.github/workflows/version-check.yml:56` | the `TemporalHazard:temporal_hazard` mapping |
+
+Only one of the four hvtiGraphics references step 5 fixed was actually broken.
+GitHub redirects a renamed *repository*, so `github.com/` and
+`raw.githubusercontent.com/` URLs kept working; GitHub Pages does not redirect a
+renamed *project site*, so the book's `packages.bib` citation was a genuine 404. One
+rename produces two classes of stale link and only one of them shows as a failure. The
+hvtiPlotR line above is in the surviving class: it resolves, under the wrong name.
 
 Step 4's larger body is done and verified the way this plan asks: the 22 `R/` files were
 regenerated, and two of the resulting book URLs were fetched and returned 200 rather than
@@ -229,6 +237,11 @@ add a stub at the old path; or leave the filename and fix only the URLs inside i
 convention, which governs repos and packages. Renaming it buys tidiness and costs a dead
 URL, and this wave already has two dead-link defects to clean up.
 
+**Resolved by events, 2026-09-01.** There is no `temporal_hazard.qmd`. The chapter is
+`hazard.qmd`, and `hvtiGraphics/hazard.html` returns 200. The decision was already taken
+somewhere else, before this plan described it as open — which is the same failure the
+`Status:` line had, read from the other end.
+
 ## Order of work
 
 Nothing here is blocked by Wave 3. Suggested sequence, each its own PR. Status as of
@@ -244,7 +257,8 @@ Nothing here is blocked by Wave 3. Suggested sequence, each its own PR. Status a
    the cosmetic passes.
 4. [all but README.md:184] **hvtiPlotR** — 22 `R/` files, then `roxygenise()`, then
    `DESCRIPTION`/README/pkgdown/vignette.
-5. [outstanding] **hvtiGraphics** — `version-check.yml`, `packages.bib`, and the chapter decision.
+5. [landed] **hvtiGraphics** — `version-check.yml`, `packages.bib`, and the chapter
+   decision, plus `README.md` and `deep-render.yml`, which this table had missed.
 6. [landed] **Prose sweep** — the 11 `AGENTS.md`/`CLAUDE.md` files, then recompose the family.
 
 ## Verification
