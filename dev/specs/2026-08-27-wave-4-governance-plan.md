@@ -202,6 +202,21 @@ every non-archived repo in the family is governed.
 
 ### F. The simplification Wave 2 unlocked
 
+> ⚠️ **DECIDED, AND NOT ADOPTED.** See "Where this stands" above: `hvtiR/R/members.R:6-10`
+> records the decision against this derivation, and it stands. This section is kept as the
+> proposal that was considered, not as work outstanding.
+>
+> It has been re-raised as an open conflict at least twice, because the derivation is true
+> for every member **today** and so reads as safe. It was false until the 2026-08 renames
+> (`hvtiRpropensity` at `ehrlinger/hvtiPropensityScores`, `TemporalHazard` at
+> `ehrlinger/temporal_hazard`), and `ehrlinger/temporal_hazard` still resolves by GitHub
+> redirect. A derived repo that goes stale fails the same way: by appearing to work.
+>
+> `hvtiR::members()` already returns a stored `package`/`repo` mapping, so the policy in
+> `hvtiR/AGENTS.md` is implemented rather than aspirational. ⚠️ Do not mistake
+> `house-style/repos.yml` for that registry: it carries `name`, `path`, `profile` and
+> persona fields and no repo at all, because it serves house-style composition.
+
 The design's Clause 2 proposes deriving the mapping rather than hand-maintaining it:
 
 ```r
