@@ -96,11 +96,17 @@ imports this file.
   because no repository in the family has a `CODEOWNERS` file, so a PR can merge unreviewed.
 - Versions are **straight three digits** (`0.1.1`). Never a `.9000` suffix or a fourth digit.
 - **Patch-digit bumps only**, as fixes land. Minor and major are the maintainer's decision.
-- **A change that ships bumps the version.** Bump `DESCRIPTION`, refresh its `Date`, and add
-  the matching `NEWS.md` entry in the same commit. "Ships" means the file lands in the built
-  tarball, which is more than code: `R/`, `man/`, `NAMESPACE`, `inst/`, `tests/`,
-  `vignettes/`, `README.md` and `NEWS.md` itself all ship. Treat that as illustration, not an
-  inventory. `R CMD build` output is the authority when a case is unclear, not this list.
+- **A change that ships earns a `NEWS.md` entry.** File it under the
+  `# hvtiRdatabuild (unreleased)` heading, which you add when it is not already there.
+  "Ships" means the file lands in the built tarball, which is more than code: `R/`, `man/`,
+  `NAMESPACE`, `inst/`, `tests/`, `vignettes/`, `README.md` and `NEWS.md` itself all ship.
+  Treat that as illustration, not an inventory. `R CMD build` output is the authority when a
+  case is unclear, not this list.
+- **Bump when you name a version, not when you merge.** A pull request lands without
+  touching `Version:`. A separate commit renames that unreleased heading to the new version
+  and updates `DESCRIPTION` and its `Date`, at most once a day. The heading is gone again
+  after a bump, so the next change re-adds it. `.claude/house-style.md` carries the rule and
+  the reasoning.
 - **Repo-governance files do not bump the version.** `AGENTS.md`, `CLAUDE.md`, `.github/`,
   `dev/`, `.lintr`, `_pkgdown.yml` and `equivalence_signoff.yaml` are all listed in
   `.Rbuildignore`, so they never reach an installed package, and a bump would announce a
