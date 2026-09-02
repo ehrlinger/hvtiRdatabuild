@@ -63,10 +63,33 @@ directly. The port reads that list out of the study's own `vars.sas` at run time
 ported code carries no identifier even on the share, and the list cannot drift from its
 source.
 
-**The attrition record is a first-class output**, with one row per rule: `rule`, `reason`,
-`n_in`, `n_out`. Ordering is significant and is recorded, because `n_in`/`n_out` reconcile
-only against a fixed sequence: two studies applying the same rules in a different order
-produce different intermediate counts and identical final ones.
+**The attrition record is a first-class output, and it is NOT a new format.**
+`hvtiPlotR` already provides it: `hv_consort_start()` returns a tracker,
+`hv_consort_exclude()` applies rules as `predicate ~ "Reason"` formulas, and
+`hv_consort_summary()` reports the result.
+
+⚠️ **An earlier draft of this note proposed a `rule`/`reason`/`n_in`/`n_out` table of its
+own. That was written without checking, and the existing tracker is strictly richer**: it
+retains WHICH patients each rule removed, not merely how many, so
+`hv_consort_patients(tracker, stage, reason)` answers an audit question the proposed schema
+could not. A parallel format would have been a worse copy of something already shipped.
+
+So a ported `vars.R` expresses its exclusions as `hv_consort_exclude()` calls. The CONSORT
+diagram, the attrition record and the per-rule verification then come from one mechanism
+rather than three.
+
+**Ordering is significant, and the tracker already enforces the semantics that make it so.**
+First match wins: a patient excluded by an earlier rule is not counted again by a later one.
+That matches the sequential `if ... then delete` of the SAS being ported, and it means two
+studies applying the same rules in a different order produce different intermediate counts
+and identical final ones. Verified against the tracker rather than assumed: a rule placed
+after one that already removed its members reports zero.
+
+**One gap, filed rather than worked around.** `hv_consort_summary()` counts per stage, not
+per reason, so a stage built from several rules reports a single total. Per-reason counts
+are what a CONSORT arm displays and what a port is verified against.
+[hvtiPlotR#129](https://github.com/ehrlinger/hvtiPlotR/issues/129). Until it lands, a port
+tabulates the exclusion column itself and should stop doing so afterwards.
 
 ### Why the record, and not just the filtered data
 
@@ -114,9 +137,11 @@ inherit them by accident.**
 1. **Divergence is reported, not forbidden.** A study may exclude beyond the criteria HVTR
    passes down. The reconciliation surfaces the difference. Forbidding it would either
    block legitimate study-local exclusions or force upstream to carry per-study trivia.
-2. **The attrition record is the interchange format, and it is per-rule.** Aggregate counts
-   cannot drive a CONSORT diagram.
-3. **Reasons are free text for now, and this is a known weakness.** CONSORT arms will want
+2. **The interchange format is `hvtiPlotR`'s CONSORT tracker, not a new schema**, and what
+   HVTR passes must be expressible as `predicate ~ "Reason"` rules. Aggregate counts cannot
+   drive a CONSORT diagram, and a second format would drift from the one that draws it.
+3. **Reasons are free text for now, and this is a known weakness.** They are the
+   right-hand side of the tracker's formula rules. CONSORT arms will want
    a controlled vocabulary. Retrofitting one across a corpus of this size is expensive, and
    inventing one before seeing HVTR's is how two ends drift apart. Flagged, not solved.
 4. **Rule ordering is significant and recorded.** See §3.
