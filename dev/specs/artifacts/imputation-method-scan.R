@@ -24,6 +24,16 @@
 # THE CONSOLE echoes the --root you passed (and nothing below it), so do not
 # pass a root that is itself sensitive.
 
+# The study definition, SAS lexing and JSON writer are shared with
+# `imputation-callsite-scan.R`. They live in one file because both scans report
+# STUDY counts that have to reconcile with each other, and two copies of
+# `study_of()` would drift into two different answers to "how many studies?".
+here <- (function() {
+  f <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
+  if (length(f)) dirname(f[[1]]) else "."
+})()
+source(file.path(here, "scan-common.R"))
+
 args <- commandArgs(trailingOnly = TRUE)
 getarg <- function(flag, default = NULL) {
   i <- match(flag, args)
@@ -35,40 +45,10 @@ outfile <- getarg("--out", "imputation-scan.json")
 # Far slower (millions of files). Off by default; the stem scan answers S2.
 wide    <- "--wide" %in% args
 
-# path.expand() FIRST: list.files() expands a tilde root but returns expanded
-# paths, so an unexpanded `root` would misalign the substring() below by a
-# constant and leave fragments of the root path inside every study label.
-root <- path.expand(root)
-if (!dir.exists(root)) stop("root not found: ", root, call. = FALSE)
-
-# The study definition comes from hvtiRutilities. Check it BEFORE the walk:
-# the traversal is the expensive part, and discovering a missing package after
-# an hour of it is the failure this guard exists to prevent.
-if (!requireNamespace("hvtiRutilities", quietly = TRUE)) {
-  # ⚠️ Do NOT say "not installed". requireNamespace() returns FALSE for ANY
-  # load failure -- absent, broken, or built by a newer R than this one -- and
-  # cannot tell them apart. A server carrying several R versions makes the last
-  # of those the likely case, and it is the one a bare "not installed" sends
-  # the reader hunting in the wrong direction: the library path carries
-  # <major>.<minor>, so R 4.4 and R 4.6 cannot share one. Report the R actually
-  # running and the paths actually searched, and let the reader diagnose it.
-  stop("hvtiRutilities could not be loaded -- it defines what a study is, and ",
-       "without it the study counts cannot reconcile with the census.\n",
-       "  This R:      ", R.version.string, "\n",
-       "  R_HOME:      ", R.home(), "\n",
-       "  libPaths:    ", paste(.libPaths(), collapse = "\n               "), "\n",
-       "It may be absent, or present but built by a different R than this one. ",
-       "Check the library paths above before installing anything.",
-       call. = FALSE)
-}
-.folders <- unique(hvtiRutilities::hvti_taxonomy()$folder)
+root <- normalise_root(root)
+.folders <- taxonomy_folders()
+study_of <- study_of_factory(root, .folders)
 message("taxonomy folders: ", paste(.folders, collapse = ", "))
-# list.files(full.names = TRUE) prefixes the literal string it was given.
-# Strip trailing slashes ONCE, here, and use this same string everywhere --
-# comparing against normalizePath() instead silently no-ops under a symlinked
-# or automounted root (very plausible for a share), which would collapse every
-# study to one id and make every `studies` count wrong without any error.
-root <- sub("/+$", "", root)
 
 message("Scanning (", if (wide) "WIDE: all .sas" else "stem-matched .sas", ")")
 
@@ -88,58 +68,10 @@ files <- list.files(root, pattern = pat, recursive = TRUE,
                     all.files = FALSE, no.. = TRUE)
 message("candidate files: ", length(files))
 
-# ---- study attribution ---------------------------------------------------
-# A STUDY IS THE DIRECTORY HOLDING A TAXONOMY FOLDER, and the nearest such
-# ancestor wins. This is hvtiRutilities' definition (R/job_census.R:1-12) and
-# it is the one that produced the census counts this scan reconciles against,
-# so it is reused rather than reinvented.
-#
-# ⚠️ An earlier draft took the first two path components as "<tree>/<study>".
-# That is WRONG for this corpus and would have reported subject areas as
-# studies: real studies sit at variable depth -- `cardiac/pericardium` at two,
-# `cardiac/support/avecor` and `vascular/thoracic-aorta/previous_surgery` at
-# three.
-#
-# The folder list is read from hvtiRutilities (loaded above) rather than
-# hardcoded, so it cannot drift from the taxonomy.
-
-study_of <- function(paths) {
-  # substring(), not sub(): `root` is a path, not a regex, and a directory
-  # named "study (copy)" or "v1.2+" carries metacharacters that would match
-  # the wrong thing while still looking like it worked.
-  # iconv() first: ONE Latin-1 filename anywhere on the share makes
-  # substring() abort with "invalid multibyte string" -- after the whole
-  # traversal, for zero output. hvtiRutilities documents this as having
-  # already bitten this corpus.
-  paths <- iconv(paths, "", "UTF-8", sub = "byte")
-  rel   <- substring(paths, nchar(root) + 2L)
-  parts <- strsplit(rel, "/", fixed = TRUE)
-  vapply(parts, function(p) {
-    dirs <- utils::head(p, -1L)              # only directories can be a folder
-    hits <- which(dirs %in% .folders)
-    if (!length(hits)) return(NA_character_) # unplaced: no taxonomy ancestor
-    i <- max(hits)                           # nearest to the file
-    if (i == 1L) "." else paste(dirs[seq_len(i - 1L)], collapse = "/")
-  }, character(1))
-}
-
 # ---- classifiers ------------------------------------------------------------
 # SAS is case-insensitive and free-form: a statement may wrap lines, so match
 # against the whole file with newlines collapsed to spaces, and split on ';'
 # to keep one statement's options from bleeding into the next.
-statements <- function(txt) {
-  one <- paste(txt, collapse = " ")
-  one <- gsub("/\\*.*?\\*/", " ", one)          # strip /* block comments */
-  one <- tolower(gsub("[[:space:]]+", " ", one))
-  st  <- strsplit(one, ";", fixed = TRUE)[[1]]
-  # SAS `* ... ;` and macro `%* ... ;` comments end at the semicolon, so after
-  # the split each is its own element. Drop them. Without this a commented-out
-  # or historical `* proc standard replace;` -- ordinary in a 30-year corpus --
-  # counts as single mean imputation, biasing the ONE number S2 blocks on, and
-  # in one direction only.
-  st[!grepl("^ *%?\\*", st)]
-}
-
 classify <- function(path) {
   txt <- tryCatch(readLines(path, warn = FALSE, encoding = "latin1"),
                   error = function(e) character(0))
@@ -342,21 +274,6 @@ out <- list(
 
 # ---- emit -------------------------------------------------------------------
 # Minimal JSON writer so the script needs no packages.
-to_json <- function(x, ind = 0) {
-  pad <- strrep(" ", ind)
-  if (is.null(x) || (length(x) == 1 && is.na(x) && !is.character(x))) return("null")
-  if (is.list(x)) {
-    if (!length(x)) return("{}")
-    nm <- names(x)
-    items <- vapply(seq_along(x), function(i)
-      paste0(pad, "  \"", nm[i], "\": ", to_json(x[[i]], ind + 2)), character(1))
-    return(paste0("{\n", paste(items, collapse = ",\n"), "\n", pad, "}"))
-  }
-  if (is.character(x)) return(paste0("\"", gsub("\"", "'", x), "\""))
-  if (is.logical(x))   return(if (isTRUE(x)) "true" else "false")
-  if (is.na(x))        return("null")
-  format(x, scientific = FALSE)
-}
 writeLines(to_json(out), outfile)
 
 message("\n--- S2 ANSWER ---")
