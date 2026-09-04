@@ -258,6 +258,13 @@ out <- list(
     run_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%S%z"),
     root    = if (identical(root, "/studies")) "/studies" else "(non-default root)",
     mode    = if (wide) "wide: all .sas" else "stem-matched .sas",
+    # WHICH taxonomy defined "a study" for this run. The study counts are a
+    # function of this folder list, so a run that does not record it cannot be
+    # compared against another run -- the same script over the same share
+    # returns different study totals under a different hvtiRutilities. These
+    # are taxonomy category names, not study or patient identifiers.
+    hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
+    taxonomy_folders       = paste(sort(.folders), collapse = ","),
     files_considered = length(files),
     files_read       = length(res),
     contains_identifiers = FALSE
