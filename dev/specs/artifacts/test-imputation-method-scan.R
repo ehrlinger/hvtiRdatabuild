@@ -23,8 +23,13 @@ scan_script <- file.path(here, "imputation-method-scan.R")
 stopifnot(file.exists(scan_script))
 
 if (!requireNamespace("hvtiRutilities", quietly = TRUE)) {
-  message("SKIP: hvtiRutilities not installed; the scan needs it for the ",
-          "taxonomy folders that define a study.")
+  # Same caution as the scan's guard: requireNamespace() cannot distinguish
+  # absent from built-by-another-R, so report what is running rather than
+  # asserting the package is missing.
+  message("SKIP: hvtiRutilities could not be loaded, so the scan cannot run.\n",
+          "  This R:   ", R.version.string, "\n",
+          "  libPaths: ", paste(.libPaths(), collapse = "\n            "), "\n",
+          "It may be absent, or built by a different R than this one.")
   quit(save = "no", status = 0)
 }
 
@@ -76,8 +81,14 @@ put("cardiac/epsilon", "mult_imput_epsilon.sas",
 # ---- run --------------------------------------------------------------------
 
 outfile <- file.path(root, "out.json")
-res <- system2("Rscript", c(shQuote(normalizePath(scan_script)),
-                            "--root", shQuote(root), "--out", shQuote(outfile)),
+# Spawn the scan with THE R THAT IS RUNNING THIS TEST, not with whatever
+# `Rscript` is on PATH. A server may carry a dozen R versions with one default
+# symlink, so `system2("Rscript", ...)` can test a different R than the one you
+# invoked -- which makes the test's verdict about the wrong interpreter, and
+# reports the mismatch as a scan failure rather than an environment one.
+rscript <- file.path(R.home("bin"), "Rscript")
+res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
+                          "--root", shQuote(root), "--out", shQuote(outfile)),
                stdout = TRUE, stderr = TRUE)
 if (!file.exists(outfile)) {
   cat(res, sep = "\n")

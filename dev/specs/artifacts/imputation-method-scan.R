@@ -45,8 +45,20 @@ if (!dir.exists(root)) stop("root not found: ", root, call. = FALSE)
 # the traversal is the expensive part, and discovering a missing package after
 # an hour of it is the failure this guard exists to prevent.
 if (!requireNamespace("hvtiRutilities", quietly = TRUE)) {
-  stop("hvtiRutilities is required -- it defines what a study is. ",
-       "Without it the study counts cannot reconcile with the census.",
+  # ⚠️ Do NOT say "not installed". requireNamespace() returns FALSE for ANY
+  # load failure -- absent, broken, or built by a newer R than this one -- and
+  # cannot tell them apart. A server carrying several R versions makes the last
+  # of those the likely case, and it is the one a bare "not installed" sends
+  # the reader hunting in the wrong direction: the library path carries
+  # <major>.<minor>, so R 4.4 and R 4.6 cannot share one. Report the R actually
+  # running and the paths actually searched, and let the reader diagnose it.
+  stop("hvtiRutilities could not be loaded -- it defines what a study is, and ",
+       "without it the study counts cannot reconcile with the census.\n",
+       "  This R:      ", R.version.string, "\n",
+       "  R_HOME:      ", R.home(), "\n",
+       "  libPaths:    ", paste(.libPaths(), collapse = "\n               "), "\n",
+       "It may be absent, or present but built by a different R than this one. ",
+       "Check the library paths above before installing anything.",
        call. = FALSE)
 }
 .folders <- unique(hvtiRutilities::hvti_taxonomy()$folder)
