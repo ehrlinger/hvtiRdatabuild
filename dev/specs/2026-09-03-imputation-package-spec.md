@@ -38,7 +38,8 @@ The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A
 
 **The scan is written and unrun**, at
 [`artifacts/imputation-method-scan.R`](artifacts/imputation-method-scan.R).
-Base R, no packages, run where `/studies` is mounted:
+Run where the studies share is mounted. It **requires `hvtiRutilities`**, for
+the reason in the note below, and stops rather than guessing if it is absent:
 
 ```
 Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
@@ -50,6 +51,21 @@ Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
 which is not imputation at all. A scan that greps `proc standard.*replace` and
 stops conflates the two and inflates the single-imputation count. The script
 reports the three cases separately.
+
+⚠️ **A study is the directory holding a taxonomy folder**, nearest ancestor
+wins -- `hvtiRutilities`' definition (`R/job_census.R:1-12`), and the one that
+produced the census counts this scan reconciles against. The folder list is
+read from `hvtiRutilities::hvti_taxonomy()` rather than hardcoded so it cannot
+drift.
+
+⚠️ **An earlier draft took the first two path components as `<tree>/<study>`,
+and running it against the real share proved that wrong.** Studies sit at
+variable depth -- `cardiac/pericardium` at two, `cardiac/support/avecor` and
+`vascular/thoracic-aorta/previous_surgery` at three -- so that rule reported
+**subject areas as studies**, undercounting badly while emitting
+well-formed JSON. Files with no taxonomy ancestor are now counted as
+`files_unplaced` rather than dropped, so a missing job stays distinguishable
+from a job that does not exist.
 
 Its output carries counts only -- no path, no file name, no study identifier,
 no variable name -- enforced in its emitter rather than left to care.
@@ -258,8 +274,8 @@ the stable part of the contract in the meantime.
 
 - [ ] **§2 settled by a scan**: which of the 309 and 242 studies ran single versus
   multiple imputation. **Still open, and still blocking.** The scan is written
-  (`imputation-method-scan.R`, base R, no packages) and needs running where
-  `/studies` is mounted; it classifies `PROC STANDARD REPLACE` **without**
+  (`imputation-method-scan.R`; requires `hvtiRutilities` for the study
+  definition) and needs running where the studies share is mounted; it classifies `PROC STANDARD REPLACE` **without**
   `MEAN=`/`STD=` (imputation) separately from **with** them (standardisation,
   which is not imputation at all), and counts `PROC MI`/`MIANALYZE` and
   `NIMPUTE=`. Until it returns, ⚠️ **do not name a function `impute()`.**

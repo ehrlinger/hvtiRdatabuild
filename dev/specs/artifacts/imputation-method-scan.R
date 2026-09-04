@@ -5,7 +5,8 @@
 # of the studies carrying an `imputsub` or `mult_imput` job, which ran SINGLE
 # mean imputation and which ran MULTIPLE imputation?
 #
-# Run where /studies is mounted. Base R only, no packages.
+# Run where the studies share is mounted. REQUIRES hvtiRutilities, which
+# defines what a study is; everything else is base R.
 #
 #   Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
 #
@@ -16,7 +17,7 @@
 # source line reaches it.
 #
 # THE RUNNING PROCESS does hold study directory names in memory -- `study_of()`
-# returns "<tree>/<study>" so that distinct studies can be counted. That value
+# returns the study directory path so that distinct studies can be counted. That value
 # is reduced to a count by `nstud()` and never emitted. It is NOT anonymised,
 # so anything added here that prints or writes `stu` would break the contract.
 #
@@ -34,7 +35,22 @@ outfile <- getarg("--out", "imputation-scan.json")
 # Far slower (millions of files). Off by default; the stem scan answers S2.
 wide    <- "--wide" %in% args
 
+# path.expand() FIRST: list.files() expands a tilde root but returns expanded
+# paths, so an unexpanded `root` would misalign the substring() below by a
+# constant and leave fragments of the root path inside every study label.
+root <- path.expand(root)
 if (!dir.exists(root)) stop("root not found: ", root, call. = FALSE)
+
+# The study definition comes from hvtiRutilities. Check it BEFORE the walk:
+# the traversal is the expensive part, and discovering a missing package after
+# an hour of it is the failure this guard exists to prevent.
+if (!requireNamespace("hvtiRutilities", quietly = TRUE)) {
+  stop("hvtiRutilities is required -- it defines what a study is. ",
+       "Without it the study counts cannot reconcile with the census.",
+       call. = FALSE)
+}
+.folders <- unique(hvtiRutilities::hvti_taxonomy()$folder)
+message("taxonomy folders: ", paste(.folders, collapse = ", "))
 # list.files(full.names = TRUE) prefixes the literal string it was given.
 # Strip trailing slashes ONCE, here, and use this same string everywhere --
 # comparing against normalizePath() instead silently no-ops under a symlinked
@@ -48,8 +64,10 @@ message("Scanning (", if (wide) "WIDE: all .sas" else "stem-matched .sas", ")")
 # The census counted by file-name prefix; match the same two stems so the
 # result reconciles against it (926 imputsub files, 411 mult_imput).
 # Anchored: the census counted by file-name PREFIX, so an unanchored match
-# (which would also take `xx_imputsub_old.sas`) would find strictly more files
-# and the reconciliation against 926/411 could not close.
+# (which would also take `xx_imputsub_old.sas`) would inflate the count.
+# NOTE the census's 926/411 have NO extension allowlist -- they include .log,
+# .lst and the rest -- so this .sas-only scan will legitimately return FEWER
+# files. That gap is a definition difference, not a scan defect.
 stem_re <- "^(imputsub|mult_imput)"
 pat     <- if (wide) "\\.sas$" else paste0(stem_re, ".*\\.sas$")
 
@@ -58,16 +76,39 @@ files <- list.files(root, pattern = pat, recursive = TRUE,
                     all.files = FALSE, no.. = TRUE)
 message("candidate files: ", length(files))
 
-# A study is the directory one level below a top-level tree:
-# <root>/<tree>/<study>/...  Reduced to an integer id immediately; the
-# character path is never carried forward.
+# ---- study attribution ---------------------------------------------------
+# A STUDY IS THE DIRECTORY HOLDING A TAXONOMY FOLDER, and the nearest such
+# ancestor wins. This is hvtiRutilities' definition (R/job_census.R:1-12) and
+# it is the one that produced the census counts this scan reconciles against,
+# so it is reused rather than reinvented.
+#
+# ⚠️ An earlier draft took the first two path components as "<tree>/<study>".
+# That is WRONG for this corpus and would have reported subject areas as
+# studies: real studies sit at variable depth -- `cardiac/pericardium` at two,
+# `cardiac/support/avecor` and `vascular/thoracic-aorta/previous_surgery` at
+# three.
+#
+# The folder list is read from hvtiRutilities (loaded above) rather than
+# hardcoded, so it cannot drift from the taxonomy.
+
 study_of <- function(paths) {
-  # substring(), not sub(): `root` is a path, not a regex, and interpolating it
-  # into one would misbehave on any metacharacter it contains.
-  rel <- substring(paths, nchar(root) + 2L)
+  # substring(), not sub(): `root` is a path, not a regex, and a directory
+  # named "study (copy)" or "v1.2+" carries metacharacters that would match
+  # the wrong thing while still looking like it worked.
+  # iconv() first: ONE Latin-1 filename anywhere on the share makes
+  # substring() abort with "invalid multibyte string" -- after the whole
+  # traversal, for zero output. hvtiRutilities documents this as having
+  # already bitten this corpus.
+  paths <- iconv(paths, "", "UTF-8", sub = "byte")
+  rel   <- substring(paths, nchar(root) + 2L)
   parts <- strsplit(rel, "/", fixed = TRUE)
-  vapply(parts, function(p) if (length(p) >= 2L) paste(p[1:2], collapse = "/") else NA_character_,
-         character(1))
+  vapply(parts, function(p) {
+    dirs <- utils::head(p, -1L)              # only directories can be a folder
+    hits <- which(dirs %in% .folders)
+    if (!length(hits)) return(NA_character_) # unplaced: no taxonomy ancestor
+    i <- max(hits)                           # nearest to the file
+    if (i == 1L) "." else paste(dirs[seq_len(i - 1L)], collapse = "/")
+  }, character(1))
 }
 
 # ---- classifiers ------------------------------------------------------------
@@ -175,13 +216,23 @@ out <- list(
   totals = list(
     files                  = length(res),
     studies                = nstud(rep(TRUE, length(res))),
+    files_unplaced         = sum(is.na(stu)),
     single_mean_imputation = sum(single),
     multiple_imputation    = sum(multi),
     both_in_one_file       = sum(single & multi),
     neither                = sum(!single & !multi),
     studies_single         = nstud(single),
     studies_multiple       = nstud(multi),
-    studies_both           = nstud(single & multi)
+    studies_both           = nstud(single & multi),
+    # A job that CALLS %imputsub instead of inlining `proc standard replace`
+    # classifies as `neither`. Without these, a corpus that mostly calls the
+    # macro would print "single mean imputation: 0 studies", which reads as
+    # "nobody ran single imputation" -- the opposite of the truth, from a
+    # clean-looking run. S2 must be read with these alongside the two above.
+    files_calls_imputsub   = sum(fld("calls_imputsub")),
+    files_calls_mult_imput = sum(fld("calls_mult_imput")),
+    studies_calls_imputsub  = nstud(fld("calls_imputsub")),
+    studies_calls_mult_imput= nstud(fld("calls_mult_imput"))
   ),
   by_stem = list(imputsub = by_stem("imputsub"),
                  mult_imput = by_stem("mult_imput"),
@@ -236,6 +287,10 @@ message("multiple imputation:     ", out$totals$multiple_imputation,
         " files / ", out$totals$studies_multiple, " studies")
 message("both in one file:        ", out$totals$both_in_one_file)
 message("neither (macro call/other): ", out$totals$neither)
+message("  of which call %imputsub:   ", out$totals$files_calls_imputsub,
+        " files / ", out$totals$studies_calls_imputsub, " studies")
+message("  of which call %mult_imput: ", out$totals$files_calls_mult_imput,
+        " files / ", out$totals$studies_calls_mult_imput, " studies")
 message("\nPROC STANDARD REPLACE without MEAN=/STD= (imputation): ",
         out$proc_standard_detail$files_replace_without_mean_std)
 message("PROC STANDARD REPLACE with MEAN=/STD= (standardisation, NOT imputation): ",
