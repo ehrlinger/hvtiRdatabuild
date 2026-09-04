@@ -1,0 +1,259 @@
+# Spec — `hvtiRimputation`, and whether it should exist
+
+**Date:** 2026-09-03
+**Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
+**Status:** designed, nothing built. §6 and §8 are now **decided** (2026-09-04); §2 and §7 remain open.
+**Updated:** 2026-09-04 — §6 settled by the maintainer, §8 settled by design, and the §2 scan written for server-side execution.
+**Origin:** porting a study's `vars.sas` (issue #31) found that reproducing published results requires an imputation step nobody had accounted for.
+
+⚠️ **No study or patient identifier appears here, and no counts or names beyond those already public.** Three variable names and their coefficients appear in §1; they are quoted verbatim from [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33), a public issue on this repository, and are reproduced only because the size of the effect is the argument. ⚠️ This is a **narrower claim than the sibling specs make** — `2026-09-02-vars-port-and-attrition-design.md` carries no variable names at all. Do not copy the blanket wording from there onto this file; it would be false.
+
+---
+
+## 1. Why this is not a nice-to-have
+
+Imputation reads like preprocessing. It is not: it changes filed results.
+
+One study, one model, from #33:
+
+| | SAS (with imputation) | R (complete case) |
+|---|---|---|
+| `ln_avare` | −2.4618 | −1.6772 |
+| `chb_pr` | 0.8579 | 1.1037 |
+| `hxn_mi` | 0.8718 | 0.8992 |
+
+Complete case retained **1,712 of 2,696 rows**. With the imputation step implemented, **all eleven coefficients match the published listing to its printed precision.**
+
+So a port that skips imputation does not produce a slightly different answer. It produces a different model on a different cohort, and it looks like it worked.
+
+**Corpus scale:** `imputsub` appears in **309 studies**, `mult_imput` in **242**. Neither has a taxonomy prefix.
+
+## 2. 🔴 The distinction that has to be settled first
+
+**`PROC STANDARD ... REPLACE` is single mean imputation. It is not multiple imputation.** They are different methods with different inferential properties: mean imputation is deterministic and understates variance; multiple imputation generates several completed datasets and pools, precisely so the standard errors reflect the uncertainty.
+
+The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A package called `hvtiRimputation` that quietly does one when a user expects the other is a worse failure than no package at all.
+
+**Required before anything is built:** determine what the 309 and 242 studies actually ran. That is a scan question, not a design question, and it is cheap. Until then, ⚠️ **do not name a function `impute()`.**
+
+**The scan is written and unrun**, at
+[`artifacts/imputation-method-scan.R`](artifacts/imputation-method-scan.R).
+Base R, no packages, run where `/studies` is mounted:
+
+```
+Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
+```
+
+⚠️ **It separates a trap #33 names and this section did not repeat.**
+`PROC STANDARD ... REPLACE` is mean imputation *only when there is no* `MEAN=`
+*or* `STD=`. With `MEAN=0 STD=1` the identical statement is standardisation,
+which is not imputation at all. A scan that greps `proc standard.*replace` and
+stops conflates the two and inflates the single-imputation count. The script
+reports the three cases separately.
+
+Its output carries counts only -- no path, no file name, no study identifier,
+no variable name -- enforced in its emitter rather than left to care.
+
+## 3. What the SAS step actually does
+
+From #33, and this is the contract to reproduce:
+
+- **Mean of the non-missing, per variable.**
+- **Applied after derivation, not before.** The order matters: a derived variable computed from imputed inputs is not the same as a derived variable imputed after the fact.
+- **`ms_*` missingness indicators created before imputation**, so the model can carry "this was missing" as a term.
+
+That last one is the same pattern this family keeps rediscovering: ⭐ **a value that means "observed" and a value that means "filled in" must not be the same value.** The `ms_*` indicators are the SAS-era answer to it. Whatever gets built must preserve that, not because SAS did it but because it is right.
+
+## 4. What it must emit
+
+- **The imputed dataset.**
+- **A record of what was imputed, per variable and per row.** Not a count — the actual map. A summary that says "12 values imputed in `ln_avare`" cannot answer "was this patient's value imputed?", which is the question an audit asks.
+- **The `ms_*` indicators**, or whatever replaces them, generated rather than hand-maintained.
+- **Enough provenance to re-run it.** Imputation is one of the steps John named in the 2026-09-02 training as version-pinning: *"if we run an imputation step and we save that into the data, then that sort of pins what version of the imputation package we need."* So the emitted artifact must record the method and the package version that produced it, the way `record_provenance()` already does for renders.
+
+## 5. Swappable method
+
+#33 asks for alternatives to mean imputation. The design consequence: **the method is a parameter, and the emitted record names which method ran.** A dataset that does not say how it was imputed is not reproducible, and the default must not be silent — if mean imputation is the default because it reproduces SAS, the artifact should say "mean" rather than "default".
+
+## 6. Own package, or a layer in `hvtiRdatabuild`?
+
+The open question in #33. The arguments as they stand:
+
+**For a layer inside `hvtiRdatabuild`:** imputation happens during the build, on the built dataset, before analysis. It shares the manifest, the checksums and the provenance machinery already there. A separate package means a second place to keep those in sync.
+
+**For its own package:** imputation is a *method*, not a build step, and the family's pattern is that methods live in their own packages — `hvtiRbootstrap`, `hvtiRpropensity`, `hvtiRlifetables`. Analysis jobs that impute without rebuilding would otherwise have to depend on the whole build layer.
+
+⭐ **The test that decides it:** does anything outside the build ever need to impute? If an analysis job can be handed a built dataset and impute it — which the per-study `vars.sas` pattern suggests, since imputation sits inside `vars` and `vars` is per-study — then it is a method and wants its own package. If imputation only ever happens once, during the build, it is a layer.
+
+**My reading is that it is a method and wants its own package**, on the strength of `imputsub` appearing in 309 studies as a *job stem* rather than as part of a build. But that is an inference from a filename pattern, and this family has been bitten three times in a fortnight by exactly that kind of inference. **Check it before committing.**
+
+### 🟢 DECIDED 2026-09-04 — its own package
+
+`hvtiRimputation` is a package, not a layer. The decision is the maintainer's,
+taken directly rather than derived from the §6 test, and it matches the reading
+above.
+
+⚠️ **The §6 test was not run.** "Does anything outside the build ever need to
+impute?" is still unverified — the evidence remains the filename pattern this
+section warns about. That does not reopen the decision, but it does mean the
+package should be built so that being wrong is survivable: if imputation turns
+out to happen only during the build, a package that `hvtiRdatabuild` depends on
+is a mild redundancy, whereas a build layer that analysis jobs turn out to need
+would have been a hard rewrite. **The decision fails safe in the direction it
+was taken**, which is the reason to stop worrying about the unrun test.
+
+⚠️ Note that this is a statement about **cost if the decision is wrong**, not a
+prediction that the dependency will exist. §8 states that `hvtiRdatabuild` gains
+no dependency on `hvtiRimputation` under the design as it stands, and that
+remains true; the sentence above describes the fallback if §6 turns out to have
+been decided the wrong way.
+
+## 7. Taxonomy
+
+Needs a two-letter prefix. `mi` was floated in the 2026-09-02 training. ⚠️ If §2 concludes that both single and multiple imputation are present, **one prefix will not be enough** — they are different job types by the same test that split `dc` into five.
+
+Coordinate with the per-folder re-parse (`hvtiRtemplates/dev/specs/2026-09-02-per-folder-naming-parse-handoff.md`); the taxonomy is being re-derived and this is the moment to add prefixes rather than after.
+
+## 8. 🟢 DECIDED 2026-09-04 — imputation and the attrition record
+
+#33 flagged that imputation changes what the CONSORT diagram says, and left it
+open. It is now decided.
+
+### The tension, with the numbers
+
+From #33's worked study: the analysis set is **2,696 rows**; complete-case
+would have used **1,712**. So **984 rows (36.5%) are in the published analysis
+only because a covariate was filled in.**
+
+Those rows are **not excluded** — the attrition record must not show them as
+dropped. They are also not fully observed. The record has had no vocabulary for
+that third state.
+
+### What drives the design: port verification
+
+The attrition record has three consumers (#31 §1): CONSORT input, HVTR
+reconciliation, and port verification. **Port verification drives the imputation
+entry**; the other two are derived from it. The reason is that verification
+needs checkable numbers, and CONSORT can be produced from a richer record while
+the reverse does not hold.
+
+984 is the number that earns its place: a port that mean-imputes the **wrong
+variable list** still reaches 2,696 rows and still looks correct. It does not
+reach 984.
+
+### The shape: an annotation stage on the CONSORT tracker
+
+⚠️ **The attrition record is `hvtiPlotR`'s CONSORT tracker**, not a table of
+this package's design — see `2026-09-02-vars-port-and-attrition-design.md` §3,
+which records an earlier draft proposing a `rule`/`reason`/`n_in`/`n_out`
+schema and rejects it because the shipped tracker is strictly richer. That
+still holds: the design below extends the tracker rather than paralleling it.
+
+#### 🔴 What the first draft of this section got wrong
+
+A draft written earlier on 2026-09-04 claimed the tracker **already** supported
+a non-excluding stage, on the strength of `hv_consort_summary()` reading
+`if (!is.null(s$excl_col)) ... else NA_integer_`, and concluded that the gap
+was "a constructor, not a schema". **That was a misreading, and it is recorded
+here rather than deleted because the misreading is an easy one to repeat.**
+
+Read `hv_consort_exclude()` (`consort-plot.R:222-229`): it writes `excl_col`
+onto the **stage that is currently last**, and then appends a fresh stage whose
+`excl_col` is `NULL`. `hv_consort_start()` does the same for stage one.
+
+So **`excl_col = NULL` means "nothing has excluded downstream of this stage
+yet" — it identifies the terminal stage.** hvtiPlotR's own roxygen says so:
+*"`n_excluded` and `excl_col` are `NA` for the final stage (no downstream exclusion defined yet)"* (`consort-plot.R:270-271`). It is not a
+marker for a stage that excludes nobody, and a stage relying on it loses the
+property the moment another exclusion is appended.
+
+Two further consequences of that draft, both defects:
+
+- **An all-`TRUE` `include_col` silently resurrects excluded patients.**
+  `hv_consort_exclude()` computes `active <- dat[[prev_include]]`
+  (`consort-plot.R:203-204`), so the next rule would re-admit everyone every
+  earlier rule removed. No error, no warning, a wrong final N.
+- **`hv_consort_patients()` cannot answer the counterfactual.** It reads only
+  `include_col` and `excl_col` (`consort-plot.R:340-353`). `imputed_any` and
+  `complete_case_pass` are ordinary data columns it never inspects, so the
+  claim that the 984 falls out "with no new function" was false.
+
+#### The corrected design
+
+An **annotation stage**: a stage that records something about the rows without
+removing any.
+
+1. **Its `include_col` is a copy of the previous stage's include column**, not
+   an all-`TRUE` column. This is the load-bearing detail. It keeps `n_included`
+   honest (the survivor count, not the screened count) and keeps any later
+   `hv_consort_exclude()` gating on the right row set.
+2. **It stores the names of its annotation columns on the stage record.** This
+   is a schema addition, and calling it one is the correction above: without it
+   a summary row cannot say what was annotated, and an accessor has nothing to
+   read.
+3. **Its `excl_col` behaves like any other stage's** — `NULL` until something is
+   appended after it, then the downstream exclusion's column. That is the
+   tracker's existing model and needs no change.
+
+### What the imputation annotation carries
+
+| Column | Meaning |
+|---|---|
+| `imputed_any` | row level: did this row have any value filled? |
+| `complete_case_pass` | row level: would this row have survived complete-case? |
+
+**Row level, not counts.** 984 is **not** the sum of the per-variable missing
+counts — a row missing three covariates is dropped once — so only a row-wise
+evaluation gets it right, and it is the number that catches a port which
+imputed the *wrong variable list* yet still reached 2,696.
+
+The counterfactual is then `imputed_any & !complete_case_pass`. ⚠️ **That needs
+an accessor; it is not free.** Either hvtiPlotR gains one alongside the
+annotation constructor, or the caller reads `tracker$data` directly — which
+works today but hard-codes column names the tracker owns. Prefer the accessor.
+
+### Division of labour
+
+- **`hvtiRimputation`** owns the per-row, per-variable map (§4) and the `ms_*`
+  indicators, and emits the two columns above.
+- **The study's ported `vars.R`** passes them to the tracker.
+- **`hvtiPlotR`** gains the annotation-stage constructor and its accessor,
+  generic rather than imputation-aware.
+
+### The consistency check this buys
+
+`sum(imputed_any)` must equal the number of rows where any `ms_*` is set. Two
+independently produced numbers that must agree — the per-rule-table property
+#31 wants, applied to imputation.
+
+### ⚠️ Cross-package consequence
+
+The annotation stage constructor **and its accessor** land in **`hvtiPlotR`**,
+together with the stage-record field naming the annotation columns. Both must be
+**generic** — "a stage that annotates without excluding" — not
+imputation-specific: `hvtiPlotR` is a plotting package and must not learn what
+imputation is. Winsorisation and any other non-excluding transform should reach
+for the same constructor.
+
+⚠️ This is a **change to a shipped, exported API's data structure**, not an
+additive helper, so it is a larger ask than the first draft implied. hvtiPlotR
+is heading to 3.0 (currently 2.7.12), which is the right moment for it, but the
+work belongs on hvtiPlotR's roadmap and should be raised there rather than
+assumed by this spec.
+
+## Definition of done for this spec
+
+- [ ] **§2 settled by a scan**: which of the 309 and 242 studies ran single versus
+  multiple imputation. **Still open, and still blocking.** The scan is written
+  (`imputation-method-scan.R`, base R, no packages) and needs running where
+  `/studies` is mounted; it classifies `PROC STANDARD REPLACE` **without**
+  `MEAN=`/`STD=` (imputation) separately from **with** them (standardisation,
+  which is not imputation at all), and counts `PROC MI`/`MIANALYZE` and
+  `NIMPUTE=`. Until it returns, ⚠️ **do not name a function `impute()`.**
+- [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
+  §6 test itself was not run; see §6 for why the decision fails safe anyway.
+- [ ] **Taxonomy prefix or prefixes agreed**, coordinated with the re-parse.
+  Still open, and still contingent on §2: if both single and multiple
+  imputation are present, one prefix is not enough.
+- [x] **The imputation/CONSORT interaction decided** 2026-09-04 — §8.
+- [ ] Only then: a design spec for the package, and a plan.
