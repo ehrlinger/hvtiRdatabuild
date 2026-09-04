@@ -135,24 +135,55 @@ classify <- function(path) {
   st <- statements(txt)
 
   std <- grep("proc standard", st, fixed = TRUE, value = TRUE)
-  # REPLACE is what fills missing values. MEAN=/STD= on the SAME statement
-  # turn it into standardisation, which is NOT imputation -- the distinction
-  # #33 rests on. Count the three cases separately.
+  # REPLACE is what fills missing values, and it fills them WHETHER OR NOT
+  # MEAN=/STD= is also present.
+  #
+  # ⚠️ An earlier draft treated `REPLACE` with `MEAN=`/`STD=` as standardisation
+  # and excluded it from every single-imputation count. That is WRONG, and it
+  # deflated the one number S2 turns on. SAS documents REPLACE as replacing
+  # missing values with the variable mean, or with the MEAN= value when one is
+  # given. So `PROC STANDARD MEAN=0 STD=1 REPLACE` does BOTH: it standardises
+  # the observed values and it fills the missing ones with 0 -- which, in
+  # standardised units, IS the mean. Both cases are imputation.
+  #
+  # The distinction is still worth reporting, because the two fill with a
+  # different value on a different scale, and a port has to reproduce whichever
+  # one the study ran. It is a breakdown, not a filter.
   std_replace  <- grep("replace", std, fixed = TRUE, value = TRUE)
   has_mean_std <- grepl("\\bmean *=|\\bstd *=", std_replace)
 
+  # PROC MI: NIMPUTE binds to ITS OWN statement, so classify per statement.
+  #
+  # ⚠️ NIMPUTE=0 is the documented way to run PROC MI for missingness
+  # diagnostics WITHOUT imputing. Counting it as multiple imputation inflates
+  # the other number S2 turns on -- and a careful programmer running the
+  # diagnostic before deciding is exactly the case that matters here, not a
+  # rare edge.
+  #
+  # An absent NIMPUTE= means the SAS default, which is positive: that is
+  # imputing. We do NOT record what the default number is, because it has
+  # varied across SAS releases and this corpus spans thirty years of them.
+  mi_stmts <- grep("proc mi\\b", st, value = TRUE)
+  mi_n <- vapply(mi_stmts, function(s) {
+    m <- regmatches(s, regexpr("nimpute *= *[0-9]+", s))
+    if (length(m)) as.integer(sub("\\D+", "", m)) else NA_integer_
+  }, integer(1), USE.NAMES = FALSE)
+
   list(
     study            = NA_character_,   # filled by caller
-    std_replace_mean = any(!has_mean_std),   # single mean imputation
-    std_replace_z    = any(has_mean_std),    # standardisation, not imputation
+    # Both of the next two are imputation; see the note above.
+    std_replace_plain = any(!has_mean_std),  # fills with the variable mean
+    std_replace_std   = any(has_mean_std),   # standardises AND fills with MEAN=
     std_no_replace   = length(std) > length(std_replace),
-    proc_mi          = any(grepl("proc mi\\b", st)),
+    proc_mi          = length(mi_stmts) > 0L,
+    # At least one PROC MI that actually imputes.
+    proc_mi_imputing = any(is.na(mi_n) | mi_n > 0L),
+    # Every PROC MI in the file is NIMPUTE=0, i.e. diagnostics only. Reported
+    # so the count that was previously inflated is visible rather than merely
+    # absent.
+    proc_mi_diag_only = length(mi_n) > 0L && all(!is.na(mi_n) & mi_n == 0L),
     proc_mianalyze   = any(grepl("proc mianalyze\\b", st)),
-    nimpute          = {
-      m <- regmatches(st, regexpr("nimpute *= *[0-9]+", st))
-      m <- unlist(m)
-      if (length(m)) as.integer(sub("\\D+", "", m[1])) else NA_integer_
-    },
+    nimpute          = list(mi_n),
     calls_imputsub   = any(grepl("%imputsub", st, fixed = TRUE)),
     calls_mult_imput = any(grepl("%mult_imput", st, fixed = TRUE)),
     defines_macro    = any(grepl("%macro +(imputsub|mult_imput)", st)),
@@ -179,9 +210,13 @@ stem <- vapply(res, function(r) r$stem, character(1))
 stu  <- vapply(res, function(r) r$study, character(1))
 
 nstud <- function(mask) length(unique(stu[mask & !is.na(stu)]))
+# The set of studies a file-level mask touches. Study-level questions are
+# answered by combining THESE, never by combining the file-level masks first.
+sstud <- function(mask) unique(stu[mask & !is.na(stu)])
 
-single <- fld("std_replace_mean")
-multi  <- fld("proc_mi") | fld("proc_mianalyze")
+# REPLACE imputes in both forms; PROC MI counts only when it actually imputes.
+single <- fld("std_replace_plain") | fld("std_replace_std")
+multi  <- fld("proc_mi_imputing") | fld("proc_mianalyze")
 
 by_stem <- function(s) {
   m <- stem == s
@@ -190,17 +225,31 @@ by_stem <- function(s) {
     studies               = nstud(m),
     single_mean_imputation= sum(m & single),
     multiple_imputation   = sum(m & multi),
-    both                  = sum(m & single & multi),
+    both_in_one_file      = sum(m & single & multi),
     neither               = sum(m & !single & !multi),
-    standardisation_only  = sum(m & !single & !multi & fld("std_replace_z")),
+    proc_mi_diag_only     = sum(m & fld("proc_mi_diag_only")),
     calls_macro           = sum(m & (fld("calls_imputsub") | fld("calls_mult_imput"))),
     defines_macro         = sum(m & fld("defines_macro")),
     ms_indicators         = sum(m & fld("ms_indicators"))
   )
 }
 
-nimp <- vapply(res, function(r) r$nimpute, integer(1))
+# Every NIMPUTE= value from every PROC MI statement in the corpus. Previously
+# this took the FIRST match in each file and reported it as the file's value,
+# so a file invoking PROC MI twice contributed one number and hid the other.
+nimp <- unlist(lapply(res, function(r) r$nimpute[[1]]), use.names = FALSE)
 nimp <- nimp[!is.na(nimp)]
+
+# ---- study-level sets -------------------------------------------------------
+# ⚠️ `studies_both` was previously `nstud(single & multi)`, which ANDs the two
+# masks at FILE level and so counted a study only when ONE file carried both
+# methods. The two methods live under two different stems -- `imputsub` and
+# `mult_imput` -- so the study that runs both runs them in two DIFFERENT files,
+# and that is precisely the case the file-level AND can never see. The overlap
+# the scan exists to measure was structurally guaranteed to read zero.
+s_single <- sstud(single)
+s_multi  <- sstud(multi)
+s_both   <- intersect(s_single, s_multi)
 
 out <- list(
   `_provenance` = list(
@@ -221,9 +270,18 @@ out <- list(
     multiple_imputation    = sum(multi),
     both_in_one_file       = sum(single & multi),
     neither                = sum(!single & !multi),
-    studies_single         = nstud(single),
-    studies_multiple       = nstud(multi),
-    studies_both           = nstud(single & multi),
+    # PROC MI present but every invocation NIMPUTE=0: diagnostics, not
+    # imputation. These are NOT in multiple_imputation.
+    files_proc_mi_diag_only = sum(fld("proc_mi_diag_only")),
+    # STUDY level, from set operations -- see the note above `s_single`.
+    # The three exclusive cells (single-only, multiple-only, both) sum to the
+    # union of the two study sets, so a reader can check the arithmetic rather
+    # than take the totals on trust.
+    studies_single         = length(s_single),
+    studies_multiple       = length(s_multi),
+    studies_both           = length(s_both),
+    studies_single_only    = length(setdiff(s_single, s_multi)),
+    studies_multiple_only  = length(setdiff(s_multi, s_single)),
     # A job that CALLS %imputsub instead of inlining `proc standard replace`
     # classifies as `neither`. Without these, a corpus that mostly calls the
     # macro would print "single mean imputation: 0 studies", which reads as
@@ -241,17 +299,21 @@ out <- list(
   # a standardising PROC STANDARD, so these can sum past files_read. They are
   # not a partition; `exclusive` below is.
   proc_standard_detail = list(
-    files_replace_without_mean_std = sum(fld("std_replace_mean")),
-    files_replace_with_mean_std    = sum(fld("std_replace_z")),
+    # BOTH of the first two impute. They differ in the value filled in and the
+    # scale it is on, which a port must reproduce -- not in whether they fill.
+    files_replace_plain            = sum(fld("std_replace_plain")),
+    files_replace_with_mean_std    = sum(fld("std_replace_std")),
+    # No REPLACE: standardisation only, and the one case here that is NOT
+    # imputation.
     files_standard_without_replace = sum(fld("std_no_replace")),
     exclusive = list(
-      imputation_only     = sum(fld("std_replace_mean") & !fld("std_replace_z")),
-      standardisation_only= sum(!fld("std_replace_mean") & fld("std_replace_z")),
-      both_in_one_file    = sum(fld("std_replace_mean") & fld("std_replace_z"))
+      replace_plain_only  = sum(fld("std_replace_plain") & !fld("std_replace_std")),
+      replace_std_only    = sum(!fld("std_replace_plain") & fld("std_replace_std")),
+      both_in_one_file    = sum(fld("std_replace_plain") & fld("std_replace_std"))
     )
   ),
   nimpute = list(
-    n_files_declaring = length(nimp),
+    n_statements_declaring = length(nimp),
     min = if (length(nimp)) min(nimp) else NA_integer_,
     median = if (length(nimp)) as.numeric(stats::median(nimp)) else NA_real_,
     max = if (length(nimp)) max(nimp) else NA_integer_,
@@ -285,14 +347,21 @@ message("single mean imputation:  ", out$totals$single_mean_imputation,
         " files / ", out$totals$studies_single, " studies")
 message("multiple imputation:     ", out$totals$multiple_imputation,
         " files / ", out$totals$studies_multiple, " studies")
+message("studies running BOTH:    ", out$totals$studies_both,
+        "  (single-only ", out$totals$studies_single_only,
+        ", multiple-only ", out$totals$studies_multiple_only, ")")
 message("both in one file:        ", out$totals$both_in_one_file)
+message("PROC MI, diagnostics only (NIMPUTE=0), NOT counted above: ",
+        out$totals$files_proc_mi_diag_only, " files")
 message("neither (macro call/other): ", out$totals$neither)
 message("  of which call %imputsub:   ", out$totals$files_calls_imputsub,
         " files / ", out$totals$studies_calls_imputsub, " studies")
 message("  of which call %mult_imput: ", out$totals$files_calls_mult_imput,
         " files / ", out$totals$studies_calls_mult_imput, " studies")
-message("\nPROC STANDARD REPLACE without MEAN=/STD= (imputation): ",
-        out$proc_standard_detail$files_replace_without_mean_std)
-message("PROC STANDARD REPLACE with MEAN=/STD= (standardisation, NOT imputation): ",
-        out$proc_standard_detail$files_replace_with_mean_std)
+message("\nPROC STANDARD REPLACE, no MEAN=/STD= (fills with the variable mean): ",
+        out$proc_standard_detail$files_replace_plain)
+message("PROC STANDARD REPLACE with MEAN=/STD= (standardises AND fills; ",
+        "also imputation): ", out$proc_standard_detail$files_replace_with_mean_std)
+message("PROC STANDARD without REPLACE (standardisation only, NOT imputation): ",
+        out$proc_standard_detail$files_standard_without_replace)
 message("\nwrote ", outfile)

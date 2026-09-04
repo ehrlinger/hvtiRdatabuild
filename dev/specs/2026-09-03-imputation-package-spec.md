@@ -45,12 +45,31 @@ the reason in the note below, and stops rather than guessing if it is absent:
 Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
 ```
 
-⚠️ **It separates a trap #33 names and this section did not repeat.**
-`PROC STANDARD ... REPLACE` is mean imputation *only when there is no* `MEAN=`
-*or* `STD=`. With `MEAN=0 STD=1` the identical statement is standardisation,
-which is not imputation at all. A scan that greps `proc standard.*replace` and
-stops conflates the two and inflates the single-imputation count. The script
-reports the three cases separately.
+⚠️ **An earlier draft of this section, and of the script, got the `PROC
+STANDARD` semantics backwards, and the error is recorded rather than quietly
+corrected because it deflated the one number §2 turns on.** The claim was that
+`REPLACE` is imputation *only* when no `MEAN=` or `STD=` is present, and that
+`MEAN=0 STD=1 REPLACE` is standardisation and not imputation. That is wrong.
+SAS documents `REPLACE` as filling missing values with the variable mean, or
+with the `MEAN=` value when one is given — so `PROC STANDARD MEAN=0 STD=1
+REPLACE` does **both**: it standardises the observed values *and* fills the
+missing ones with 0, which in standardised units is the mean. **Both forms are
+imputation**, and the script now counts both.
+
+The distinction is still reported, because the two fill a different value on a
+different scale and a port has to reproduce whichever the study ran. It is a
+breakdown, not a filter. The case that genuinely is *not* imputation is
+`PROC STANDARD` with **no** `REPLACE` at all.
+
+⚠️ **`PROC MI NIMPUTE=0` does not impute.** It is the documented way to run the
+procedure for missingness diagnostics only, which is exactly what a careful
+programmer does before deciding — not a rare edge. Counting it inflates the
+multiple-imputation side. `NIMPUTE=` binds to its own `PROC MI` statement, so
+the script classifies per statement rather than per file; a file may carry a
+diagnostic call and a real one.
+
+⭐ Note that these two errors pushed the headline ratio in **opposite**
+directions. Fixing either alone would have made it worse than fixing neither.
 
 ⚠️ **A study is the directory holding a taxonomy folder**, nearest ancestor
 wins -- `hvtiRutilities`' definition (`R/job_census.R:1-12`), and the one that
@@ -275,10 +294,16 @@ the stable part of the contract in the meantime.
 - [ ] **§2 settled by a scan**: which of the 309 and 242 studies ran single versus
   multiple imputation. **Still open, and still blocking.** The scan is written
   (`imputation-method-scan.R`; requires `hvtiRutilities` for the study
-  definition) and needs running where the studies share is mounted; it classifies `PROC STANDARD REPLACE` **without**
-  `MEAN=`/`STD=` (imputation) separately from **with** them (standardisation,
-  which is not imputation at all), and counts `PROC MI`/`MIANALYZE` and
-  `NIMPUTE=`. Until it returns, ⚠️ **do not name a function `impute()`.**
+  definition) and needs running where the studies share is mounted. It counts
+  `PROC STANDARD REPLACE` as imputation in **both** its forms, reported
+  separately; excludes `PROC STANDARD` without `REPLACE`; and counts `PROC MI`
+  only where it actually imputes, per statement, so `NIMPUTE=0` diagnostics do
+  not inflate the total. Study-level overlap is a set intersection, so a study
+  running single imputation in one file and multiple in another is seen as
+  running both. `test-imputation-method-scan.R` checks all of this against a
+  synthetic corpus with a known answer — run it before trusting a result, since
+  `dev/` is `.Rbuildignore`d and the package suite never exercises this script.
+  Until the scan returns, ⚠️ **do not name a function `impute()`.**
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
 - [ ] **Taxonomy prefix or prefixes agreed**, coordinated with the re-parse.
