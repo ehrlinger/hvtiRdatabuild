@@ -238,8 +238,21 @@ for the same constructor.
 ⚠️ This is a **change to a shipped, exported API's data structure**, not an
 additive helper, so it is a larger ask than the first draft implied. hvtiPlotR
 is heading to 3.0 (currently 2.7.12), which is the right moment for it, but the
-work belongs on hvtiPlotR's roadmap and should be raised there rather than
-assumed by this spec.
+work belongs on hvtiPlotR's roadmap rather than being assumed by this spec.
+
+🟢 **Raised as [hvtiPlotR#131](https://github.com/ehrlinger/hvtiPlotR/issues/131)**
+(2026-09-04), which carries a runnable reproduction of the resurrection defect
+described above and states the three requirements: the copying constructor, the
+stage-record field naming the annotation columns, and the accessor. It is a
+sibling of [hvtiPlotR#129](https://github.com/ehrlinger/hvtiPlotR/issues/129),
+which wants per-reason rather than per-stage counts from the same tracker for
+the same verification reason.
+
+⚠️ **This spec's §8 is therefore blocked on another package's roadmap.** The
+design is decided; the mechanism it depends on does not exist yet. Nothing in
+`hvtiRimputation` should be written against the annotation stage until #131
+lands, and the two columns it emits (`imputed_any`, `complete_case_pass`) are
+the stable part of the contract in the meantime.
 
 ## Definition of done for this spec
 
