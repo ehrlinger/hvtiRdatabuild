@@ -28,22 +28,110 @@ So a port that skips imputation does not produce a slightly different answer. It
 
 **Corpus scale:** `imputsub` appears in **309 studies**, `mult_imput` in **242**. Neither has a taxonomy prefix.
 
-## 2. 🔴 The distinction that has to be settled first
+## 2. ✅ The distinction that had to be settled first — SETTLED 2026-09-04
 
 **`PROC STANDARD ... REPLACE` is single mean imputation. It is not multiple imputation.** They are different methods with different inferential properties: mean imputation is deterministic and understates variance; multiple imputation generates several completed datasets and pools, precisely so the standard errors reflect the uncertainty.
 
 The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A package called `hvtiRimputation` that quietly does one when a user expects the other is a worse failure than no package at all.
 
-**Required before anything is built:** determine what the 309 and 242 studies actually ran. That is a scan question, not a design question, and it is cheap. Until then, ⚠️ **do not name a function `impute()`.**
+**The question was: what did the 309 and 242 studies actually run?**
 
-**The scan is written and unrun**, at
-[`artifacts/imputation-method-scan.R`](artifacts/imputation-method-scan.R).
-Run where the studies share is mounted. It **requires `hvtiRutilities`**, for
-the reason in the note below, and stops rather than guessing if it is absent:
+### The answer
+
+**Both methods are real, distinct, and present at scale.** Measured over
+`/studies`, 2026-09-04:
+
+| method | studies calling it |
+|---|---|
+| single mean imputation — `%imputsub` → `PROC STANDARD ... REPLACE` | 223 |
+| multiple imputation — `%mult_imput` → `PROC MI` | 326 |
+| both | 18 |
+| imputing inline, through neither macro | 29 |
+
+⭐ **`mult_imput` performs genuine multiple imputation.** Of 939 resolved calls,
+**925 (98.5%) pass `NIMPUTE > 1`**; the distribution is `5`×882, `10`×37, `8`×3,
+and one each of `7`, `12`, `20`, with a median of 5. `NIMPUTE = 1` — which is
+single stochastic imputation whatever the macro is called — accounts for **14
+calls, 1.5%**.
+
+So the hold lifts: the package may honestly offer **both** a mean-imputation
+function and an `mi()`. ⚠️ What it must still never do is offer one `impute()`
+that silently picks between them — the original reason for the hold is
+unchanged, and §7 now clearly needs **two** taxonomy prefixes rather than one.
+
+### Two caveats that belong with the number
+
+⚠️ **69% of calls take the macro's default** (647 of 939 resolved from a
+default, 292 from an explicit argument). Since 882 calls resolve to 5, the
+canonical macro's default is almost certainly 5. The corpus-wide answer is
+therefore **one institutional default propagated 647 times**, not 939
+deliberate per-study choices. That matters for the port: an R default of `m = 5`
+reproduces SAS for most of these studies by construction, and per §5 it must
+*say* that it is doing so rather than defaulting silently.
+
+⚠️ **A resolved call proves what value would be passed, not that the call
+executed.** A call inside a `%if` branch that never fires is counted. Read this
+as "the corpus is configured for m = 5", not "939 multiple imputations were
+run."
+
+Also worth carrying forward: **63 distinct macro names bind `NIMPUTE`**, not
+one. There is no single canonical `mult_imput` — there are 63 named variants,
+each internally consistent.
+
+### How it was measured, and what the first two attempts got wrong
+
+Three scans, in `artifacts/`, each with a test beside it that runs against a
+synthetic corpus with a known answer. Run the test before trusting a scan:
+`dev/` is `.Rbuildignore`d, so `devtools::test()` never exercises any of them.
+
+| scan | asked | result |
+|---|---|---|
+| [`imputation-method-scan.R`](artifacts/imputation-method-scan.R) | which methods appear in the stem-matched jobs | 1,134 files, 547 studies, 3 unplaced |
+| [`imputation-callsite-scan.R`](artifacts/imputation-callsite-scan.R) | who **calls** them | 527 of 547 studies call a macro |
+| [`imputation-nimpute-scan.R`](artifacts/imputation-nimpute-scan.R) | what `NIMPUTE` reaches `PROC MI` | 939 calls, **0 unresolved** |
+
+⚠️ **The first two scans each answered a narrower question than the one asked,
+and the record is kept because the failure mode recurs.**
+
+Scan 1 found that 1,132 of 1,134 stem-matched files **define** a macro and
+**none call one**. It had measured how many studies hold a *copy of the
+definition*, not how many ran imputation. Its result looked authoritative
+precisely because it was clean — 100% separation by stem, no file carrying both
+methods, no exceptions in thirty years. ⭐ **That perfect partition was the
+warning, not the confirmation:** it was 1,134 copies of two canonical files, the
+same per-study distribution pattern
+[`2026-09-02-vars-port-and-attrition-design.md`](2026-09-02-vars-port-and-attrition-design.md)
+documents for `vars.sas`.
+
+Scan 2 then resolved macro variables, but only within one file, and left 864 of
+871 statements unresolved. The 7 it could read said `NIMPUTE = 1` five times —
+which briefly looked like the alarming answer. ⭐ **It was a biased sample, not
+merely a small one.** The calls resolvable inside a single file were exactly the
+unusual ones, where someone hardcoded `%let n = 1;` beside the call instead of
+using the macro's argument. The 99.2% that were invisible were the ordinary
+ones.
+
+Both failed for one structural reason: the `PROC MI` sits inside a macro
+**definition**, where `nimpute` is a **parameter**, and the value is supplied by
+the **caller** — in a different file, and often a different study, since
+`mult_imput` is called in 326 studies but defined in 277.
 
 ```
-Rscript imputation-method-scan.R --root /studies --out imputation-scan.json
+definition:  %macro mult_imput(data=, nimpute=5);
+               proc mi data=&data nimpute=&nimpute;   <- binds to a PARAMETER
+call site:   %mult_imput(data=w, nimpute=25);         <- supplies the VALUE
 ```
+
+Scan 3 joins the two, globally by macro name. It reports
+`conflicting_redefinitions`, and that value came back **0** — so the assumption
+that the many copies are one canonical file is **checked rather than assumed**,
+which is what the three preceding corpus errors in this family had in common.
+
+All three require `hvtiRutilities`, which defines what a study is, and stop
+rather than guessing if it cannot be loaded. Each output records the
+`hvtiRutilities` version and folder list it used, because the study counts are a
+function of that taxonomy and two runs are comparable only when it matches. The
+runs above used 1.1.9.
 
 ⚠️ **An earlier draft of this section, and of the script, got the `PROC
 STANDARD` semantics backwards, and the error is recorded rather than quietly
@@ -145,7 +233,20 @@ been decided the wrong way.
 
 ## 7. Taxonomy
 
-Needs a two-letter prefix. `mi` was floated in the 2026-09-02 training. ⚠️ If §2 concludes that both single and multiple imputation are present, **one prefix will not be enough** — they are different job types by the same test that split `dc` into five.
+Needs a two-letter prefix. `mi` was floated in the 2026-09-02 training.
+
+⚠️ **The condition §2 was holding this on is now met: both methods are present
+at scale, so one prefix will not be enough.** 223 studies call single mean
+imputation and 326 call multiple imputation, with 18 doing both — they are
+different job types by the same test that split `dc` into five, and 18 studies
+running both means a single prefix could not even label those unambiguously.
+
+Two prefixes are therefore required. **Which two is still an open decision**, and
+`mi` is a poor choice for either taken alone: it reads as multiple imputation to
+a statistician, so using it for the single-imputation job would repeat at the
+taxonomy level exactly the misnaming §2 went looking for. Note also that the
+corpus carries **63 distinct macro names** binding `NIMPUTE`, so a prefix is
+labelling a job type, not a macro.
 
 Coordinate with the per-folder re-parse (`hvtiRtemplates/dev/specs/2026-09-02-per-folder-naming-parse-handoff.md`); the taxonomy is being re-derived and this is the moment to add prefixes rather than after.
 
@@ -291,22 +392,21 @@ the stable part of the contract in the meantime.
 
 ## Definition of done for this spec
 
-- [ ] **§2 settled by a scan**: which of the 309 and 242 studies ran single versus
-  multiple imputation. **Still open, and still blocking.** The scan is written
-  (`imputation-method-scan.R`; requires `hvtiRutilities` for the study
-  definition) and needs running where the studies share is mounted. It counts
-  `PROC STANDARD REPLACE` as imputation in **both** its forms, reported
-  separately; excludes `PROC STANDARD` without `REPLACE`; and counts `PROC MI`
-  only where it actually imputes, per statement, so `NIMPUTE=0` diagnostics do
-  not inflate the total. Study-level overlap is a set intersection, so a study
-  running single imputation in one file and multiple in another is seen as
-  running both. `test-imputation-method-scan.R` checks all of this against a
-  synthetic corpus with a known answer — run it before trusting a result, since
-  `dev/` is `.Rbuildignore`d and the package suite never exercises this script.
-  Until the scan returns, ⚠️ **do not name a function `impute()`.**
+- [x] **§2 settled** 2026-09-04 — **both methods are real and present at scale**:
+  223 studies call `%imputsub` (single mean imputation), 326 call `%mult_imput`,
+  18 call both, and 29 impute inline through neither. `mult_imput` performs
+  **genuine multiple imputation** — 925 of 939 resolved calls (98.5%) pass
+  `NIMPUTE > 1`, median 5. See §2 for the full result, the three scans that
+  produced it, and two caveats that belong with the number: 69% of calls take
+  the macro default rather than choosing, and a resolved call proves the value
+  passed rather than that it executed. The hold on `impute()` lifts only in
+  part: the package may offer a mean-imputation function **and** an `mi()`, but
+  ⚠️ **must not offer one `impute()` that silently picks between them.**
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
-- [ ] **Taxonomy prefix or prefixes agreed**, coordinated with the re-parse.
+- [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 settled the
+  evidence question — **two are needed, not one** — so what remains is the
+  naming decision itself, not the measurement behind it. See §7.
   Still open, and still contingent on §2: if both single and multiple
   imputation are present, one prefix is not enough.
 - [x] **The imputation/CONSORT interaction decided** 2026-09-04 — §8.
