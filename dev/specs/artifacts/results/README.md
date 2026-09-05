@@ -20,6 +20,8 @@ match. All four below used 1.1.9 over `/studies`.
 | `callsite-scan.json` | who **calls** those jobs | 2026-09-04 16:58 |
 | `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-05 07:33 |
 | `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
+| `reconcile-scan.json` | which macro names disagree, and at what cost | 2026-09-05 14:43 |
+| `studylocal-scan.json` | ⭐ NIMPUTE per the calling study's own copy | 2026-09-05 14:59 |
 
 ## `nimpute-scan.json` is the corrected re-run
 
@@ -51,19 +53,27 @@ confirms that the figures quoted in section 4a of
 `2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
 were right.
 
-## 🔴 One committed result still needs regenerating
+## 🔴 `nimpute-scan.json` is still provisional
 
-**`nimpute-scan.json` may have shifted.** #41 corrected a positional-argument
-defect shared by three scans: a value supplied positionally in a call that also
-carries a keyword argument was being read as omitted. That moves a call off the
-"states its value" route and onto an inferred one. How many calls it touches in
-this corpus is unmeasured, so the 292 / 25 / 622 split and anything downstream of
-it should be treated as provisional until the scan is rerun.
+#41 corrected a positional-argument defect shared by three scans: a value
+supplied positionally in a call that also carried a keyword argument read as
+omitted.
+
+⚠️ **An earlier version of this section declared the flag lifted, on the grounds
+that `studylocal-scan.json` reports `from_argument` at 292, identical to the
+corpus-wide scan which ran without the fix. That argument does not hold.** The
+study-local scan changed a second thing at the same time: it selects parameter
+names and positions from the calling study's own copy rather than one
+corpus-wide definition. So a newly recognised mixed call could be offset by a
+call classified differently for that unrelated reason, and the totals would still
+match. ⭐ Two aggregates agreeing across two different algorithms is not evidence
+that either change was inert.
+
+Settling it needs a direct measurement rather than an inference: rerun
+`imputation-nimpute-scan.R` with the fixed parser, or count mixed calls
+explicitly. Until then the 292 / 25 / 622 split is provisional.
 
 ## Not yet run
 
-`studylocal-scan.json` -- output of `../imputation-studylocal-scan.R`, which
-resolves NIMPUTE against the calling study's own copy rather than a corpus-wide
-map. That map is what makes 619 of 939 calls look undeterminable, and this pass
-tests whether they are undeterminable at study scale too. Written and tested;
-not run.
+Nothing. Every scan in `../` has been run against `/studies` and its output is
+here.

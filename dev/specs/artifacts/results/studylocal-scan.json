@@ -1,0 +1,58 @@
+{
+  "_provenance": {
+    "script": "imputation-studylocal-scan.R",
+    "question": "does resolving NIMPUTE against the CALLING STUDY's own copy determine the calls a corpus-wide map could not?",
+    "run_at": "2026-09-05T14:59:06-0400",
+    "root": "/studies",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "definition_files": 1134,
+    "candidate_files": 104666,
+    "files_unreadable": 1,
+    "contains_identifiers": false,
+    "inference": "study-local copy, not verified against run logs"
+  },
+  "routes": {
+    "calls": 939,
+    "studies_calling": 329,
+    "from_argument": 292,
+    "from_study_local": 518,
+    "study_local_ambiguous": 38,
+    "global_fallback_ok": 0,
+    "global_fallback_conflict": 91,
+    "unresolved": 0
+  },
+  "determinate": {
+    "n": 810,
+    "nimpute_1": 12,
+    "nimpute_gt1": 798,
+    "nimpute_0": 0,
+    "median": 5,
+    "table": {
+      "1": 12,
+      "5": 735,
+      "7": 1,
+      "8": 3,
+      "10": 57,
+      "12": 1,
+      "20": 1
+    }
+  },
+  "by_route": {
+    "from_argument": {
+      "1": 9,
+      "5": 242,
+      "7": 1,
+      "8": 3,
+      "10": 35,
+      "12": 1,
+      "20": 1
+    },
+    "from_study_local": {
+      "1": 3,
+      "5": 493,
+      "10": 22
+    },
+    "global_fallback": {}
+  }
+}

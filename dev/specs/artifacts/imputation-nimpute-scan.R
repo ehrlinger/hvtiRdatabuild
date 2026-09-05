@@ -227,6 +227,15 @@ nimp_defs  <- integer(0)
 n_calls <- 0L
 n_from_arg <- 0L; n_from_default <- 0L; n_unresolved <- 0L
 n_from_conflicted <- 0L       # default-resolved, but the copies disagree
+# ⭐ Counted so the positional-argument defect corrected in #41 can be MEASURED
+# rather than inferred. `positional_in_mixed_call` is exactly the population the
+# old gate discarded: a NIMPUTE value supplied by position in a call that also
+# carries a keyword argument. Zero means that defect was inert in this corpus;
+# comparing aggregate totals across two scans cannot establish the same thing,
+# because those scans differ in more than one way.
+n_mixed_form <- 0L            # calls carrying both positional and keyword args
+n_from_positional <- 0L       # NIMPUTE supplied by position
+n_pos_in_mixed <- 0L          # ... in a call that also has keyword args
 n_conf_all_gt1 <- 0L          # ... and every declared default resolves > 1
 n_conf_straddle <- 0L         # ... all resolve, and they span 1 in both directions
 n_conf_all_le1 <- 0L          # ... all resolve and NONE exceeds 1: settled NEGATIVE
@@ -270,7 +279,12 @@ if (length(macro_names)) {
       call_studies <- c(call_studies, studies[[i]])
       pname <- d$param
       a <- parse_call_args(m[3])
+      if (length(a$pos) && length(a$kw)) n_mixed_form <- n_mixed_form + 1L
       val <- arg_value(a, pname, d$params)
+      if (!is.null(val) && is.null(a$kw[[pname]])) {
+        n_from_positional <- n_from_positional + 1L
+        if (length(a$kw)) n_pos_in_mixed <- n_pos_in_mixed + 1L
+      }
       from_default <- FALSE
       if (is.null(val)) { val <- d$default; from_default <- TRUE }
       v <- resolve(val, list(lm, d$lets))
@@ -390,7 +404,12 @@ out <- list(
     # NOT a call: a definition that settles NIMPUTE without any caller. Counted
     # here and reported separately in `definition_settled`, never pooled into
     # the call distribution.
-    settled_by_definition_alone   = n_literal_defs
+    settled_by_definition_alone   = n_literal_defs,
+    # See the note beside these counters. `positional_in_mixed_call` is the
+    # direct measurement of what the pre-#41 positional gate discarded.
+    mixed_form_calls          = n_mixed_form,
+    nimpute_from_positional   = n_from_positional,
+    positional_in_mixed_call  = n_pos_in_mixed
   ),
   definition_settled = list(
     n      = length(dvals),

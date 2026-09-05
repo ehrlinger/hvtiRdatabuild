@@ -159,7 +159,62 @@ which is cheaper, needs no institutional decision, and may collapse the 619 to
 something small. Reconciliation, if it is still wanted afterwards, applies to
 whatever is left.
 
+## 4b. The study-local pass, run 2026-09-05, and what it recovers
+
+4a argued that the ambiguity was partly an artifact of asking the question
+corpus-wide. Measured, it mostly was.
+
+| route | calls |
+|---|---|
+| the call states the value | 292 |
+| ⭐ **the calling study's own copy settles it** | **518** |
+| the study's own copies disagree | 38 |
+| the study holds no copy, and the corpus-wide map conflicts | 91 |
+| unresolved | 0 |
+
+**Determinate: 810 of 939, 86%.** Of those, **798 are multiple imputation and 12
+are single.** The undeterminable share falls from 619 to **129**.
+
+⭐ **The first run of all this claimed 925 of 939, 98.5%. We arrive at 798 of
+810, also 98.5%.** The number never moved. What changed is that it is now earned:
+86% coverage measured, rather than 100% coverage assumed.
+
+⚠️ **The residual 129 has two halves that need different remedies, and neither
+is reconciling the five.** Only 38 are **calls** whose study holds copies that
+disagree with each other. The other 91 are calls from studies that hold **no
+copy at all**,
+which is the gap between `mult_imput` being called in 326 studies and defined in
+277: those calls reach a definition from somewhere this scan cannot see, and the
+corpus-wide map is not a substitute.
+
+⚠️ The inference stands as an inference. A study's own copy is strong evidence of
+what its calls ran and is not proof; the autocall path decides at run time. The
+output records that in its provenance block so it travels with the numbers.
+
+⭐ **One thing this run settles in passing.** `from_argument` is 292, identical to
+the corpus-wide scan, which ran before the positional-argument fix. Had mixed
+positional and keyword calls existed here, this pass would have found more. It
+found none, so that defect cost this corpus nothing.
+
 ## 5. Where this is heading
+
+⚠️ **This section and section 6 were written before the worksheet and the
+study-local pass ran, and both overturned them. They are kept as written, and
+this box says what is no longer true, because the wrong turns are the point of
+the record.**
+
+| said below | actually |
+|---|---|
+| reconciling is "small, finite" | 423 copies, 381 distinct bodies (4a) |
+| "the only route to lifting the bound" | the study-local pass lifted most (4b) |
+| 320 determinate, 619 open (section 6) | **810 determinate, 129 open** |
+| the worksheet has not been run | run 2026-09-05, as has 4b's pass |
+
+**The current next step is neither reconciliation nor another scan.** The
+residual 129 splits into 38 calls whose study holds copies that disagree, and 91
+calls from studies holding no copy, and those need different remedies. Both are
+small enough to leave alone unless a specific study needs its own answer, in
+which case that study's saved log settles it directly.
 
 Three things follow, in order of how tractable they are.
 
