@@ -123,12 +123,29 @@ parse_call_args <- function(argstr) {
   list(kw = kw, pos = pos)
 }
 
-# `%let name = value;` occurrences in a set of statements.
+# One `%let name = value;` statement, or NULL.
+parse_let <- function(s) {
+  m <- regmatches(s, regexec("^ *%let +([a-z0-9_]+) *= *(.*?) *$", s))[[1]]
+  if (length(m) == 3L) list(name = m[2], value = m[3]) else NULL
+}
+
+# `%let` occurrences in a set of statements, later assignments winning.
+#
+# ⚠️ ORDER-BLIND, and only safe where order cannot matter. A file that reassigns
+# a macro variable between two calls --
+#
+#     %let n = 5;  %mult_imput(nimpute=&n);
+#     %let n = 10; %mult_imput(nimpute=&n);
+#
+# -- resolves BOTH calls to 10 under this function, silently. Pass 2 therefore
+# does NOT use it: it walks the statements in order and resolves each call
+# against the assignments that precede it. This remains for macro BODIES, where
+# there is one binding site and no call sequence to interleave with.
 let_map <- function(st) {
   out <- list()
   for (l in grep("^ *%let ", st, value = TRUE)) {
-    m <- regmatches(l, regexec("^ *%let +([a-z0-9_]+) *= *(.*?) *$", l))[[1]]
-    if (length(m) == 3L) out[[m[2]]] <- m[3]
+    p <- parse_let(l)
+    if (!is.null(p)) out[[p$name]] <- p$value
   }
   out
 }
@@ -163,7 +180,9 @@ resolve <- function(expr, lookups, depth = 0L) {
 def_scan <- if ("--defs-all" %in% args) files else defs_files
 message("pass 1: definitions (", length(def_scan), " files)")
 defmap <- list()          # macro name -> binding
-def_conflicts <- 0L
+conflicted <- list()      # macro names whose copies disagree
+def_conflicts <- 0L       # copies binding NIMPUTE to a different expression
+def_default_conflicts <- 0L  # same expression, different declared default
 n_def_files <- 0L
 
 for (i in seq_along(def_scan)) {
@@ -192,11 +211,33 @@ for (i in seq_along(def_scan)) {
             else if (sub("^&+", "", gsub("[ %]", "", expr)) %in% h$params) "param"
             else if (!is.null(lm[[sub("^&+", "", gsub("[ %]", "", expr))]])) "local"
             else "unknown"
-    entry <- list(kind = kind, expr = expr, params = h$params,
-                  defaults = h$defaults, lets = lm)
+    pname <- if (identical(kind, "param")) sub("^&+", "", gsub("[ %]", "", expr))
+             else NA_character_
+    dflt <- if (!is.na(pname)) h$defaults[[pname]] else NA_character_
+    if (is.null(dflt)) dflt <- NA_character_
+    entry <- list(kind = kind, expr = expr, param = pname, default = dflt,
+                  params = h$params, defaults = h$defaults, lets = lm)
     prev <- defmap[[h$name]]
-    if (!is.null(prev) && !identical(prev$expr, entry$expr)) def_conflicts <- def_conflicts + 1L
-    if (is.null(prev)) defmap[[h$name]] <- entry
+    if (is.null(prev)) {
+      defmap[[h$name]] <- entry
+    } else {
+      # ⚠️ Compare the DEFAULT as well as the expression. Two copies of one
+      # macro that bind `nimpute=&nimpute` but declare different DEFAULTS are
+      # IDENTICAL in `expr` and materially different in what they run. Comparing
+      # `expr` alone reported zero conflicts and silently used whichever copy
+      # was read first -- and 69% of calls in this corpus resolve from a
+      # default, so that is the least checked input to the most load-bearing
+      # number. A default conflict makes every default-resolved call to this
+      # macro AMBIGUOUS, so pass 2 counts those separately and keeps them out of
+      # the headline distribution rather than picking one.
+      if (!identical(prev$expr, entry$expr)) {
+        def_conflicts <- def_conflicts + 1L
+        conflicted[[h$name]] <- TRUE
+      } else if (!identical(prev$default, entry$default)) {
+        def_default_conflicts <- def_default_conflicts + 1L
+        conflicted[[h$name]] <- TRUE
+      }
+    }
   }
   if (i %% 500 == 0) message("  ", i, " / ", length(def_scan))
 }
@@ -204,41 +245,57 @@ message("macros binding NIMPUTE: ", length(defmap))
 
 # ---- pass 2: call sites -----------------------------------------------------
 message("pass 2: call sites")
-nimp <- integer(0)            # every resolved NIMPUTE, one per call
+# ⚠️ TWO SEPARATE COLLECTIONS, deliberately not merged.
+#
+# `nimp_calls` holds one value per resolved CALL. `nimp_defs` holds one value
+# per DEFINITION that settles NIMPUTE without any caller -- a literal, or a
+# %let in the macro body. An earlier version pooled them, which put a
+# definition that is never invoked into the same denominator as 939 actual
+# calls and reported the mixture as though every entry were a call. The
+# headline distribution is calls only.
+nimp_calls <- integer(0)
+nimp_defs  <- integer(0)
 n_calls <- 0L
 n_from_arg <- 0L; n_from_default <- 0L; n_unresolved <- 0L
+n_from_conflicted <- 0L       # default-resolved, but the copies disagree
 n_literal_defs <- 0L          # PROC MI whose NIMPUTE needs no caller
 call_studies <- character(0)
 studies <- study_of(files)
 macro_names <- names(defmap)
 
-# A macro whose NIMPUTE is a literal or a body-local %let is settled without any
-# call. Count those once per definition rather than per invocation.
 for (nm in macro_names) {
   d <- defmap[[nm]]
   if (d$kind %in% c("literal", "local")) {
     v <- resolve(d$expr, list(d$lets))
-    if (!is.na(v)) { nimp <- c(nimp, v); n_literal_defs <- n_literal_defs + 1L }
+    if (!is.na(v)) { nimp_defs <- c(nimp_defs, v); n_literal_defs <- n_literal_defs + 1L }
   }
 }
 
 if (length(macro_names)) {
-  call_re <- paste0("%(", paste(macro_names, collapse = "|"), ") *\\(")
+  name_alt <- paste(macro_names, collapse = "|")
+  call_re  <- paste0("%(", name_alt, ") *\\(")
+  arg_re   <- paste0("%(", name_alt, ") *\\((.*)\\)")
   for (i in seq_along(files)) {
     st <- read_statements(files[[i]])
     if (is.null(st)) next
-    hits <- grep(call_re, st, value = TRUE)
-    if (!length(hits)) next
-    lm <- let_map(st)
-    for (s in hits) {
-      m <- regmatches(s, regexec(paste0("%(", paste(macro_names, collapse = "|"),
-                                        ") *\\((.*)\\)"), s))[[1]]
+    if (!any(grepl(call_re, st))) next
+    # ⚠️ WALK THE STATEMENTS IN ORDER, carrying the %let assignments seen so
+    # far. Building one map for the whole file first lets a LATER assignment
+    # decide an EARLIER call: `%let n=5; call; %let n=10; call;` resolved both
+    # calls to 10. Each call must see only what precedes it.
+    lm <- list()
+    for (k in seq_along(st)) {
+      s <- st[[k]]
+      p <- parse_let(s)
+      if (!is.null(p)) { lm[[p$name]] <- p$value; next }
+      if (!grepl(call_re, s)) next
+      m <- regmatches(s, regexec(arg_re, s))[[1]]
       if (length(m) < 3L) next
       d <- defmap[[m[2]]]
       if (is.null(d) || !identical(d$kind, "param")) next
       n_calls <- n_calls + 1L
       call_studies <- c(call_studies, studies[[i]])
-      pname <- sub("^&+", "", gsub("[ %]", "", d$expr))
+      pname <- d$param
       a <- parse_call_args(m[3])
       val <- a$kw[[pname]]
       if (is.null(val)) {
@@ -247,12 +304,17 @@ if (length(macro_names)) {
         if (!is.na(idx) && length(a$pos) >= idx && !length(a$kw)) val <- a$pos[[idx]]
       }
       from_default <- FALSE
-      if (is.null(val)) { val <- d$defaults[[pname]]; from_default <- TRUE }
+      if (is.null(val)) { val <- d$default; from_default <- TRUE }
       v <- resolve(val, list(lm, d$lets))
       if (is.na(v)) {
         n_unresolved <- n_unresolved + 1L
+      } else if (from_default && isTRUE(conflicted[[m[2]]])) {
+        # The copies of this macro declare different defaults, so which value
+        # this call ran is genuinely unknown. Counted, and kept OUT of the
+        # headline distribution rather than guessed.
+        n_from_conflicted <- n_from_conflicted + 1L
       } else {
-        nimp <- c(nimp, v)
+        nimp_calls <- c(nimp_calls, v)
         if (from_default) n_from_default <- n_from_default + 1L else n_from_arg <- n_from_arg + 1L
       }
     }
@@ -261,10 +323,12 @@ if (length(macro_names)) {
 }
 
 # ---- aggregate --------------------------------------------------------------
-vals <- nimp[!is.na(nimp)]
+# The headline distribution is CALLS ONLY -- see the note above `nimp_calls`.
+vals <- nimp_calls[!is.na(nimp_calls)]
 n1  <- sum(vals == 1L)
 ngt <- sum(vals > 1L)
 n0  <- sum(vals == 0L)
+dvals <- nimp_defs[!is.na(nimp_defs)]
 
 out <- list(
   `_provenance` = list(
@@ -288,20 +352,36 @@ out <- list(
     binding_literal = sum(vapply(defmap, function(d) identical(d$kind, "literal"), logical(1))),
     binding_local   = sum(vapply(defmap, function(d) identical(d$kind, "local"), logical(1))),
     binding_unknown = sum(vapply(defmap, function(d) identical(d$kind, "unknown"), logical(1))),
-    # ⚠️ Definitions of the SAME macro name that bind NIMPUTE differently. These
-    # are meant to be copies of one canonical file; a nonzero count means they
-    # have drifted, and the global map resolves calls using the first seen.
-    conflicting_redefinitions = def_conflicts
+    # ⚠️ Copies of the SAME macro name that disagree. These are meant to be
+    # copies of one canonical file, so a nonzero count means they have drifted.
+    # The two are separate because they fail differently: a different
+    # EXPRESSION binds NIMPUTE to something else entirely, while a different
+    # DEFAULT is invisible in the expression and decides 69% of the calls.
+    conflicting_redefinitions = def_conflicts,
+    conflicting_defaults      = def_default_conflicts,
+    macros_conflicted         = length(conflicted)
   ),
   calls = list(
     calls_to_parameterised_macros = n_calls,
     studies_calling               = length(unique(stats::na.omit(call_studies))),
     resolved_from_argument        = n_from_arg,
     resolved_from_default         = n_from_default,
+    # Default-resolved, but the macro's copies declare different defaults, so
+    # which value ran is genuinely unknown. Kept OUT of the distribution below
+    # rather than guessed. These four buckets partition the calls.
+    unresolved_conflicting_default = n_from_conflicted,
     unresolved                    = n_unresolved,
+    # NOT a call: a definition that settles NIMPUTE without any caller. Counted
+    # here and reported separately in `definition_settled`, never pooled into
+    # the call distribution.
     settled_by_definition_alone   = n_literal_defs
   ),
-  # ⭐ THE ANSWER. Every NIMPUTE this scan could resolve.
+  definition_settled = list(
+    n      = length(dvals),
+    table  = if (length(dvals)) as.list(table(dvals)) else list()
+  ),
+  # ⭐ THE ANSWER. One entry per resolved CALL; definitions settled without a
+  # caller are in `definition_settled` above and are not counted here.
   nimpute = list(
     resolved_total = length(vals),
     nimpute_0      = n0,    # diagnostics; not imputation at all
@@ -322,10 +402,12 @@ message("macros binding NIMPUTE:   ", out$definitions$macros_binding_nimpute,
         ", literal ", out$definitions$binding_literal,
         ", local ", out$definitions$binding_local,
         ", unknown ", out$definitions$binding_unknown, ")")
-message("conflicting redefinitions: ", out$definitions$conflicting_redefinitions)
+message("conflicting redefinitions: ", out$definitions$conflicting_redefinitions,
+        "  (differing defaults: ", out$definitions$conflicting_defaults, ")")
 message("\n--- CALLS ---")
 message("calls resolved from an argument: ", out$calls$resolved_from_argument)
 message("calls falling back to a default: ", out$calls$resolved_from_default)
+message("calls on a conflicting default:  ", out$calls$unresolved_conflicting_default)
 message("calls unresolved:                ", out$calls$unresolved)
 message("\n--- NIMPUTE ---")
 message("resolved values: ", out$nimpute$resolved_total)

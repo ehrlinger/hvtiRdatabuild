@@ -91,6 +91,29 @@ put("cardiac/iota", "mult_imput_cmt.sas",
       "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
 put("cardiac/iota", "driver_cmt.sas", c("* %mi_cmt(data=w, nimpute=2);"))
 
+# ⚠️ mi_conf: TWO copies of one macro name binding the same EXPRESSION but
+# declaring DIFFERENT DEFAULTS. Comparing expressions alone reported zero
+# conflicts and silently used whichever copy was read first. The call omits the
+# argument, so which value ran is genuinely unknown: it must be counted as a
+# conflicting default and kept OUT of the distribution, not guessed.
+put("cardiac/kappa", "mult_imput_conf.sas",
+    c("%macro mi_conf(data=, nimpute=5);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("thoracic/lambda", "mult_imput_conf.sas",
+    c("%macro mi_conf(data=, nimpute=50);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("cardiac/kappa", "driver_conf.sas", c("%mi_conf(data=w);"))
+
+# ⚠️ mi_ord: one file, one macro variable REASSIGNED between two calls. Building
+# a whole-file %let map first let the later assignment decide the earlier call,
+# resolving both to 10. Correct is 5 then 10.
+put("cardiac/mu", "mult_imput_ord.sas",
+    c("%macro mi_ord(data=, nimpute=);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("cardiac/mu", "driver_ord.sas",
+    c("%let n = 5;", "%mi_ord(data=w, nimpute=&n);",
+      "%let n = 10;", "%mi_ord(data=w, nimpute=&n);"))
+
 # ---- run --------------------------------------------------------------------
 
 outfile <- file.path(root, "out.json")
@@ -113,19 +136,29 @@ num <- function(field) {
 # ---- expectations -----------------------------------------------------------
 
 expected <- list(
-  # eight macros, every one binding NIMPUTE
-  macros_binding_nimpute = 8L,
+  # ten macros, every one binding NIMPUTE
+  macros_binding_nimpute = 10L,
   binding_literal = 1L,   # mi_lit
   binding_local   = 1L,   # mi_local
-  binding_param   = 6L,   # the rest
+  binding_param   = 8L,   # the rest
+  # mi_conf's two copies share an expression, so this stays 0 ...
   conflicting_redefinitions = 0L,
-  # mi_kw, mi_pos, mi_let, mi_def, mi_unres. NOT mi_cmt -- commented out.
-  calls_to_parameterised_macros = 5L,
-  resolved_from_argument = 3L,   # 25, 7, 1
+  # ... and the disagreement shows up here instead. This is the pair the
+  # expression-only comparison could not see.
+  conflicting_defaults = 1L,
+  macros_conflicted    = 1L,
+  # mi_kw, mi_pos, mi_let, mi_def, mi_unres, mi_conf, and mi_ord TWICE.
+  # NOT mi_cmt -- commented out.
+  calls_to_parameterised_macros = 8L,
+  # 25, 7, 1, and mi_ord's 5 and 10
+  resolved_from_argument = 5L,
   resolved_from_default  = 1L,   # mi_def's 10
+  unresolved_conflicting_default = 1L,  # mi_conf: 5 or 50, unknowable
   unresolved             = 1L,   # mi_unres
-  settled_by_definition_alone = 2L,  # mi_local's 3, mi_lit's 40
-  # 25, 7, 1, 10, 3, 40
+  # mi_local's 3 and mi_lit's 40 -- definitions, NOT calls, and no longer
+  # pooled into the call distribution below.
+  settled_by_definition_alone = 2L,
+  # 25, 7, 1, 5, 10, 10 -- calls only
   resolved_total = 6L,
   nimpute_1   = 1L,
   nimpute_gt1 = 5L,
@@ -143,10 +176,29 @@ for (nm in names(expected)) {
 
 # Call outcomes must partition, or a call was counted twice or lost.
 if (num("resolved_from_argument") + num("resolved_from_default") +
-    num("unresolved") != num("calls_to_parameterised_macros")) {
+    num("unresolved_conflicting_default") + num("unresolved") !=
+    num("calls_to_parameterised_macros")) {
   message("FAIL  call outcomes do not partition the calls")
   fail <- fail + 1L
 }
+# The distribution must count CALLS only. If a definition settled without a
+# caller leaks into it, this fails.
+if (num("resolved_total") !=
+    num("resolved_from_argument") + num("resolved_from_default")) {
+  message("FAIL  the distribution is not calls-only")
+  fail <- fail + 1L
+}
+
+# ⚠️ THE ORDERING CHECK, and it has to look at the DISTRIBUTION rather than the
+# counts. Under the order-blind bug mi_ord resolves to 10 and 10 instead of 5
+# and 10 -- and every count above is IDENTICAL either way: still 8 calls, still
+# 5 from arguments, still 1 nimpute_1, still 5 nimpute_gt1. Only the values
+# differ. `nimpute` is emitted last, so its table is the final one.
+tbl <- sub(".*\"table\"", "", j)
+ord_ok <- grepl("\"5\" *: *1", tbl) && grepl("\"10\" *: *2", tbl)
+message(sprintf("%-32s %s", "ordered %let resolution",
+                if (ord_ok) "ok  (5 once, 10 twice)" else "FAIL"))
+if (!ord_ok) fail <- fail + 1L
 # Every resolved value is accounted for by exactly one bucket.
 if (num("nimpute_0") + num("nimpute_1") + num("nimpute_gt1") !=
     num("resolved_total")) {

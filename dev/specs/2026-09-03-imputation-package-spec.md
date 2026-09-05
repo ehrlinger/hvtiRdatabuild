@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-03
 **Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
-**Status:** designed, nothing built. §6 and §8 are now **decided** (2026-09-04); §2 and §7 remain open.
-**Updated:** 2026-09-04 — §6 settled by the maintainer, §8 settled by design, and the §2 scan written for server-side execution.
+**Status:** designed, nothing built. §6 and §8 are **decided**, and §2 is **answered pending a confirmation run** (all 2026-09-04). §7 remains open as a naming decision.
+**Updated:** 2026-09-04 — §6 settled by the maintainer, §8 settled by design, and §2 measured over the corpus by three scans. ⚠️ The §2 numbers come from a run that predates three resolver corrections; see §2.
 **Origin:** porting a study's `vars.sas` (issue #31) found that reproducing published results requires an imputation step nobody had accounted for.
 
 ⚠️ **No study or patient identifier appears here, and no counts or names beyond those already public.** Three variable names and their coefficients appear in §1; they are quoted verbatim from [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33), a public issue on this repository, and are reproduced only because the size of the effect is the argument. ⚠️ This is a **narrower claim than the sibling specs make** — `2026-09-02-vars-port-and-attrition-design.md` carries no variable names at all. Do not copy the blanket wording from there onto this file; it would be false.
@@ -28,7 +28,7 @@ So a port that skips imputation does not produce a slightly different answer. It
 
 **Corpus scale:** `imputsub` appears in **309 studies**, `mult_imput` in **242**. Neither has a taxonomy prefix.
 
-## 2. ✅ The distinction that had to be settled first — SETTLED 2026-09-04
+## 2. 🟡 The distinction that had to be settled first — ANSWERED 2026-09-04, confirmation run pending
 
 **`PROC STANDARD ... REPLACE` is single mean imputation. It is not multiple imputation.** They are different methods with different inferential properties: mean imputation is deterministic and understates variance; multiple imputation generates several completed datasets and pools, precisely so the standard errors reflect the uncertainty.
 
@@ -126,6 +126,36 @@ Scan 3 joins the two, globally by macro name. It reports
 `conflicting_redefinitions`, and that value came back **0** — so the assumption
 that the many copies are one canonical file is **checked rather than assumed**,
 which is what the three preceding corpus errors in this family had in common.
+
+### ⚠️ Why this is ANSWERED and not yet SETTLED
+
+Review of [#36](https://github.com/ehrlinger/hvtiRdatabuild/pull/36) found three
+defects in scan 3's resolver **after** the run above. All three are corrected,
+each is now pinned by the fixture, and **the corpus run has not been repeated**.
+Until it is, the numbers above stand as the best available answer and not as a
+settled one.
+
+Two of the three can move them:
+
+- **Conflicting defaults were invisible.** The conflict check compared the
+  bound *expression* and not the declared *default*, so two copies of one macro
+  binding `nimpute=&nimpute` while declaring `nimpute=5` and `nimpute=10` were
+  reported as agreeing, and whichever was read first silently won. ⭐ That made
+  `conflicting_redefinitions = 0` — the field cited just above as the validity
+  check — the **least** searching test of the input deciding **69%** of the
+  calls. The scan now reports `conflicting_defaults` separately, and keeps
+  calls resting on a conflicted default out of the distribution rather than
+  guessing.
+- **`%let` resolution ignored statement order.** One map was built per file, so
+  a later assignment could decide an earlier call: `%let n=5; call; %let n=10;
+  call;` resolved both to 10. Pass 2 now walks statements in order. ⭐ Note that
+  every *count* in the output is identical under this bug — only the values
+  differ — so the fixture had to assert on the distribution itself to catch it.
+
+The third cannot move them: definitions settling `NIMPUTE` without a caller
+were pooled into the call denominator, and in this corpus there were **none**
+(`binding_literal`, `binding_local` and `settled_by_definition_alone` were all
+0). Corrected for the next corpus, which may differ.
 
 All three require `hvtiRutilities`, which defines what a study is, and stop
 rather than guessing if it cannot be loaded. Each output records the
@@ -392,7 +422,8 @@ the stable part of the contract in the meantime.
 
 ## Definition of done for this spec
 
-- [x] **§2 settled** 2026-09-04 — **both methods are real and present at scale**:
+- [ ] **§2 answered, confirmation run pending** 2026-09-04 — **both methods are
+  real and present at scale**:
   223 studies call `%imputsub` (single mean imputation), 326 call `%mult_imput`,
   18 call both, and 29 impute inline through neither. `mult_imput` performs
   **genuine multiple imputation** — 925 of 939 resolved calls (98.5%) pass
@@ -402,12 +433,13 @@ the stable part of the contract in the meantime.
   passed rather than that it executed. The hold on `impute()` lifts only in
   part: the package may offer a mean-imputation function **and** an `mi()`, but
   ⚠️ **must not offer one `impute()` that silently picks between them.**
+  ⚠️ **The box stays unticked until scan 3 is re-run**: review of #36 found
+  three resolver defects after this run, two of which can move the numbers. All
+  are fixed and pinned by the fixture; the corpus run has not been repeated.
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
-- [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 settled the
+- [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 answered the
   evidence question — **two are needed, not one** — so what remains is the
   naming decision itself, not the measurement behind it. See §7.
-  Still open, and still contingent on §2: if both single and multiple
-  imputation are present, one prefix is not enough.
 - [x] **The imputation/CONSORT interaction decided** 2026-09-04 — §8.
 - [ ] Only then: a design spec for the package, and a plan.

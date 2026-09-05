@@ -1,0 +1,90 @@
+{
+  "_provenance": {
+    "script": "imputation-method-scan.R",
+    "question": "spec 2026-09-03-imputation-package-spec.md S2: single vs multiple imputation",
+    "run_at": "2026-09-04T15:19:29-0400",
+    "root": "/studies",
+    "mode": "stem-matched .sas",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "files_considered": 1134,
+    "files_read": 1134,
+    "contains_identifiers": false
+  },
+  "totals": {
+    "files": 1134,
+    "studies": 547,
+    "files_unplaced": 3,
+    "single_mean_imputation": 628,
+    "multiple_imputation": 506,
+    "both_in_one_file": 0,
+    "neither": 0,
+    "files_proc_mi_diag_only": 0,
+    "studies_single": 309,
+    "studies_multiple": 277,
+    "studies_both": 39,
+    "studies_single_only": 270,
+    "studies_multiple_only": 238,
+    "files_calls_imputsub": 0,
+    "files_calls_mult_imput": 0,
+    "studies_calls_imputsub": 0,
+    "studies_calls_mult_imput": 0
+  },
+  "by_stem": {
+    "imputsub": {
+      "files": 628,
+      "studies": 309,
+      "single_mean_imputation": 628,
+      "multiple_imputation": 0,
+      "both_in_one_file": 0,
+      "neither": 0,
+      "proc_mi_diag_only": 0,
+      "calls_macro": 0,
+      "defines_macro": 628,
+      "ms_indicators": 0
+    },
+    "mult_imput": {
+      "files": 506,
+      "studies": 277,
+      "single_mean_imputation": 0,
+      "multiple_imputation": 506,
+      "both_in_one_file": 0,
+      "neither": 0,
+      "proc_mi_diag_only": 0,
+      "calls_macro": 0,
+      "defines_macro": 504,
+      "ms_indicators": 0
+    },
+    "other": {
+      "files": 0,
+      "studies": 0,
+      "single_mean_imputation": 0,
+      "multiple_imputation": 0,
+      "both_in_one_file": 0,
+      "neither": 0,
+      "proc_mi_diag_only": 0,
+      "calls_macro": 0,
+      "defines_macro": 0,
+      "ms_indicators": 0
+    }
+  },
+  "proc_standard_detail": {
+    "files_replace_plain": 628,
+    "files_replace_with_mean_std": 0,
+    "files_standard_without_replace": 0,
+    "exclusive": {
+      "replace_plain_only": 628,
+      "replace_std_only": 0,
+      "both_in_one_file": 0
+    }
+  },
+  "nimpute": {
+    "n_statements_declaring": 5,
+    "min": 1,
+    "median": 1,
+    "max": 1,
+    "table": {
+      "1": 5
+    }
+  }
+}

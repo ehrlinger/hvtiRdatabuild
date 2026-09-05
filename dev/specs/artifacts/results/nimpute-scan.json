@@ -1,0 +1,49 @@
+{
+  "_provenance": {
+    "script": "imputation-nimpute-scan.R",
+    "question": "spec 2026-09-03 S2: does mult_imput perform genuine multiple imputation?",
+    "run_at": "2026-09-04T18:56:59-0400",
+    "root": "/studies",
+    "scope": "studies carrying a definition",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "files_considered": 104666,
+    "contains_identifiers": false
+  },
+  "definitions": {
+    "files_scanned_for_definitions": 1134,
+    "files_defining_a_macro": 1134,
+    "macros_binding_nimpute": 63,
+    "binding_param": 62,
+    "binding_literal": 0,
+    "binding_local": 0,
+    "binding_unknown": 1,
+    "conflicting_redefinitions": 0
+  },
+  "calls": {
+    "calls_to_parameterised_macros": 939,
+    "studies_calling": 329,
+    "resolved_from_argument": 292,
+    "resolved_from_default": 647,
+    "unresolved": 0,
+    "settled_by_definition_alone": 0
+  },
+  "nimpute": {
+    "resolved_total": 939,
+    "nimpute_0": 0,
+    "nimpute_1": 14,
+    "nimpute_gt1": 925,
+    "min": 1,
+    "median": 5,
+    "max": 20,
+    "table": {
+      "1": 14,
+      "5": 882,
+      "7": 1,
+      "8": 3,
+      "10": 37,
+      "12": 1,
+      "20": 1
+    }
+  }
+}
