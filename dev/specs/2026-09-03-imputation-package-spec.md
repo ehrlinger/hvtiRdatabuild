@@ -108,8 +108,20 @@ to multiple-impute — were reported as an open question rather than a resolved
 negative one. `not all > 1` is a different predicate from `straddles`.
 
 It also classifies the conflicted macros **in pass 1**, which needs no corpus
-walk, and prints the verdict before pass 2 begins. **That run has not
-happened.**
+walk, and prints the verdict before pass 2 begins.
+
+🔴 **That run happened on 2026-09-05, and the answer is that the question cannot
+be closed from the code.** Of the five conflicted macros, **three straddle 1** and
+none has an unreadable default. So the 622 calls are not a measurement gap I
+could close with a better resolver, as I had argued they might be. They are
+copies of one macro disagreeing about whether to single- or multiply-impute, and
+which one a study loaded is not recoverable from the source.
+
+⭐ **This outranks §2 and has its own record:**
+[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md).
+The short form is that a reproduction guarantee can be offered for the 292 calls
+that state their value and cannot be offered for the 622 that do not, and that
+bound is a property of the corpus rather than of the port.
 
 ⚠️ **A resolved call proves what value would be passed, not that the call
 executed.** A call inside a `%if` branch that never fires is counted. Read this
