@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-03
 **Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
-**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is **answered**, with one split outstanding, and the census discrepancy is **resolved** (2026-09-05). §7 remains open as a naming decision.
-**Updated:** 2026-09-05 — §2 re-measured after three resolver corrections, and the census gap explained. ⚠️ 622 of 939 calls rest on conflicting macro defaults and are excluded from the headline; see §2.
+**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is **answered as a bound** and the census discrepancy is **resolved** (2026-09-05). §7 remains open as a naming decision.
+**Updated:** 2026-09-05 — §2 measured to completion. ⚠️ 619 of 939 calls (66%) cannot be attributed to either method, because the macros they call exist in copies that disagree; see [[2026-09-05-divergent-macro-copies]].
 **Origin:** porting a study's `vars.sas` (issue #31) found that reproducing published results requires an imputation step nobody had accounted for.
 
 ⚠️ **No study or patient identifier appears here, and no counts or names beyond those already public.** Three variable names and their coefficients appear in §1; they are quoted verbatim from [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33), a public issue on this repository, and are reproduced only because the size of the effect is the argument. ⚠️ This is a **narrower claim than the sibling specs make** — `2026-09-02-vars-port-and-attrition-design.md` carries no variable names at all. Do not copy the blanket wording from there onto this file; it would be false.
@@ -28,7 +28,7 @@ So a port that skips imputation does not produce a slightly different answer. It
 
 **Corpus scale:** `imputsub` appears in **309 studies**, `mult_imput` in **242**. Neither has a taxonomy prefix.
 
-## 2. 🟡 The distinction that had to be settled first — ANSWERED 2026-09-05, one split outstanding
+## 2. 🟡 The distinction that had to be settled first — ANSWERED 2026-09-05, as a bound
 
 **`PROC STANDARD ... REPLACE` is single mean imputation. It is not multiple imputation.** They are different methods with different inferential properties: mean imputation is deterministic and understates variance; multiple imputation generates several completed datasets and pools, precisely so the standard errors reflect the uncertainty.
 
@@ -54,12 +54,23 @@ whose `NIMPUTE` can be read unambiguously, **308 (97.2%) pass `NIMPUTE > 1`** �
 — single stochastic imputation whatever the macro is called — accounts for **9
 calls**.
 
-⚠️ **317, not 939.** A first run reported 925 of 939 at 98.5%. That run could not
-see conflicting macro defaults, and the corrected run finds **39 of them across
-5 macro names — governing 622 of the 939 calls**. Those 622 are now reported as
-`unresolved_conflicting_default` rather than resolved against whichever copy
-happened to be read first. The direction is unchanged and the evidence base is a
-third the size.
+🔴 **Read that as a bound, not a rate.** The honest statement of the result is:
+
+> Of the **320** calls whose method can be determined, **311 are multiple
+> imputation and 9 are single**. **619 of 939 calls, 66%, cannot be attributed
+> to either method**, because the macro they call exists in copies that declare
+> defaults on both sides of 1.
+
+A first run reported "925 of 939, 98.5%". It could not see conflicting macro
+defaults, and the corrected run finds 39 of them across 5 names governing 622
+calls. Every correction since has moved the figure the same way: 98.5% of 939,
+then 97.2% of 317, now 97% of 320 with two thirds of the corpus unmeasurable.
+⭐ The direction of the answer never changed. Confidence in how much of the
+corpus it covers fell by two thirds.
+
+The undeterminable share is a property of the corpus, not of the scan, and it
+has its own record:
+[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md).
 
 So the hold lifts: the package may honestly offer **both** a mean-imputation
 function and an `mi()`. ⚠️ What it must still never do is offer one `impute()`
@@ -110,12 +121,14 @@ negative one. `not all > 1` is a different predicate from `straddles`.
 It also classifies the conflicted macros **in pass 1**, which needs no corpus
 walk, and prints the verdict before pass 2 begins.
 
-🔴 **That run happened on 2026-09-05, and the answer is that the question cannot
-be closed from the code.** Of the five conflicted macros, **three straddle 1** and
-none has an unreadable default. So the 622 calls are not a measurement gap I
-could close with a better resolver, as I had argued they might be. They are
-copies of one macro disagreeing about whether to single- or multiply-impute, and
-which one a study loaded is not recoverable from the source.
+🔴 **That run completed on 2026-09-05, and the answer is that the question
+cannot be closed from the code.** Of the five conflicted macros, **three straddle
+1** and none has an unreadable default; weighted by invocation that is **619
+calls straddling, 3 safely above 1, 0 at or below, 0 unreadable**. So the 622 are
+not a measurement gap a better resolver could close, as I had argued they might
+be. They are copies of one macro disagreeing about whether to single- or
+multiply-impute, and which one a study loaded is not recoverable from the
+source.
 
 ⭐ **This outranks §2 and has its own record:**
 [`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md).
@@ -543,12 +556,14 @@ the stable part of the contract in the meantime.
   passed rather than that it executed. The hold on `impute()` lifts only in
   part: the package may offer a mean-imputation function **and** an `mi()`, but
   ⚠️ **must not offer one `impute()` that silently picks between them.**
-  ⚠️ **Re-run 2026-09-05 after the #36 resolver fixes, and the correction was
-  large**: 39 conflicting defaults across 5 macro names govern 622 of the 939
-  calls, so the evidence base is 317 rather than 939 and the figure is 97.2%
-  rather than 98.5%. The box stays unticked on one remaining split — whether
-  those 622 straddle `NIMPUTE = 1` or sit entirely above it. If entirely above,
-  the conclusion holds across 930 of 939 and this ticks.
+  ⚠️ **Answered as a BOUND, 2026-09-05.** Of the 320 calls whose method can be
+  determined, 311 are multiple imputation and 9 are single. **619 of 939 (66%)
+  cannot be attributed to either**, because the macro they call exists in copies
+  declaring defaults on both sides of 1. The box stays unticked because the
+  question as originally posed — what did the studies run — has no answer in the
+  code for two thirds of them. Closing it means reconciling five macro
+  definitions, not running another scan. See
+  [[2026-09-05-divergent-macro-copies]].
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
 - [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 answered the

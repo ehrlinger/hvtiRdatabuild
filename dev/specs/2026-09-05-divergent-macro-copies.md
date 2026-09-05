@@ -1,8 +1,8 @@
 # Divergent macro copies, and the ceiling they put on reproducing SAS
 
 **Date:** 2026-09-05
-**Status:** finding, measured. The definitions are counted; what any individual
-run did is not, and cannot be, recovered from the code alone.
+**Status:** finding, measured at both the definition and the call level. What any
+individual run did is not, and cannot be, recovered from the code alone.
 **Origin:** the §2 scans in
 [`2026-09-03-imputation-package-spec.md`](2026-09-03-imputation-package-spec.md),
 which set out to ask which studies ran single and which ran multiple imputation.
@@ -56,6 +56,19 @@ Of 939 calls that take `NIMPUTE` from a parameter, **622 fall back on a
 default** rather than passing a value, and those 622 land on the five divergent
 names. Only 292 calls state the number outright, and a further 25 take a default
 from a macro whose copies agree.
+
+Weighted by how often each macro is invoked, the 622 fall out as:
+
+| | calls |
+|---|---|
+| every copy above 1, so multiple imputation whichever was loaded | 3 |
+| ⭐ **copies on both sides of 1, so undeterminable** | **619** |
+| every copy at 1 or below | 0 |
+| a copy with no readable default | 0 |
+
+So **619 of 939 calls, 66%, cannot be attributed to either method.** The
+undeterminable share is not a rounding error at the edge of the result. It is
+two thirds of it.
 
 That sets a hard bound on the migration. **A reproduction guarantee can be
 offered for the calls that state their value, and cannot be offered for the
@@ -141,11 +154,14 @@ of the 2026-09-05 run:
   default, 622 take a divergent one.
 - Of the 317 calls resolvable to a value, 308 exceed 1 and 9 equal 1.
 
+- The per-call split of those 622: 3 above 1, 619 straddling, 0 at or below 1,
+  0 unreadable.
+- Of the 320 calls whose METHOD can be determined (317 resolved to a value, plus
+  3 known to exceed 1 without a known value), 311 are multiple imputation and 9
+  are single.
+
 **Not measured:**
 
-- The per-call split of the 622 across the four outcomes, under the four-bucket
-  build. Pass 2 of the 2026-09-05 run was still walking when this note was
-  written.
 - Which copy any given study loaded, which the code cannot say.
 - Whether the same drift affects other macro families. Nobody has looked.
 
@@ -153,6 +169,6 @@ of the 2026-09-05 run:
 
 - [x] The divergence measured and its size stated
 - [x] The consequence for the migration stated as a bound
-- [ ] Per-call weighting filled in from the completed 2026-09-05 run
+- [x] Per-call weighting filled in from the completed 2026-09-05 run
 - [ ] The five names reconciled, or a decision recorded not to
 - [ ] The same measurement run against one other macro family
