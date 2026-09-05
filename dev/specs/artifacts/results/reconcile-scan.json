@@ -2,7 +2,7 @@
   "_provenance": {
     "script": "imputation-reconcile-scan.R",
     "question": "which macro names disagree about NIMPUTE, and what would reconciling them take?",
-    "run_at": "2026-09-05T14:09:06-0400",
+    "run_at": "2026-09-05T14:43:19-0400",
     "root": "/studies",
     "mode": "definitions only (--no-calls)",
     "hvtiRutilities_version": "1.1.9",
@@ -24,8 +24,8 @@
     },
     "copies_with_no_readable_default": 427
   },
-  "worksheet": {
-    "": {
+  "worksheet": [
+    {
       "macro": "mult_imput",
       "copies": 423,
       "declared_defaults": {
@@ -41,7 +41,7 @@
       "calls": 0,
       "calls_relying_on_a_default": 0
     },
-    "": {
+    {
       "macro": "mult_imputiso60",
       "copies": 6,
       "declared_defaults": {
@@ -55,7 +55,7 @@
       "calls": 0,
       "calls_relying_on_a_default": 0
     },
-    "": {
+    {
       "macro": "mult_imput_dead",
       "copies": 4,
       "declared_defaults": {
@@ -69,7 +69,7 @@
       "calls": 0,
       "calls_relying_on_a_default": 0
     },
-    "": {
+    {
       "macro": "mult_imput_mv",
       "copies": 2,
       "declared_defaults": {
@@ -83,7 +83,7 @@
       "calls": 0,
       "calls_relying_on_a_default": 0
     },
-    "": {
+    {
       "macro": "multimput",
       "copies": 2,
       "declared_defaults": {
@@ -97,5 +97,5 @@
       "calls": 0,
       "calls_relying_on_a_default": 0
     }
-  }
+  ]
 }

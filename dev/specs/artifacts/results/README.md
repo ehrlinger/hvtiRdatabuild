@@ -40,16 +40,18 @@ first dot-delimited field equals the stem, which reproduces 926 and 411 to withi
 a few files. It also shows `studies_only_suspect` at 0 and 1 — so test and dead
 jobs inflate the FILE counts badly and the STUDY counts barely at all.
 
-## 🔴 Two committed results need regenerating
+## `reconcile-scan.json` was regenerated 2026-09-05 14:43
 
-**`reconcile-scan.json` is malformed and unusable programmatically.** It was
-produced before the serializer fix in
+The first copy was produced before the serializer fix in
 [#41](https://github.com/ehrlinger/hvtiRdatabuild/pull/41): an unnamed R list was
-emitted as a JSON object, so all five worksheet rows carry the key `""` and a
-standards-compliant parser keeps **one**. The numbers quoted from it in section
-4a of `2026-09-05-divergent-macro-copies.md` were read from the raw text and are
-correct; the file is not. ⚠️ Rerun `imputation-reconcile-scan.R --no-calls`,
-which takes seconds, and replace it.
+emitted as a JSON object, so all five worksheet rows carried the key `""` and a
+parser kept **one**. Replaced with the array form. ⭐ Every number is identical to
+the 14:09 run, which is the expected result of a serialization-only change, and
+confirms that the figures quoted in section 4a of
+`2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
+were right.
+
+## 🔴 One committed result still needs regenerating
 
 **`nimpute-scan.json` may have shifted.** #41 corrected a positional-argument
 defect shared by three scans: a value supplied positionally in a call that also
