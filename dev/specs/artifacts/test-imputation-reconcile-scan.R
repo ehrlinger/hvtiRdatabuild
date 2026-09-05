@@ -80,6 +80,22 @@ put("thoracic/j", "mult_imput_named.sas",
 put("cardiac/i", "driver_named.sas",
     c("%mi_named(data=w, reps=30);", "%mi_named(data=w);"))
 
+# ⚠️ mi_mixed: the copies disagree STRUCTURALLY, not just numerically. One
+# declares the NIMPUTE parameter as a keyword with a default; the other declares
+# it POSITIONALLY, which in SAS has no default at all. That difference is what
+# puts the name on the worksheet, and it means calls to it are positional. A
+# default test that recognises only `name = value` counts such a call as an
+# omission and inflates the tally that orders this work.
+put("cardiac/k", "mult_imput_mixed.sas",
+    c("%macro mi_mixed(data=, nimpute=5);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("thoracic/l", "mult_imput_mixed.sas",
+    c("%macro mi_mixed(data, nimpute);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+# one positional call supplying it, one omitting it entirely
+put("cardiac/k", "driver_mixed.sas",
+    c("%mi_mixed(w, 30);", "%mi_mixed(data=w);"))
+
 # Two calls to mi_hdr, both omitting the parameter.
 put("cardiac/d", "driver_hdr.sas", c("%mi_hdr(data=w);", "%mi_hdr(data=x);"))
 
@@ -113,7 +129,7 @@ checks <- list(
   list("names conflicting", {
     m <- regmatches(j, regexpr("\"names_with_conflicting_defaults\": *[0-9]+", j))
     as.integer(sub(".*: *", "", m))
-  }, 3L),
+  }, 4L),
   # mi_hdr: 3 copies, defaults 1 and 10, bodies identical once the header goes
   list("mi_hdr copies", fld("mi_hdr", "copies"), 3L),
   list("mi_hdr bodies", fld("mi_hdr", "distinct_bodies"), 2L),
@@ -126,7 +142,11 @@ checks <- list(
        fld("mi_body", "distinct_bodies_ignoring_header"), 2L),
   # mi_named: parameter is `reps`; one call passes it, one does not
   list("mi_named calls", fld("mi_named", "calls"), 2L),
-  list("mi_named on default", fld("mi_named", "calls_relying_on_a_default"), 1L)
+  list("mi_named on default", fld("mi_named", "calls_relying_on_a_default"), 1L),
+  # ⭐ two calls, ONE positional supply and one omission. A name-only test reads
+  # this as 2 and misorders the work.
+  list("mi_mixed calls", fld("mi_mixed", "calls"), 2L),
+  list("mi_mixed on default", fld("mi_mixed", "calls_relying_on_a_default"), 1L)
 )
 
 fail <- 0L

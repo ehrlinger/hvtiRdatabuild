@@ -81,9 +81,9 @@ for (i in seq_along(defs_files)) {
   if (!length(starts)) next
   ends <- grep("^ *%mend", st)
   for (s in starts) {
-    m <- regmatches(st[[s]], regexec("^ *%macro +([a-z0-9_]+) *(\\((.*)\\))? *$", st[[s]]))[[1]]
-    if (!length(m)) next
-    nm <- m[2]
+    h <- parse_macro_header(st[[s]])
+    if (is.null(h)) next
+    nm <- h$name
     e <- ends[ends > s]
     e <- if (length(e)) e[1] else length(st)
     body <- st[seq(s, e)]
@@ -96,20 +96,19 @@ for (i in seq_along(defs_files)) {
     }
     if (is.na(expr)) next
 
-    # The declared default for whichever parameter feeds NIMPUTE.
+    # The declared default for whichever parameter feeds NIMPUTE. A POSITIONAL
+    # parameter has no default, so this is NA for it -- which is itself a form
+    # of divergence: one copy may declare the parameter with a default while
+    # another declares it positionally, and those copies disagree structurally,
+    # not just numerically.
     pname <- sub("^&+", "", gsub("[ %]", "", expr))
-    dflt <- NA_character_
-    if (length(m) >= 4L && nzchar(m[4])) {
-      for (p in strsplit(m[4], ",", fixed = TRUE)[[1]]) {
-        kv <- regmatches(trimws(p), regexec("^([a-z0-9_]+) *(= *(.*))?$", trimws(p)))[[1]]
-        if (length(kv) && identical(kv[2], pname)) {
-          dflt <- if (length(kv) >= 4L && nzchar(trimws(kv[4]))) trimws(kv[4]) else NA_character_
-        }
-      }
-    }
+    dflt <- h$defaults[[pname]]
+    if (is.null(dflt)) dflt <- NA_character_
+
     copies[[length(copies) + 1L]] <- list(
       name = nm,
       param = pname,
+      params = h$params,
       default = dflt,
       # ⚠️ The two bodies below are held in memory ONLY to be compared. They are
       # reduced to a count of distinct variants and never emitted.
@@ -152,7 +151,13 @@ if (!no_calls && length(conflicted)) {
   }), use.names = FALSE))
   # One parameter name per macro. Pass 1 found the copies agree on it (they
   # differ in the DEFAULT, not the parameter); take the first.
-  param_of <- vapply(by_name, function(ix) copies[[ix[1]]]$param, character(1))
+  param_of  <- vapply(by_name, function(ix) copies[[ix[1]]]$param, character(1))
+  # ⚠️ EVERY copy's parameter list, not the first. The copies of a conflicted
+  # name may disagree about whether the parameter is keyword or positional, and
+  # a call does not say which copy it resolved against. Take the earliest
+  # position any copy gives it, so a positional call is credited rather than
+  # counted as an omission.
+  params_of <- lapply(by_name, function(ix) lapply(copies[ix], function(x) x$params))
   message("pass 2: call sites (", length(files), " files)")
   alt <- paste(conflicted, collapse = "|")
   call_re <- paste0("%(", alt, ") *\\(")
@@ -166,13 +171,28 @@ if (!no_calls && length(conflicted)) {
       nm <- mm[2]
       call_total[[nm]] <- call_total[[nm]] + 1L
       # Does this call pass the parameter that feeds NIMPUTE, or fall back on
-      # the declared default? Test the PARAMETER NAME captured in pass 1, not
-      # the literal string "nimpute": the parameter is named by the macro's
-      # author and need not be called that.
+      # the declared default?
+      #
+      # Test the PARAMETER NAME captured in pass 1, not the literal string
+      # "nimpute": the parameter is named by the macro's author and need not be
+      # called that.
+      #
+      # ⚠️ And accept a POSITIONAL argument. SAS macro arguments can be supplied
+      # by position, so recognising only `name = value` counts such a call as
+      # having omitted the parameter and inflates the default-reliance tally --
+      # the number that orders this work. That matters here specifically:
+      # copies that disagree may disagree about whether the parameter is
+      # keyword or positional at all, and the positional copy has no default,
+      # which is what put the name on the worksheet.
       pn <- param_of[[nm]]
-      if (is.na(pn) || !grepl(paste0("(^|[(,] *)", pn, " *="), mm[3])) {
-        call_default[[nm]] <- call_default[[nm]] + 1L
+      a  <- parse_call_args(mm[3])
+      supplied <- !is.null(a$kw[[pn]])
+      if (!supplied && !length(a$kw)) {
+        idx <- suppressWarnings(min(unlist(lapply(params_of[[nm]],
+                                                 function(pp) match(pn, pp))), na.rm = TRUE))
+        supplied <- is.finite(idx) && length(a$pos) >= idx
       }
+      if (!supplied) call_default[[nm]] <- call_default[[nm]] + 1L
     }
     if (i %% 5000 == 0) message("  ", i, " / ", length(files))
   }
