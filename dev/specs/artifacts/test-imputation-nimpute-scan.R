@@ -120,6 +120,20 @@ put("thoracic/xi", "mult_imput_safe.sas",
       "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
 put("cardiac/nu", "driver_safe.sas", c("%mi_safe(data=w);"))
 
+# ⚠️ mi_empty: copies where one declares a default and the other declares NONE
+# (`nimpute=`, caller must supply). The scan cannot read the second, so the call
+# is a MEASUREMENT GAP -- not evidence that it single-imputed. An earlier
+# version filed this under the same `mixed` bucket as a genuine straddle, which
+# made that bucket unreadable: the real corpus put 619 calls in it and there was
+# no way to tell which fact it was reporting.
+put("cardiac/omicron", "mult_imput_empty.sas",
+    c("%macro mi_empty(data=, nimpute=8);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("thoracic/pi", "mult_imput_empty.sas",
+    c("%macro mi_empty(data=, nimpute=);",
+      "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
+put("cardiac/omicron", "driver_empty.sas", c("%mi_empty(data=w);"))
+
 # ⚠️ mi_ord: one file, one macro variable REASSIGNED between two calls. Building
 # a whole-file %let map first let the later assignment decide the earlier call,
 # resolving both to 10. Correct is 5 then 10.
@@ -153,27 +167,34 @@ num <- function(field) {
 
 expected <- list(
   # ten macros, every one binding NIMPUTE
-  macros_binding_nimpute = 11L,
+  macros_binding_nimpute = 12L,
   binding_literal = 1L,   # mi_lit
   binding_local   = 1L,   # mi_local
-  binding_param   = 9L,   # the rest
+  binding_param   = 10L,  # the rest
   # mi_conf's two copies share an expression, so this stays 0 ...
   conflicting_redefinitions = 0L,
   # ... and the disagreement shows up here instead. This is the pair the
   # expression-only comparison could not see.
-  conflicting_defaults = 2L,   # mi_conf (5 vs 50) and mi_safe (5 vs 10)
-  macros_conflicted    = 2L,
+  conflicting_defaults = 3L,   # mi_conf (1 vs 50), mi_safe (5 vs 10), mi_empty (8 vs none)
+  macros_conflicted    = 3L,
+  # the same three, classified from the definitions alone -- a pass-1 fact
+  conflicted_macros_all_gt1      = 1L,   # mi_safe
+  conflicted_macros_straddles_1  = 1L,   # mi_conf
+  conflicted_macros_unresolvable = 1L,   # mi_empty
   # mi_kw, mi_pos, mi_let, mi_def, mi_unres, mi_conf, and mi_ord TWICE.
   # NOT mi_cmt -- commented out.
-  calls_to_parameterised_macros = 9L,
+  calls_to_parameterised_macros = 10L,
   # 25, 7, 1, and mi_ord's 5 and 10
   resolved_from_argument = 5L,
   resolved_from_default  = 1L,   # mi_def's 10
-  unresolved_conflicting_default = 2L,  # mi_conf and mi_safe
+  unresolved_conflicting_default = 3L,  # mi_conf, mi_safe, mi_empty
   # ⭐ mi_safe: 5 or 10, both > 1, so the ANSWER survives the ambiguity.
   conflicting_default_all_gt1 = 1L,
-  # mi_conf: 1 or 50 -- straddles 1, so the answer itself is open.
-  conflicting_default_mixed   = 1L,
+  # ⭐ The three states kept apart. Under the old two-bucket version mi_conf and
+  # mi_empty both landed in `mixed`, which is exactly the collapse that made the
+  # corpus result unreadable.
+  conflicting_default_straddles_1  = 1L,   # mi_conf: 1 or 50
+  conflicting_default_unresolvable = 1L,   # mi_empty: 8 or unreadable
   unresolved             = 1L,   # mi_unres
   # mi_local's 3 and mi_lit's 40 -- definitions, NOT calls, and no longer
   # pooled into the call distribution below.

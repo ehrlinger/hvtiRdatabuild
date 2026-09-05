@@ -2,12 +2,13 @@
   "_provenance": {
     "script": "imputation-nimpute-scan.R",
     "question": "spec 2026-09-03 S2: does mult_imput perform genuine multiple imputation?",
-    "run_at": "2026-09-05T07:33:27-0400",
+    "run_at": "2026-09-05T08:10:07-0400",
     "root": "/studies",
     "scope": "studies carrying a definition",
     "hvtiRutilities_version": "1.1.9",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
     "files_considered": 104666,
+    "files_unreadable": 1,
     "contains_identifiers": false
   },
   "definitions": {
@@ -28,6 +29,8 @@
     "resolved_from_argument": 292,
     "resolved_from_default": 25,
     "unresolved_conflicting_default": 622,
+    "conflicting_default_all_gt1": 3,
+    "conflicting_default_mixed": 619,
     "unresolved": 0,
     "settled_by_definition_alone": 0
   },
