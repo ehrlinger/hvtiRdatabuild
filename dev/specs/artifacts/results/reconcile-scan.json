@@ -1,0 +1,101 @@
+{
+  "_provenance": {
+    "script": "imputation-reconcile-scan.R",
+    "question": "which macro names disagree about NIMPUTE, and what would reconciling them take?",
+    "run_at": "2026-09-05T14:43:19-0400",
+    "root": "/studies",
+    "mode": "definitions only (--no-calls)",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "definition_files": 1134,
+    "files_unreadable": 0,
+    "emits_macro_names": true
+  },
+  "summary": {
+    "macro_names_binding_nimpute": 63,
+    "macro_copies": 933,
+    "names_with_conflicting_defaults": 5,
+    "declared_defaults_all_macros": {
+      "1": 11,
+      "5": 460,
+      "8": 2,
+      "10": 31,
+      "20": 2
+    },
+    "copies_with_no_readable_default": 427
+  },
+  "worksheet": [
+    {
+      "macro": "mult_imput",
+      "copies": 423,
+      "declared_defaults": {
+        "1": 4,
+        "5": 390,
+        "10": 27,
+        "20": 2
+      },
+      "copies_with_no_readable_default": 0,
+      "spans_1": true,
+      "distinct_bodies": 381,
+      "distinct_bodies_ignoring_header": 380,
+      "calls": 0,
+      "calls_relying_on_a_default": 0
+    },
+    {
+      "macro": "mult_imputiso60",
+      "copies": 6,
+      "declared_defaults": {
+        "1": 3,
+        "5": 3
+      },
+      "copies_with_no_readable_default": 0,
+      "spans_1": true,
+      "distinct_bodies": 2,
+      "distinct_bodies_ignoring_header": 2,
+      "calls": 0,
+      "calls_relying_on_a_default": 0
+    },
+    {
+      "macro": "mult_imput_dead",
+      "copies": 4,
+      "declared_defaults": {
+        "5": 3,
+        "8": 1
+      },
+      "copies_with_no_readable_default": 0,
+      "spans_1": false,
+      "distinct_bodies": 4,
+      "distinct_bodies_ignoring_header": 4,
+      "calls": 0,
+      "calls_relying_on_a_default": 0
+    },
+    {
+      "macro": "mult_imput_mv",
+      "copies": 2,
+      "declared_defaults": {
+        "5": 1,
+        "10": 1
+      },
+      "copies_with_no_readable_default": 0,
+      "spans_1": false,
+      "distinct_bodies": 2,
+      "distinct_bodies_ignoring_header": 2,
+      "calls": 0,
+      "calls_relying_on_a_default": 0
+    },
+    {
+      "macro": "multimput",
+      "copies": 2,
+      "declared_defaults": {
+        "1": 1,
+        "5": 1
+      },
+      "copies_with_no_readable_default": 0,
+      "spans_1": true,
+      "distinct_bodies": 2,
+      "distinct_bodies_ignoring_header": 2,
+      "calls": 0,
+      "calls_relying_on_a_default": 0
+    }
+  ]
+}

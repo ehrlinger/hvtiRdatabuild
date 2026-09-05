@@ -40,8 +40,30 @@ first dot-delimited field equals the stem, which reproduces 926 and 411 to withi
 a few files. It also shows `studies_only_suspect` at 0 and 1 — so test and dead
 jobs inflate the FILE counts badly and the STUDY counts barely at all.
 
+## `reconcile-scan.json` was regenerated 2026-09-05 14:43
+
+The first copy was produced before the serializer fix in
+[#41](https://github.com/ehrlinger/hvtiRdatabuild/pull/41): an unnamed R list was
+emitted as a JSON object, so all five worksheet rows carried the key `""` and a
+parser kept **one**. Replaced with the array form. ⭐ Every number is identical to
+the 14:09 run, which is the expected result of a serialization-only change, and
+confirms that the figures quoted in section 4a of
+`2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
+were right.
+
+## 🔴 One committed result still needs regenerating
+
+**`nimpute-scan.json` may have shifted.** #41 corrected a positional-argument
+defect shared by three scans: a value supplied positionally in a call that also
+carries a keyword argument was being read as omitted. That moves a call off the
+"states its value" route and onto an inferred one. How many calls it touches in
+this corpus is unmeasured, so the 292 / 25 / 622 split and anything downstream of
+it should be treated as provisional until the scan is rerun.
+
 ## Not yet run
 
-A re-run of `imputation-nimpute-scan.R` carrying the
-`conflicting_default_all_gt1` / `conflicting_default_mixed` split, and
-`files_unreadable`. Cheap relative to what it settles.
+`studylocal-scan.json` -- output of `../imputation-studylocal-scan.R`, which
+resolves NIMPUTE against the calling study's own copy rather than a corpus-wide
+map. That map is what makes 619 of 939 calls look undeterminable, and this pass
+tests whether they are undeterminable at study scale too. Written and tested;
+not run.

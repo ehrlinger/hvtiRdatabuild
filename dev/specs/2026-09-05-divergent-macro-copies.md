@@ -118,6 +118,47 @@ did, because SAS did more than one thing.
 For the same reason, a study being re-run in R needs its `m` supplied from that
 study's own saved output, not inferred from the macro it called.
 
+## 4a. The worksheet, run 2026-09-05, and what it overturns
+
+| macro | copies | declared defaults | spans 1 | distinct bodies |
+|---|---|---|---|---|
+| `mult_imput` | **423** | 1x4, 5x390, 10x27, 20x2 | yes | **381** |
+| `mult_imputiso60` | 6 | 1x3, 5x3 | yes | 2 |
+| `mult_imput_dead` | 4 | 5x3, 8x1 | no | 4 |
+| `mult_imput_mv` | 2 | 5x1, 10x1 | no | 2 |
+| `multimput` | 2 | 1x1, 5x1 | yes | 2 |
+
+🔴 **`mult_imput` has 423 copies and 381 distinct bodies, 380 of them still
+distinct once the header is removed.** So §5's framing below, written before this
+ran, is wrong about the dominant case. These are not copies of one canonical file
+that drifted in a default. They are **381 different programs sharing a name**,
+and there is no canonical version to converge on. Reconciling `mult_imput` is not
+a one-line edit per copy, and it is not a merge either.
+
+⚠️ **But the exposure is far narrower than the straddle suggests.** Only **4 of
+423** copies declare `nimpute=1`; 390 declare 5. Across every macro binding
+`NIMPUTE`, 460 of 506 readable defaults are 5 and 11 are 1. The three names that
+span 1 do so on a handful of outliers, and two of the five (`mult_imput_dead`,
+which is a retired job, and `mult_imput_mv`) do not span 1 at all.
+
+⭐ **And the framing of the ambiguity was wrong too, which matters more.** Every
+study carries its own copy, so a call in a study resolves against **that study's
+copy**, not against a population of 423. The scans built a map keyed by macro
+name globally, deliberately, because `mult_imput` is called in 326 studies and
+defined in 277. That global map is what makes the 619 calls look undeterminable.
+A **study-local** resolution, joining each call to the copy in its own study,
+would determine most of them.
+
+⚠️ That is an inference, not proof: which copy SAS actually loaded depends on the
+autocall path and `%include` order at run time, not merely on which file sits in
+the study directory. It is a strong inference and a testable one, against the
+studies that kept their logs.
+
+**So the next step is not reconciliation.** It is a study-local resolution pass,
+which is cheaper, needs no institutional decision, and may collapse the 619 to
+something small. Reconciliation, if it is still wanted afterwards, applies to
+whatever is left.
+
 ## 5. Where this is heading
 
 Three things follow, in order of how tractable they are.

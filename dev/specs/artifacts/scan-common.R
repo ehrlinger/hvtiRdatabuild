@@ -168,6 +168,76 @@ parse_call_args <- function(argstr) {
   list(kw = kw, pos = pos)
 }
 
+# The value a call supplies for one parameter, or NULL if it supplies none.
+#
+# ⚠️ POSITIONAL ARGUMENTS COUNT EVEN WHEN KEYWORD ARGUMENTS ARE ALSO PRESENT.
+# An earlier version in three separate scans gated the positional lookup on the
+# call having NO keyword arguments, so `%m(w, 30, seed=7)` -- valid SAS, since
+# positional arguments must simply precede keyword ones -- discarded the `30`
+# and reported the parameter as omitted. That moves a call off the "states its
+# value" route and onto an inferred one, and can change the value reported.
+#
+# `params` is the declared parameter list, in order. It may be a LIST of such
+# vectors, for a macro whose copies disagree about the order: the earliest
+# position any copy gives the parameter wins, because a call does not say which
+# copy it resolved against.
+arg_value <- function(a, pname, params) {
+  if (is.null(pname) || is.na(pname)) return(NULL)
+  v <- a$kw[[pname]]
+  if (!is.null(v)) return(v)
+  if (!is.list(params)) params <- list(params)
+  idx <- suppressWarnings(min(unlist(lapply(params, function(p) match(pname, p))),
+                              na.rm = TRUE))
+  if (is.finite(idx) && length(a$pos) >= idx) return(a$pos[[idx]])
+  NULL
+}
+
+# ---- SAS macro variables ----------------------------------------------------
+# Shared for the same reason as the parsers above: a second scan needed them,
+# and reimplementing is how the two drifted the first time.
+
+# One `%let name = value;` statement, or NULL.
+parse_let <- function(s) {
+  m <- regmatches(s, regexec("^ *%let +([a-z0-9_]+) *= *(.*?) *$", s))[[1]]
+  if (length(m) == 3L) list(name = m[2], value = m[3]) else NULL
+}
+
+# `%let` occurrences in a set of statements, later assignments winning.
+#
+# ⚠️ ORDER-BLIND, and only safe where order cannot matter. A file that reassigns
+# a macro variable between two calls --
+#
+#     %let n = 5;  %mult_imput(nimpute=&n);
+#     %let n = 10; %mult_imput(nimpute=&n);
+#
+# -- resolves BOTH calls to 10 under this function, silently. Pass 2 therefore
+# does NOT use it: it walks the statements in order and resolves each call
+# against the assignments that precede it. This remains for macro BODIES, where
+# there is one binding site and no call sequence to interleave with.
+let_map <- function(st) {
+  out <- list()
+  for (l in grep("^ *%let ", st, value = TRUE)) {
+    p <- parse_let(l)
+    if (!is.null(p)) out[[p$name]] <- p$value
+  }
+  out
+}
+
+# Resolve an expression to an integer, following &references through a chain of
+# lookups. Bounded depth: SAS macro variables can be self-referential, and an
+# unbounded walk over a thirty-year corpus will find a cycle.
+resolve <- function(expr, lookups, depth = 0L) {
+  if (is.null(expr) || is.na(expr) || !nzchar(expr) || depth > 6L) return(NA_integer_)
+  e <- gsub("[ %]", "", expr)
+  if (grepl("^[0-9]+$", e)) return(as.integer(e))
+  if (!grepl("^&+[a-z0-9_]+$", e)) return(NA_integer_)
+  nm <- sub("^&+", "", e)
+  for (L in lookups) {
+    if (!is.null(L[[nm]])) return(resolve(L[[nm]], lookups, depth + 1L))
+  }
+  NA_integer_
+}
+
 # ---- output -----------------------------------------------------------------
 # Minimal JSON writer so the scans need no packages.
 to_json <- function(x, ind = 0) {
@@ -175,6 +245,16 @@ to_json <- function(x, ind = 0) {
   if (is.null(x) || (length(x) == 1 && is.na(x) && !is.character(x))) return("null")
   if (is.list(x)) {
     if (!length(x)) return("{}")
+    # ⚠️ An UNNAMED list is a JSON ARRAY. Emitting it as an object gave every
+    # element the key "" -- valid-looking text that a parser collapses to a
+    # single entry, so a five-row worksheet read back as one. The file stayed
+    # human-readable, which is why it went unnoticed, and the regression test
+    # matched raw text rather than parsing.
+    if (is.null(names(x))) {
+      items <- vapply(x, function(el) paste0(pad, "  ", to_json(el, ind + 2)),
+                      character(1))
+      return(paste0("[\n", paste(items, collapse = ",\n"), "\n", pad, "]"))
+    }
     nm <- names(x)
     items <- vapply(seq_along(x), function(i) {
       paste0(pad, "  \"", nm[i], "\": ", to_json(x[[i]], ind + 2))
