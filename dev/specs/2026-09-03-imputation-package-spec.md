@@ -92,10 +92,24 @@ the bulk of the 619, and the field cannot distinguish them.
 ⭐ This is the same error the rest of §2 catalogues — a flag answering a coarser
 question than the one being asked — committed in the field added to prevent it.
 
-The scan now reports three disjoint outcomes: `conflicting_default_all_gt1`,
-`conflicting_default_straddles_1` and `conflicting_default_unresolvable`. It also
-classifies the conflicted macros **in pass 1**, which needs no corpus walk, and
-prints the verdict before pass 2 begins. **That run has not happened.**
+The scan now reports **four** disjoint outcomes, and the fourth was a second
+review finding on the same field:
+
+| outcome | what it means |
+|---|---|
+| `conflicting_default_all_gt1` | every copy exceeds 1 — ran multiple imputation |
+| `conflicting_default_straddles_1` | copies span 1 in both directions — **open** |
+| `conflicting_default_all_le1` | no copy exceeds 1 — **settled, and settled negative** |
+| `conflicting_default_unresolvable` | a copy declares no readable default — a measurement gap |
+
+⚠️ A three-outcome version labelled everything not-all-above-1 as
+`straddles_1`, so conflicting defaults of `{0, 1}` — where **every** copy fails
+to multiple-impute — were reported as an open question rather than a resolved
+negative one. `not all > 1` is a different predicate from `straddles`.
+
+It also classifies the conflicted macros **in pass 1**, which needs no corpus
+walk, and prints the verdict before pass 2 begins. **That run has not
+happened.**
 
 ⚠️ **A resolved call proves what value would be passed, not that the call
 executed.** A call inside a `%if` branch that never fires is counted. Read this
