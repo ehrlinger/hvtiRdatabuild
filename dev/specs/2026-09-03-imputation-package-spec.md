@@ -2,8 +2,13 @@
 
 **Date:** 2026-09-03
 **Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
-**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is **answered as a bound** and the census discrepancy is **resolved** (2026-09-05). §7 remains open as a naming decision.
-**Updated:** 2026-09-05 — §2 measured to completion. ⚠️ 619 of 939 calls (66%) cannot be attributed to either method, because the macros they call exist in copies that disagree; see [[2026-09-05-divergent-macro-copies]].
+**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is
+**answered as a bound** and the census discrepancy is **resolved** (2026-09-05).
+§7 remains open as a naming decision.
+**Updated:** 2026-09-05 — §2 measured to completion. ⚠️ 619 of 939 calls (66%)
+cannot be attributed to either method, because the macros they call exist in
+copies that disagree; see
+[2026-09-05-divergent-macro-copies.md](2026-09-05-divergent-macro-copies.md).
 **Origin:** porting a study's `vars.sas` (issue #31) found that reproducing published results requires an imputation step nobody had accounted for.
 
 ⚠️ **No study or patient identifier appears here, and no counts or names beyond those already public.** Three variable names and their coefficients appear in §1; they are quoted verbatim from [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33), a public issue on this repository, and are reproduced only because the size of the effect is the argument. ⚠️ This is a **narrower claim than the sibling specs make** — `2026-09-02-vars-port-and-attrition-design.md` carries no variable names at all. Do not copy the blanket wording from there onto this file; it would be false.
@@ -563,7 +568,7 @@ the stable part of the contract in the meantime.
   question as originally posed — what did the studies run — has no answer in the
   code for two thirds of them. Closing it means reconciling five macro
   definitions, not running another scan. See
-  [[2026-09-05-divergent-macro-copies]].
+  [2026-09-05-divergent-macro-copies.md](2026-09-05-divergent-macro-copies.md).
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
 - [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 answered the
