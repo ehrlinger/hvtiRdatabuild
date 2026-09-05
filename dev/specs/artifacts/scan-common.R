@@ -175,6 +175,16 @@ to_json <- function(x, ind = 0) {
   if (is.null(x) || (length(x) == 1 && is.na(x) && !is.character(x))) return("null")
   if (is.list(x)) {
     if (!length(x)) return("{}")
+    # ⚠️ An UNNAMED list is a JSON ARRAY. Emitting it as an object gave every
+    # element the key "" -- valid-looking text that a parser collapses to a
+    # single entry, so a five-row worksheet read back as one. The file stayed
+    # human-readable, which is why it went unnoticed, and the regression test
+    # matched raw text rather than parsing.
+    if (is.null(names(x))) {
+      items <- vapply(x, function(el) paste0(pad, "  ", to_json(el, ind + 2)),
+                      character(1))
+      return(paste0("[\n", paste(items, collapse = ",\n"), "\n", pad, "]"))
+    }
     nm <- names(x)
     items <- vapply(seq_along(x), function(i) {
       paste0(pad, "  \"", nm[i], "\": ", to_json(x[[i]], ind + 2))

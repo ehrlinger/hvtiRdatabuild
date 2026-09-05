@@ -107,7 +107,18 @@ res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
                           "--root", shQuote(root), "--out", shQuote(outfile)),
                stdout = TRUE, stderr = TRUE)
 if (!file.exists(outfile)) { cat(res, sep = "\n"); stop("scan produced no output") }
-j <- paste(readLines(outfile), collapse = " ")
+raw <- readLines(outfile)
+j <- paste(raw, collapse = " ")
+
+# ⚠️ The worksheet is a LIST OF MACROS, so it must be a JSON ARRAY. Emitted as
+# an object every element got the key "", which reads fine by eye and collapses
+# to ONE entry in any parser. Assert the shape, not just the text: the earlier
+# version of this test matched raw text and passed against the broken output.
+if (!any(grepl("\"worksheet\": \\[", raw))) {
+  message("FAIL  worksheet is not a JSON array")
+  quit(save = "no", status = 1)
+}
+n_entries <- sum(grepl("\"macro\":", raw))
 
 # Pull one macro's worksheet block out by name.
 block <- function(macro) {
@@ -124,6 +135,8 @@ fld <- function(macro, field) {
 }
 
 checks <- list(
+  # every conflicted macro survives the round trip as its own array element
+  list("worksheet entries", n_entries, 4L),
   # mi_clean agrees with itself and must not be on the worksheet
   list("mi_clean absent", is.na(block("mi_clean")), TRUE),
   list("names conflicting", {
