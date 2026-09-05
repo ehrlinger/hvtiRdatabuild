@@ -89,48 +89,6 @@ message("candidate files: ", length(files))
 
 # ---- parsing helpers --------------------------------------------------------
 
-# One `%let name = value;` statement, or NULL.
-parse_let <- function(s) {
-  m <- regmatches(s, regexec("^ *%let +([a-z0-9_]+) *= *(.*?) *$", s))[[1]]
-  if (length(m) == 3L) list(name = m[2], value = m[3]) else NULL
-}
-
-# `%let` occurrences in a set of statements, later assignments winning.
-#
-# ⚠️ ORDER-BLIND, and only safe where order cannot matter. A file that reassigns
-# a macro variable between two calls --
-#
-#     %let n = 5;  %mult_imput(nimpute=&n);
-#     %let n = 10; %mult_imput(nimpute=&n);
-#
-# -- resolves BOTH calls to 10 under this function, silently. Pass 2 therefore
-# does NOT use it: it walks the statements in order and resolves each call
-# against the assignments that precede it. This remains for macro BODIES, where
-# there is one binding site and no call sequence to interleave with.
-let_map <- function(st) {
-  out <- list()
-  for (l in grep("^ *%let ", st, value = TRUE)) {
-    p <- parse_let(l)
-    if (!is.null(p)) out[[p$name]] <- p$value
-  }
-  out
-}
-
-# Resolve an expression to an integer, following &references through a chain of
-# lookups. Bounded depth: SAS macro variables can be self-referential, and an
-# unbounded walk over a thirty-year corpus will find a cycle.
-resolve <- function(expr, lookups, depth = 0L) {
-  if (is.null(expr) || is.na(expr) || !nzchar(expr) || depth > 6L) return(NA_integer_)
-  e <- gsub("[ %]", "", expr)
-  if (grepl("^[0-9]+$", e)) return(as.integer(e))
-  if (!grepl("^&+[a-z0-9_]+$", e)) return(NA_integer_)
-  nm <- sub("^&+", "", e)
-  for (L in lookups) {
-    if (!is.null(L[[nm]])) return(resolve(L[[nm]], lookups, depth + 1L))
-  }
-  NA_integer_
-}
-
 # ---- pass 1: definitions ----------------------------------------------------
 # For each `%macro`, does its body bind NIMPUTE, and to what?
 #   literal  -> the number is in the definition; no call needed
