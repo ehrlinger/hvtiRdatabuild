@@ -104,6 +104,43 @@ summarise <- function(g) {
       studies        = nstud(variant),
       by_stem        = as.list(vs)
     ),
+    # ⚠️ VARIANTS WHOSE NAME SAYS THEY DID NOT RUN. A partial traversal of the
+    # share found `imputsub.test` at 312 files -- over a third of every
+    # `imputsub` prefix match -- plus `mult_imput_dead` and `mult_imput.iso_dead`.
+    # The sibling scans match by PREFIX, so every one of these was counted as
+    # evidence that a study ran imputation. A test fixture and a retired job are
+    # not that. This is a DIFFERENT defect from the census gap and matters more:
+    # it can move the study counts in §2 directly.
+    #
+    # Reported, deliberately not filtered. Which markers really mean "did not
+    # run" here is a judgement about this corpus's conventions, not something
+    # this scan should decide silently.
+    suspect = list(
+      test_files    = sum(m & grepl("(^|[._])test([._]|$)", stem)),
+      test_studies  = nstud(m & grepl("(^|[._])test([._]|$)", stem)),
+      dead_files    = sum(m & grepl("(^|[._])(dead|old|bak|orig|backup)([._]|$)", stem)),
+      dead_studies  = nstud(m & grepl("(^|[._])(dead|old|bak|orig|backup)([._]|$)", stem)),
+      # Studies whose ONLY prefix match is a test or dead file -- the studies
+      # the sibling scans credited with imputation on no other evidence.
+      #
+      # ⚠️ BOTH SIDES ARE `.sas` ONLY, and that is the whole point of the field.
+      # The counts above describe the corpus across every extension; THIS one
+      # exists to correct the sibling scans, and those open `.sas` files alone.
+      # Mixing the two scopes gets it wrong in both directions:
+      #
+      #   imputsub.test.sas + imputsub.log -> the clean .log cancels the study,
+      #     yet the siblings saw only the test file. FALSE NEGATIVE.
+      #   imputsub.test.log alone          -> counted, though no sibling scan
+      #     ever opened it. FALSE POSITIVE.
+      #
+      # Both are in the fixture.
+      studies_only_suspect = {
+        susp <- grepl("(^|[._])(test|dead|old|bak|orig|backup)([._]|$)", stem)
+        sas  <- !is.na(ext) & ext == "sas"
+        length(setdiff(unique(stu[m & sas & susp & !is.na(stu)]),
+                       unique(stu[m & sas & !susp & !is.na(stu)])))
+      }
+    ),
     extensions = as.list(sort(table(ifelse(is.na(ext[m]), "(none)", ext[m])),
                               decreasing = TRUE))
   )

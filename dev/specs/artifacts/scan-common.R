@@ -99,12 +99,34 @@ statements <- function(txt) {
   st[!grepl("^ *%?\\*", st)]
 }
 
+# ⚠️ suppressWarnings(), not just tryCatch(error=). A file that disappears
+# between the listing and the read -- a broken symlink, or a directory changing
+# under a two-hour traversal -- raises a WARNING from file(), not an error, so
+# tryCatch's error handler never sees it and R prints it. The warning text
+# CONTAINS THE FULL PATH, which is a study identifier, and the scans' contract
+# says the console echoes the root and nothing below it. Observed in the
+# 2026-09-05 run, which printed one study path.
+#
+# Unreadable files are counted by the caller via `.scan_unreadable`, so they are
+# reported as a number rather than vanishing silently.
+.scan_unreadable <- new.env(parent = emptyenv())
+.scan_unreadable$n <- 0L
+
 read_statements <- function(path) {
-  txt <- tryCatch(readLines(path, warn = FALSE, encoding = "latin1"),
-                  error = function(e) character(0))
+  txt <- suppressWarnings(
+    tryCatch(readLines(path, warn = FALSE, encoding = "latin1"),
+             error = function(e) NULL))
+  if (is.null(txt)) {
+    .scan_unreadable$n <- .scan_unreadable$n + 1L
+    return(NULL)
+  }
   if (!length(txt)) return(NULL)
   statements(txt)
 }
+
+# How many files could not be read at all. Report it: a scan that silently
+# skips files reports a smaller corpus than it walked and says nothing.
+unreadable_count <- function() .scan_unreadable$n
 
 # ---- output -----------------------------------------------------------------
 # Minimal JSON writer so the scans need no packages.

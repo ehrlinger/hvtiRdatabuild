@@ -45,6 +45,28 @@ put("vascular/thoracic-aorta/delta", "mult_imputation.sas")
 put("cardiac/epsilon", "mult_imput2.sas")
 put("cardiac/epsilon", "mult_imput_old.sas")
 
+# ⚠️ zeta's ONLY prefix match is a test file. The sibling scans credited such a
+# study with running imputation on that evidence alone.
+put("cardiac/zeta", "imputsub.test.sas")
+
+# ⚠️ eta: a suspect .sas PLUS a clean .log of the exact stem. The sibling scans
+# are .sas-only, so they saw ONLY the test file and credited eta on it. Building
+# the comparison over every extension let the .log cancel eta out -- a FALSE
+# NEGATIVE against the very count this field exists to correct.
+put("cardiac/eta", "imputsub.test.sas")
+put("cardiac/eta", "imputsub.log")
+
+# ⚠️ theta: a suspect file with NO .sas at all. No sibling scan ever opened it,
+# so it must not appear in a correction to their counts. Counting every
+# extension made it a FALSE POSITIVE.
+#
+# ⚠️ IT IS ON THE mult_imput SIDE DELIBERATELY. Placed next to eta under
+# `imputsub`, the false positive (+1) and eta's false negative (-1) CANCEL: the
+# buggy scan and the fixed one both report 2, differing only in WHICH studies.
+# A count assertion cannot see that. Split across the two groups, each field
+# moves on its own and the bug is visible.
+put("thoracic/theta", "mult_imput_dead.log")
+
 outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
 res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
@@ -78,24 +100,43 @@ num_in <- function(name, field, sub = NULL) {
 
 checks <- list(
   # exact stem, all extensions: 4 files (3 + 1), 2 studies
-  list("imputsub exact files",        num_in("imputsub", "files", "exact"), 4L),
-  list("imputsub exact studies",      num_in("imputsub", "studies", "exact"), 2L),
+  # alpha's .sas/.log/.lst, beta's .sas, eta's .log
+  list("imputsub exact files",        num_in("imputsub", "files", "exact"), 5L),
+  list("imputsub exact studies",      num_in("imputsub", "studies", "exact"), 3L),
   # .sas only drops the .log and .lst: 2 files, still 2 studies
   list("imputsub .sas files",         num_in("imputsub", "files", "exact_sas_only"), 2L),
   list("imputsub .sas studies",       num_in("imputsub", "studies", "exact_sas_only"), 2L),
-  # no variants, so a prefix match adds nothing
-  list("imputsub variant stems",      num_in("imputsub", "distinct_stems", "prefix_only"), 0L),
-  list("imputsub variant studies",    num_in("imputsub", "studies", "prefix_only"), 0L),
+  # one variant stem -- `imputsub.test`, in one study. Mirrors the real corpus,
+  # where a partial traversal found `imputsub.test` at 312 files against 617 for
+  # the exact stem. My first draft of this fixture asserted imputsub had NO
+  # variants, which was an assumption about the corpus and was wrong.
+  list("imputsub variant stems",      num_in("imputsub", "distinct_stems", "prefix_only"), 1L),
+  # zeta and eta carry the `imputsub.test` stem
+  list("imputsub variant studies",    num_in("imputsub", "studies", "prefix_only"), 2L),
   # mult_imput exact: 2 files, 1 study
   list("mult_imput exact files",      num_in("mult_imput", "files", "exact"), 2L),
   list("mult_imput exact studies",    num_in("mult_imput", "studies", "exact"), 1L),
   # three variant stems across two studies -- the inflation being explained
-  list("mult_imput variant stems",    num_in("mult_imput", "distinct_stems", "prefix_only"), 3L),
-  list("mult_imput variant files",    num_in("mult_imput", "files", "prefix_only"), 3L),
-  list("mult_imput variant studies",  num_in("mult_imput", "studies", "prefix_only"), 2L),
+  list("mult_imput variant files",    num_in("mult_imput", "files", "prefix_only"), 4L),
+  list("mult_imput variant studies",  num_in("mult_imput", "studies", "prefix_only"), 3L),
   # ⭐ the shape the real corpus shows: a prefix, .sas-only match returns MORE
   # studies (3) than the exact-stem census (1), despite the extension filter.
-  list("mult_imput prefix studies",   num_in("mult_imput", "studies", "prefix_sas_only"), 3L)
+  list("mult_imput prefix studies",   num_in("mult_imput", "studies", "prefix_sas_only"), 3L),
+  # zeta's imputsub.test.sas, and epsilon's mult_imput_old.sas
+  # zeta's and eta's .test.sas -- descriptive, all extensions
+  list("imputsub test files",         num_in("imputsub", "test_files", "suspect"), 2L),
+  # ⭐ zeta AND eta: eta must survive its clean .log, because the .sas-only
+  # sibling scans saw nothing but its test file. Over every extension this
+  # reads 1.
+  list("imputsub only-suspect studies", num_in("imputsub", "studies_only_suspect", "suspect"), 2L),
+  # epsilon's mult_imput_old.sas and theta's mult_imput_dead.log
+  list("mult_imput dead files",       num_in("mult_imput", "dead_files", "suspect"), 2L),
+  # ⭐ epsilon also holds mult_imput2.sas so it is not credited on suspect
+  # evidence alone, and theta has no .sas at all so no sibling scan saw it.
+  # Over every extension this reads 1.
+  list("mult_imput only-suspect studies", num_in("mult_imput", "studies_only_suspect", "suspect"), 0L),
+  # theta adds a fourth variant stem across a third study
+  list("mult_imput variant stems2",   num_in("mult_imput", "distinct_stems", "prefix_only"), 4L)
 )
 
 fail <- 0L

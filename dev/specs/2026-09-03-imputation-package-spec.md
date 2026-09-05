@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-03
 **Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
-**Status:** designed, nothing built. §6 and §8 are **decided**, and §2 is **answered pending a confirmation run** (all 2026-09-04). §7 remains open as a naming decision.
-**Updated:** 2026-09-04 — §6 settled by the maintainer, §8 settled by design, and §2 measured over the corpus by three scans. ⚠️ The §2 numbers come from a run that predates three resolver corrections; see §2.
+**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is **answered**, with one split outstanding, and the census discrepancy is **resolved** (2026-09-05). §7 remains open as a naming decision.
+**Updated:** 2026-09-05 — §2 re-measured after three resolver corrections, and the census gap explained. ⚠️ 622 of 939 calls rest on conflicting macro defaults and are excluded from the headline; see §2.
 **Origin:** porting a study's `vars.sas` (issue #31) found that reproducing published results requires an imputation step nobody had accounted for.
 
 ⚠️ **No study or patient identifier appears here, and no counts or names beyond those already public.** Three variable names and their coefficients appear in §1; they are quoted verbatim from [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33), a public issue on this repository, and are reproduced only because the size of the effect is the argument. ⚠️ This is a **narrower claim than the sibling specs make** — `2026-09-02-vars-port-and-attrition-design.md` carries no variable names at all. Do not copy the blanket wording from there onto this file; it would be false.
@@ -28,7 +28,7 @@ So a port that skips imputation does not produce a slightly different answer. It
 
 **Corpus scale:** `imputsub` appears in **309 studies**, `mult_imput` in **242**. Neither has a taxonomy prefix.
 
-## 2. 🟡 The distinction that had to be settled first — ANSWERED 2026-09-04, confirmation run pending
+## 2. 🟡 The distinction that had to be settled first — ANSWERED 2026-09-05, one split outstanding
 
 **`PROC STANDARD ... REPLACE` is single mean imputation. It is not multiple imputation.** They are different methods with different inferential properties: mean imputation is deterministic and understates variance; multiple imputation generates several completed datasets and pools, precisely so the standard errors reflect the uncertainty.
 
@@ -48,11 +48,18 @@ The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A
 | both | 18 |
 | imputing inline, through neither macro | 29 |
 
-⭐ **`mult_imput` performs genuine multiple imputation.** Of 939 resolved calls,
-**925 (98.5%) pass `NIMPUTE > 1`**; the distribution is `5`×882, `10`×37, `8`×3,
-and one each of `7`, `12`, `20`, with a median of 5. `NIMPUTE = 1` — which is
-single stochastic imputation whatever the macro is called — accounts for **14
-calls, 1.5%**.
+⭐ **`mult_imput` performs genuine multiple imputation.** Of the **317** calls
+whose `NIMPUTE` can be read unambiguously, **308 (97.2%) pass `NIMPUTE > 1`** —
+`5`×266, `10`×36, `8`×3, and one each of `7`, `12`, `20`, median 5. `NIMPUTE = 1`
+— single stochastic imputation whatever the macro is called — accounts for **9
+calls**.
+
+⚠️ **317, not 939.** A first run reported 925 of 939 at 98.5%. That run could not
+see conflicting macro defaults, and the corrected run finds **39 of them across
+5 macro names — governing 622 of the 939 calls**. Those 622 are now reported as
+`unresolved_conflicting_default` rather than resolved against whichever copy
+happened to be read first. The direction is unchanged and the evidence base is a
+third the size.
 
 So the hold lifts: the package may honestly offer **both** a mean-imputation
 function and an `mi()`. ⚠️ What it must still never do is offer one `impute()`
@@ -61,22 +68,51 @@ unchanged, and §7 now clearly needs **two** taxonomy prefixes rather than one.
 
 ### Two caveats that belong with the number
 
-⚠️ **69% of calls take the macro's default** (647 of 939 resolved from a
-default, 292 from an explicit argument). Since 882 calls resolve to 5, the
-canonical macro's default is almost certainly 5. The corpus-wide answer is
-therefore **one institutional default propagated 647 times**, not 939
-deliberate per-study choices. That matters for the port: an R default of `m = 5`
-reproduces SAS for most of these studies by construction, and per §5 it must
-*say* that it is doing so rather than defaulting silently.
+⚠️ **Only 292 of 939 calls state `NIMPUTE` explicitly.** The rest take a
+default: 25 from a macro whose copies agree, and **622 from a macro whose copies
+do not**. So the corpus-wide answer rests far more on institutional defaults
+than on per-study choices, and a third of it on defaults that are not even
+internally consistent. For the port: an R default of `m = 5` would reproduce
+SAS for many of these studies by construction, and per §5 it must *say* so
+rather than defaulting silently.
+
+🔴 **The open question is whether those 622 are ambiguous about the ANSWER or
+only about the VALUE.** If every default a conflicted name declares is above 1,
+the call ran multiple imputation whichever copy it picked up, and the conclusion
+holds across 930 of 939. If the defaults straddle 1, it does not. The scan now
+reports `conflicting_default_all_gt1` against `conflicting_default_mixed`; that
+run has not happened.
 
 ⚠️ **A resolved call proves what value would be passed, not that the call
 executed.** A call inside a `%if` branch that never fires is counted. Read this
 as "the corpus is configured for m = 5", not "939 multiple imputations were
 run."
 
+⚠️ **Test and dead jobs are counted as evidence, but the effect is one study.**
+All the scans match by **prefix**, which sweeps in `imputsub.test` — 312 files,
+over a third of every `imputsub` prefix match — plus `mult_imput_dead` and
+`mult_imput.iso_dead`. A test fixture and a retired job are not evidence that
+imputation ran, so this looked like a serious threat to the study counts.
+
+Measured, it is not. `studies_only_suspect` — studies credited on *no* evidence
+but a test or dead file — is **0** for `imputsub` and **1** for `mult_imput`.
+The 312 test files sit in 306 studies that also hold real `imputsub` jobs. ⭐ The
+**file** counts are badly inflated (312 of 628 `imputsub` `.sas` files are
+tests); the **study** counts are not. An earlier draft of this section said to
+treat 223 and 326 as upper bounds implying a large correction; the correction is
+at most one study.
+
+⚠️ What this does not settle is whether the files *making the calls* are
+themselves test or retired jobs. `studies_only_suspect` is about which files
+exist, not which ones call.
+
 Also worth carrying forward: **63 distinct macro names bind `NIMPUTE`**, not
 one. There is no single canonical `mult_imput` — there are 63 named variants,
-each internally consistent.
+each internally consistent. The stem traversal is consistent with that, and
+shows real structure: a `mult_imput.iso*` family, year-suffixed variants
+(`_1995`, `_2015`), and ⭐ `mult_imput5` / `mult_imput10` / `mult_imput2`, whose
+names plausibly encode `NIMPUTE` itself and would be independent corroboration
+of the m = 5 finding if so.
 
 ### How it was measured, and what the first two attempts got wrong
 
@@ -127,13 +163,47 @@ Scan 3 joins the two, globally by macro name. It reports
 that the many copies are one canonical file is **checked rather than assumed**,
 which is what the three preceding corpus errors in this family had in common.
 
+### The census discrepancy — RESOLVED 2026-09-05
+
+`imputsub` matched the census exactly at 309 studies while `mult_imput` came in
+at 277 against 242, and at 506 files against 411 — *higher* than a census with
+no extension filter, which should have been a superset. Measured:
+
+| rule | `imputsub` files | `mult_imput` files |
+|---|---|---|
+| exact stem only | 617 | 318 |
+| ⭐ **first dot-delimited field** | **929** | **412** |
+| any character prefix | 930 | 685 |
+| *the census* | *926* | *411* |
+
+⭐ **The census counted files whose first dot-delimited field equals the stem** —
+which is `hvtiRutilities`' own taxonomy parse, since the convention splits on
+dots. Both figures reproduce to within a few files, consistent with the census
+having been taken slightly earlier.
+
+The scans match by raw character prefix instead. For `imputsub` the two rules
+nearly coincide, because its one real variant is `imputsub.test`, whose first
+dot-field *is* `imputsub` — which is why it agreed with the census. For
+`mult_imput` they diverge: **220 distinct variant stems** — `mult_imputation`,
+`mult_imput2`, `mult_imputiso60` — are prefix matches and different jobs.
+
+⚠️ **Consequence: the scans' `mult_imput` study count is inflated.** Prefix
+matching gives 277 studies where the exact stem gives 235 and the census 242. It
+does not affect the `NIMPUTE` finding, which rests on resolved call sites rather
+than file names, but any file-based `mult_imput` figure in this spec should be
+read as a prefix count.
+
 ### ⚠️ Why this is ANSWERED and not yet SETTLED
 
 Review of [#36](https://github.com/ehrlinger/hvtiRdatabuild/pull/36) found three
-defects in scan 3's resolver **after** the run above. All three are corrected,
-each is now pinned by the fixture, and **the corpus run has not been repeated**.
-Until it is, the numbers above stand as the best available answer and not as a
-settled one.
+defects in scan 3's resolver after the first run. All three are corrected, each
+is pinned by the fixture, and **the corpus run was repeated on 2026-09-05** —
+the numbers in this section are from that second run.
+
+⭐ **The review was right, and the correction was large.** The conflicting-default
+defect alone moved the evidence base from 939 calls to 317. One thing remains
+before this is SETTLED: the 622 conflicted calls have not been split into those
+whose defaults are all above 1 and those that straddle it (see the 🔴 above).
 
 Two of the three can move them:
 
@@ -433,9 +503,12 @@ the stable part of the contract in the meantime.
   passed rather than that it executed. The hold on `impute()` lifts only in
   part: the package may offer a mean-imputation function **and** an `mi()`, but
   ⚠️ **must not offer one `impute()` that silently picks between them.**
-  ⚠️ **The box stays unticked until scan 3 is re-run**: review of #36 found
-  three resolver defects after this run, two of which can move the numbers. All
-  are fixed and pinned by the fixture; the corpus run has not been repeated.
+  ⚠️ **Re-run 2026-09-05 after the #36 resolver fixes, and the correction was
+  large**: 39 conflicting defaults across 5 macro names govern 622 of the 939
+  calls, so the evidence base is 317 rather than 939 and the figure is 97.2%
+  rather than 98.5%. The box stays unticked on one remaining split — whether
+  those 622 straddle `NIMPUTE = 1` or sit entirely above it. If entirely above,
+  the conclusion holds across 930 of 939 and this ticks.
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
 - [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 answered the
