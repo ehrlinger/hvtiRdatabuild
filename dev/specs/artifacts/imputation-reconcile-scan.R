@@ -186,13 +186,9 @@ if (!no_calls && length(conflicted)) {
       # which is what put the name on the worksheet.
       pn <- param_of[[nm]]
       a  <- parse_call_args(mm[3])
-      supplied <- !is.null(a$kw[[pn]])
-      if (!supplied && !length(a$kw)) {
-        idx <- suppressWarnings(min(unlist(lapply(params_of[[nm]],
-                                                 function(pp) match(pn, pp))), na.rm = TRUE))
-        supplied <- is.finite(idx) && length(a$pos) >= idx
+      if (is.null(arg_value(a, pn, params_of[[nm]]))) {
+        call_default[[nm]] <- call_default[[nm]] + 1L
       }
-      if (!supplied) call_default[[nm]] <- call_default[[nm]] + 1L
     }
     if (i %% 5000 == 0) message("  ", i, " / ", length(files))
   }

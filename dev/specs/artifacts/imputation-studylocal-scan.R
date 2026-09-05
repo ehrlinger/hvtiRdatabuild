@@ -75,8 +75,20 @@ as_int <- function(x) {
 # are built in one walk because the fallback needs both.
 local_map  <- new.env(parent = emptyenv())
 global_map <- new.env(parent = emptyenv())
-param_map  <- new.env(parent = emptyenv())
-params_map <- new.env(parent = emptyenv())
+# ⚠️ The parameter metadata is keyed by STUDY AND NAME, like `local_map`, not by
+# name alone. Keyed by name, the last copy read would control argument parsing
+# in every study -- so if one study binds NIMPUTE through `nimpute` and another
+# copy of the same macro through `reps`, an explicit argument in the first study
+# reads as omitted and the call is credited to its local default instead. The
+# worksheet in 4a of the finding note measured 381 distinct bodies for one name,
+# so signature divergence between copies is the expected case here, not an edge.
+local_param  <- new.env(parent = emptyenv())
+local_params <- new.env(parent = emptyenv())
+# Kept by name too, for the fallback when a calling study holds no copy. Every
+# variant is retained rather than the last, so the fallback can say when the
+# corpus-wide signature is itself ambiguous.
+global_param  <- new.env(parent = emptyenv())
+global_params <- new.env(parent = emptyenv())
 
 add <- function(env, key, value) {
   cur <- if (!is.null(env[[key]])) env[[key]] else integer(0)
@@ -107,11 +119,16 @@ for (i in seq_along(defs_files)) {
     pname <- sub("^&+", "", gsub("[ %]", "", expr))
     dflt  <- as_int(h$defaults[[pname]])
 
-    param_map[[h$name]]  <- pname
-    params_map[[h$name]] <- h$params
     add(global_map, h$name, dflt)
+    global_param[[h$name]]  <- unique(c(global_param[[h$name]], pname))
+    global_params[[h$name]] <- c(global_params[[h$name]], list(h$params))
     stu <- def_study[[i]]
-    if (!is.na(stu)) add(local_map, paste0(stu, "\r", h$name), dflt)
+    if (!is.na(stu)) {
+      key <- paste0(stu, "\r", h$name)
+      add(local_map, key, dflt)
+      local_param[[key]]  <- unique(c(local_param[[key]], pname))
+      local_params[[key]] <- c(local_params[[key]], list(h$params))
+    }
   }
   if (i %% 200 == 0) message("  ", i, " / ", length(defs_files))
 }
@@ -162,16 +179,26 @@ for (i in seq_along(files)) {
     mm <- regmatches(s, regexec(arg_re, s))[[1]]
     if (length(mm) < 3L) next
     nm <- mm[2]
-    pn <- param_map[[nm]]
-    if (is.null(pn)) next
-    call_studies <- c(call_studies, studies[[i]])
+    stu <- studies[[i]]
+    key <- if (is.na(stu)) NULL else paste0(stu, "\r", nm)
 
-    # 1. Did the call state the value?
+    # ⭐ Read the signature from the CALLING STUDY's copy where there is one,
+    # and only fall back to the corpus-wide one otherwise. Same reasoning as the
+    # default itself: the copy in the study is what the call resolved against.
+    pns <- if (!is.null(key) && !is.null(local_param[[key]])) local_param[[key]]
+           else global_param[[nm]]
+    pps <- if (!is.null(key) && !is.null(local_params[[key]])) local_params[[key]]
+           else global_params[[nm]]
+    if (is.null(pns)) next
+    call_studies <- c(call_studies, stu)
+
+    # 1. Did the call state the value? Try every parameter name the relevant
+    # copies use, since copies of one macro may name it differently.
     a <- parse_call_args(mm[3])
-    val <- a$kw[[pn]]
-    if (is.null(val) && !length(a$kw)) {
-      idx <- match(pn, params_map[[nm]])
-      if (!is.na(idx) && length(a$pos) >= idx) val <- a$pos[[idx]]
+    val <- NULL
+    for (pn in pns) {
+      val <- arg_value(a, pn, pps)
+      if (!is.null(val)) break
     }
     if (!is.null(val)) {
       v <- resolve(val, list(lm))
@@ -183,8 +210,6 @@ for (i in seq_along(files)) {
     }
 
     # 2. The copy in THIS study.
-    stu <- studies[[i]]
-    key <- if (is.na(stu)) NULL else paste0(stu, "\r", nm)
     loc <- if (!is.null(key)) local_map[[key]] else NULL
     if (!is.null(loc)) {
       v <- settle(loc)

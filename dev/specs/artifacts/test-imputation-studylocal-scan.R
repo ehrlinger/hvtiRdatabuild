@@ -68,6 +68,25 @@ put("cardiac/eps2", "mult_imput_agreed.sas", defn("mi_agreed", 9))
 put("cardiac/eps3", "mult_imput_x.sas", defn("mi_x", 4))
 put("cardiac/eps3", "driver.sas", c("%mi_agreed(data=w);"))
 
+# ⚠️ mi_sig: the two copies bind NIMPUTE through DIFFERENT PARAMETER NAMES.
+# eta's copy uses `nimpute`, theta's uses `reps`. eta's call names `nimpute`, so
+# it must read as stating its value. Keyed by macro name alone, whichever copy
+# was read last would control parsing in BOTH studies, and eta's explicit
+# argument would read as omitted and be credited to a default instead.
+put("cardiac/eta", "mult_imput_sig.sas", defn("mi_sig", 5))
+put("thoracic/theta", "mult_imput_sig.sas",
+    c("%macro mi_sig(data=, reps=9);",
+      "proc mi data=&data out=m nimpute=&reps;", "run;", "%mend;"))
+put("cardiac/eta", "driver.sas", c("%mi_sig(data=w, nimpute=12);"))
+
+# ⚠️ mi_mix: a MIXED call, positional then keyword, which SAS allows. The
+# positional `30` supplies NIMPUTE. A positional lookup gated on the call having
+# no keyword arguments discards it and reports the parameter as omitted.
+put("cardiac/iota", "mult_imput_mix.sas",
+    c("%macro mi_mix(data, nimpute, seed=);",
+      "proc mi data=&data out=m nimpute=&nimpute seed=&seed;", "run;", "%mend;"))
+put("cardiac/iota", "driver.sas", c("%mi_mix(w, 30, seed=7);"))
+
 # zeta states the value outright, which beats every inference.
 put("cardiac/zeta", "mult_imput_z.sas", defn("mi_z", 5))
 put("cardiac/zeta", "driver.sas", c("%mi_z(data=w, nimpute=25);"))
@@ -89,9 +108,10 @@ num <- function(field) {
 }
 
 expected <- list(
-  # alpha, beta, gamma, delta, eps3, zeta
-  calls = 6L,
-  from_argument = 1L,          # zeta's 25
+  # alpha, beta, gamma, delta, eps3, eta, iota, zeta
+  calls = 8L,
+  # zeta's 25, eta's 12 (divergent parameter name), iota's 30 (mixed call)
+  from_argument = 3L,
   # ⭐ alpha (5) and beta (1). Globally these two are the SAME undeterminable
   # call; locally they are opposite answers, and both are determinate.
   from_study_local = 2L,
@@ -99,10 +119,10 @@ expected <- list(
   global_fallback_ok = 1L,     # eps3: every copy of mi_agreed says 9
   global_fallback_conflict = 1L,  # delta: mi_shared conflicts corpus-wide
   unresolved = 0L,
-  # argument + study-local only: 25, 5, 1
-  n = 3L,
+  # argument + study-local only: 25, 12, 30, 5, 1
+  n = 5L,
   nimpute_1 = 1L,
-  nimpute_gt1 = 2L,
+  nimpute_gt1 = 4L,
   nimpute_0 = 0L
 )
 

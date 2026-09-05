@@ -270,12 +270,7 @@ if (length(macro_names)) {
       call_studies <- c(call_studies, studies[[i]])
       pname <- d$param
       a <- parse_call_args(m[3])
-      val <- a$kw[[pname]]
-      if (is.null(val)) {
-        # Positional: the parameter's index among the declared parameters.
-        idx <- match(pname, d$params)
-        if (!is.na(idx) && length(a$pos) >= idx && !length(a$kw)) val <- a$pos[[idx]]
-      }
+      val <- arg_value(a, pname, d$params)
       from_default <- FALSE
       if (is.null(val)) { val <- d$default; from_default <- TRUE }
       v <- resolve(val, list(lm, d$lets))

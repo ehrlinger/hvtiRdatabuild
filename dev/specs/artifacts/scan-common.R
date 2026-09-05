@@ -168,6 +168,30 @@ parse_call_args <- function(argstr) {
   list(kw = kw, pos = pos)
 }
 
+# The value a call supplies for one parameter, or NULL if it supplies none.
+#
+# ⚠️ POSITIONAL ARGUMENTS COUNT EVEN WHEN KEYWORD ARGUMENTS ARE ALSO PRESENT.
+# An earlier version in three separate scans gated the positional lookup on the
+# call having NO keyword arguments, so `%m(w, 30, seed=7)` -- valid SAS, since
+# positional arguments must simply precede keyword ones -- discarded the `30`
+# and reported the parameter as omitted. That moves a call off the "states its
+# value" route and onto an inferred one, and can change the value reported.
+#
+# `params` is the declared parameter list, in order. It may be a LIST of such
+# vectors, for a macro whose copies disagree about the order: the earliest
+# position any copy gives the parameter wins, because a call does not say which
+# copy it resolved against.
+arg_value <- function(a, pname, params) {
+  if (is.null(pname) || is.na(pname)) return(NULL)
+  v <- a$kw[[pname]]
+  if (!is.null(v)) return(v)
+  if (!is.list(params)) params <- list(params)
+  idx <- suppressWarnings(min(unlist(lapply(params, function(p) match(pname, p))),
+                              na.rm = TRUE))
+  if (is.finite(idx) && length(a$pos) >= idx) return(a$pos[[idx]])
+  NULL
+}
+
 # ---- SAS macro variables ----------------------------------------------------
 # Shared for the same reason as the parsers above: a second scan needed them,
 # and reimplementing is how the two drifted the first time.
