@@ -12,40 +12,36 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All three below used 1.1.9 over `/studies`.
+match. All four below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
 | `imputation-scan.json` | which methods appear in the stem-matched jobs | 2026-09-04 15:19 |
 | `callsite-scan.json` | who **calls** those jobs | 2026-09-04 16:58 |
-| `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-04 18:56 |
+| `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-05 07:33 |
+| `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
 
-## ⚠️ `nimpute-scan.json` predates three resolver corrections
+## `nimpute-scan.json` is the corrected re-run
 
-Review of [#36](https://github.com/ehrlinger/hvtiRdatabuild/pull/36) found three
-defects in `imputation-nimpute-scan.R` after this run. All are fixed; the corpus
-run has not been repeated. **Two of them can move the numbers in this file:**
+Replaced 2026-09-05 after the three resolver fixes from
+[#36](https://github.com/ehrlinger/hvtiRdatabuild/pull/36). ⭐ The correction was
+large: 39 conflicting macro defaults across 5 names govern **622 of 939 calls**,
+which the first run had silently resolved against whichever copy it read first.
+The evidence base is **317 calls, not 939**, and the headline is 97.2% rather
+than 98.5%. The direction is unchanged.
 
-- conflicting macro **defaults** were invisible to the conflict check, so
-  `conflicting_redefinitions: 0` here is weaker evidence than it reads as — and
-  69% of the calls in this file resolved from a default;
-- `%let` resolution ignored statement order, so a later assignment could decide
-  an earlier call.
+⚠️ One split is still missing from this file and decides whether §2 ticks:
+whether those 622 conflicted calls straddle `NIMPUTE = 1` or sit entirely above
+it. The scan now emits `conflicting_default_all_gt1` and
+`conflicting_default_mixed`; **this file predates those fields.**
 
-The third — definitions settling `NIMPUTE` with no caller entering the call
-denominator — cannot affect this file: `binding_literal`, `binding_local` and
-`settled_by_definition_alone` are all 0 in it.
-
-**Replace this file from a fresh run before citing it as settled**, and expect
-the new output to carry fields this one does not (`conflicting_defaults`,
-`macros_conflicted`, `unresolved_conflicting_default`, `definition_settled`).
-
-The first two files are unaffected by those corrections.
+`census-reconcile.json` resolves the census gap: the census counted files whose
+first dot-delimited field equals the stem, which reproduces 926 and 411 to within
+a few files. It also shows `studies_only_suspect` at 0 and 1 — so test and dead
+jobs inflate the FILE counts badly and the STUDY counts barely at all.
 
 ## Not yet run
 
-`census-reconcile.json` — output of `../imputation-census-reconcile.R`, which
-explains why these scans and the job census disagree about `mult_imput`
-(506 files / 277 studies here against a census of 411 / 242, *higher* than a
-census that should be a superset). The scan is written and tested; it has not
-been run.
+A re-run of `imputation-nimpute-scan.R` carrying the
+`conflicting_default_all_gt1` / `conflicting_default_mixed` split, and
+`files_unreadable`. Cheap relative to what it settles.

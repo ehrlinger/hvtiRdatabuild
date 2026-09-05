@@ -219,8 +219,18 @@ for (i in seq_along(def_scan)) {
                   params = h$params, defaults = h$defaults, lets = lm)
     prev <- defmap[[h$name]]
     if (is.null(prev)) {
+      entry$seen <- list(dflt)
       defmap[[h$name]] <- entry
     } else {
+      # ⭐ Keep EVERY distinct default declared for this name, not just the
+      # first. A conflict makes a default-resolved call ambiguous in VALUE, but
+      # not necessarily ambiguous in the ANSWER: if every copy declares a
+      # default above 1, the call ran multiple imputation whichever copy it
+      # used. Without the full set that distinction cannot be drawn, and 622 of
+      # 939 calls in this corpus rest on it.
+      if (!any(vapply(prev$seen, identical, logical(1), dflt))) {
+        defmap[[h$name]]$seen <- c(prev$seen, list(dflt))
+      }
       # ⚠️ Compare the DEFAULT as well as the expression. Two copies of one
       # macro that bind `nimpute=&nimpute` but declare different DEFAULTS are
       # IDENTICAL in `expr` and materially different in what they run. Comparing
@@ -258,6 +268,8 @@ nimp_defs  <- integer(0)
 n_calls <- 0L
 n_from_arg <- 0L; n_from_default <- 0L; n_unresolved <- 0L
 n_from_conflicted <- 0L       # default-resolved, but the copies disagree
+n_conf_all_gt1 <- 0L          # ... and every declared default is > 1
+n_conf_mixed   <- 0L          # ... and they straddle 1, so the ANSWER is open
 n_literal_defs <- 0L          # PROC MI whose NIMPUTE needs no caller
 call_studies <- character(0)
 studies <- study_of(files)
@@ -313,6 +325,16 @@ if (length(macro_names)) {
         # this call ran is genuinely unknown. Counted, and kept OUT of the
         # headline distribution rather than guessed.
         n_from_conflicted <- n_from_conflicted + 1L
+        # ⭐ But unknown VALUE is not always unknown ANSWER. Resolve every
+        # default this name was seen to declare: if all of them exceed 1, the
+        # call ran multiple imputation whichever copy it picked up.
+        sv <- vapply(d$seen, function(x) resolve(x, list(lm, d$lets)), integer(1))
+        sv <- sv[!is.na(sv)]
+        if (length(sv) == length(d$seen) && all(sv > 1L)) {
+          n_conf_all_gt1 <- n_conf_all_gt1 + 1L
+        } else {
+          n_conf_mixed <- n_conf_mixed + 1L
+        }
       } else {
         nimp_calls <- c(nimp_calls, v)
         if (from_default) n_from_default <- n_from_default + 1L else n_from_arg <- n_from_arg + 1L
@@ -340,6 +362,7 @@ out <- list(
     hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     files_considered = length(files),
+    files_unreadable = unreadable_count(),
     contains_identifiers = FALSE
   ),
   definitions = list(
@@ -370,6 +393,12 @@ out <- list(
     # which value ran is genuinely unknown. Kept OUT of the distribution below
     # rather than guessed. These four buckets partition the calls.
     unresolved_conflicting_default = n_from_conflicted,
+    # ⭐ Of those, the ones whose ambiguity does NOT reach the conclusion:
+    # every default the name declares is > 1, so the call ran multiple
+    # imputation regardless of which copy it used. `mixed` is the remainder,
+    # where the answer itself is open.
+    conflicting_default_all_gt1 = n_conf_all_gt1,
+    conflicting_default_mixed   = n_conf_mixed,
     unresolved                    = n_unresolved,
     # NOT a call: a definition that settles NIMPUTE without any caller. Counted
     # here and reported separately in `definition_settled`, never pooled into
@@ -407,7 +436,9 @@ message("conflicting redefinitions: ", out$definitions$conflicting_redefinitions
 message("\n--- CALLS ---")
 message("calls resolved from an argument: ", out$calls$resolved_from_argument)
 message("calls falling back to a default: ", out$calls$resolved_from_default)
-message("calls on a conflicting default:  ", out$calls$unresolved_conflicting_default)
+message("calls on a conflicting default:  ", out$calls$unresolved_conflicting_default,
+        "  (all defaults >1: ", out$calls$conflicting_default_all_gt1,
+        ", straddling 1: ", out$calls$conflicting_default_mixed, ")")
 message("calls unresolved:                ", out$calls$unresolved)
 message("\n--- NIMPUTE ---")
 message("resolved values: ", out$nimpute$resolved_total)
