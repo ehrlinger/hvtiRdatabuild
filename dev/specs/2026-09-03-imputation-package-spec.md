@@ -76,12 +76,52 @@ internally consistent. For the port: an R default of `m = 5` would reproduce
 SAS for many of these studies by construction, and per §5 it must *say* so
 rather than defaulting silently.
 
-🔴 **The open question is whether those 622 are ambiguous about the ANSWER or
-only about the VALUE.** If every default a conflicted name declares is above 1,
-the call ran multiple imputation whichever copy it picked up, and the conclusion
-holds across 930 of 939. If the defaults straddle 1, it does not. The scan now
-reports `conflicting_default_all_gt1` against `conflicting_default_mixed`; that
-run has not happened.
+🔴 **Whether those 622 are ambiguous about the ANSWER or only about the VALUE is
+still open, and the run meant to settle it did not.** The 2026-09-05 08:10 run
+returned `all_gt1` 3, `mixed` **619** — which reads as "the conclusion collapses"
+and does not mean that.
+
+⚠️ **`mixed` was a bad field and the fault is this spec's, not the corpus's.**
+It was defined as "not all defaults resolve above 1", which merged two unrelated
+facts: *the copies straddle 1* (the answer is open) and *one copy declares no
+default at all* — an empty `nimpute=`, meaning the caller must supply it, which
+is a **measurement gap and not evidence of single imputation**. In a corpus where
+a macro requiring its caller to pass `nimpute` is ordinary, the second is likely
+the bulk of the 619, and the field cannot distinguish them.
+
+⭐ This is the same error the rest of §2 catalogues — a flag answering a coarser
+question than the one being asked — committed in the field added to prevent it.
+
+The scan now reports **four** disjoint outcomes, and the fourth was a second
+review finding on the same field:
+
+| outcome | what it means |
+|---|---|
+| `conflicting_default_all_gt1` | every copy exceeds 1 — ran multiple imputation |
+| `conflicting_default_straddles_1` | copies span 1 in both directions — **open** |
+| `conflicting_default_all_le1` | no copy exceeds 1 — **settled, and settled negative** |
+| `conflicting_default_unresolvable` | a copy declares no readable default — a measurement gap |
+
+⚠️ A three-outcome version labelled everything not-all-above-1 as
+`straddles_1`, so conflicting defaults of `{0, 1}` — where **every** copy fails
+to multiple-impute — were reported as an open question rather than a resolved
+negative one. `not all > 1` is a different predicate from `straddles`.
+
+It also classifies the conflicted macros **in pass 1**, which needs no corpus
+walk, and prints the verdict before pass 2 begins.
+
+🔴 **That run happened on 2026-09-05, and the answer is that the question cannot
+be closed from the code.** Of the five conflicted macros, **three straddle 1** and
+none has an unreadable default. So the 622 calls are not a measurement gap I
+could close with a better resolver, as I had argued they might be. They are
+copies of one macro disagreeing about whether to single- or multiply-impute, and
+which one a study loaded is not recoverable from the source.
+
+⭐ **This outranks §2 and has its own record:**
+[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md).
+The short form is that a reproduction guarantee can be offered for the 292 calls
+that state their value and cannot be offered for the 622 that do not, and that
+bound is a property of the corpus rather than of the port.
 
 ⚠️ **A resolved call proves what value would be passed, not that the call
 executed.** A call inside a `%if` branch that never fires is counted. Read this

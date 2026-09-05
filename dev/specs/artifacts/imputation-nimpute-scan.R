@@ -253,6 +253,41 @@ for (i in seq_along(def_scan)) {
 }
 message("macros binding NIMPUTE: ", length(defmap))
 
+# ---- pass 1 verdict on the conflicted macros --------------------------------
+# ⭐ Printed HERE, before pass 2, because this is the question §2 turns on and
+# pass 1 costs seconds where pass 2 walks 100k files. What a conflicted macro's
+# copies DECLARE is a property of the definitions alone; only the per-call
+# tallies need the walk.
+conf_names <- names(conflicted)
+conf_classify <- function(nm) {
+  d <- defmap[[nm]]
+  sv <- vapply(d$seen, function(x) resolve(x, list(d$lets)), integer(1))
+  # ⚠️ FOUR outcomes. `not all > 1` is not the same as `straddles`: defaults of
+  # {0, 1} mean EVERY copy fails to multiple-impute, which is a settled NEGATIVE
+  # answer, not an open one. Reporting it as a straddle would say the question
+  # is unresolved when it has in fact been resolved the other way.
+  if (anyNA(sv)) "unresolvable"
+  else if (all(sv > 1L)) "all_gt1"
+  else if (all(sv <= 1L)) "all_le1"
+  else "straddles_1"
+}
+conf_class <- vapply(conf_names, conf_classify, character(1))
+conf_vals <- unlist(lapply(conf_names, function(nm) {
+  sv <- vapply(defmap[[nm]]$seen, function(x) resolve(x, list(defmap[[nm]]$lets)),
+               integer(1))
+  sv[!is.na(sv)]
+}), use.names = FALSE)
+message("conflicted macros: ", length(conf_names),
+        "  (all defaults >1: ", sum(conf_class == "all_gt1"),
+        ", straddling 1: ", sum(conf_class == "straddles_1"),
+        ", all <=1: ", sum(conf_class == "all_le1"),
+        ", a default unreadable: ", sum(conf_class == "unresolvable"), ")")
+if (length(conf_vals)) {
+  message("  declared defaults seen on conflicted macros: ",
+          paste(sprintf("%s x%d", names(table(conf_vals)), as.integer(table(conf_vals))),
+                collapse = ", "))
+}
+
 # ---- pass 2: call sites -----------------------------------------------------
 message("pass 2: call sites")
 # ⚠️ TWO SEPARATE COLLECTIONS, deliberately not merged.
@@ -268,8 +303,10 @@ nimp_defs  <- integer(0)
 n_calls <- 0L
 n_from_arg <- 0L; n_from_default <- 0L; n_unresolved <- 0L
 n_from_conflicted <- 0L       # default-resolved, but the copies disagree
-n_conf_all_gt1 <- 0L          # ... and every declared default is > 1
-n_conf_mixed   <- 0L          # ... and they straddle 1, so the ANSWER is open
+n_conf_all_gt1 <- 0L          # ... and every declared default resolves > 1
+n_conf_straddle <- 0L         # ... all resolve, and they span 1 in both directions
+n_conf_all_le1 <- 0L          # ... all resolve and NONE exceeds 1: settled NEGATIVE
+n_conf_unres   <- 0L          # ... at least one default cannot be resolved at all
 n_literal_defs <- 0L          # PROC MI whose NIMPUTE needs no caller
 call_studies <- character(0)
 studies <- study_of(files)
@@ -328,12 +365,23 @@ if (length(macro_names)) {
         # ⭐ But unknown VALUE is not always unknown ANSWER. Resolve every
         # default this name was seen to declare: if all of them exceed 1, the
         # call ran multiple imputation whichever copy it picked up.
+        # ⚠️ THREE OUTCOMES, NOT TWO. An earlier version had `all_gt1` and a
+        # catch-all `mixed`, which put "the copies straddle 1" and "one copy
+        # declares no default at all" in the same bucket. Those are different
+        # facts: the first says the ANSWER is open, the second says the scan
+        # could not read one of the inputs. `nimpute=` with an empty default --
+        # a macro requiring the caller to supply it -- is common, and it made
+        # `mixed` unreadable as evidence.
         sv <- vapply(d$seen, function(x) resolve(x, list(lm, d$lets)), integer(1))
-        sv <- sv[!is.na(sv)]
-        if (length(sv) == length(d$seen) && all(sv > 1L)) {
+        if (anyNA(sv)) {
+          n_conf_unres <- n_conf_unres + 1L
+        } else if (all(sv > 1L)) {
           n_conf_all_gt1 <- n_conf_all_gt1 + 1L
+        } else if (all(sv <= 1L)) {
+          # Settled the OTHER way: no copy of this macro multiple-imputes.
+          n_conf_all_le1 <- n_conf_all_le1 + 1L
         } else {
-          n_conf_mixed <- n_conf_mixed + 1L
+          n_conf_straddle <- n_conf_straddle + 1L
         }
       } else {
         nimp_calls <- c(nimp_calls, v)
@@ -382,7 +430,16 @@ out <- list(
     # DEFAULT is invisible in the expression and decides 69% of the calls.
     conflicting_redefinitions = def_conflicts,
     conflicting_defaults      = def_default_conflicts,
-    macros_conflicted         = length(conflicted)
+    macros_conflicted         = length(conflicted),
+    # ⭐ The conflicted macros classified by what their copies DECLARE. This is
+    # a pass-1 fact and needs no corpus walk; the per-call tallies under `calls`
+    # are the same classification weighted by how often each macro is invoked.
+    conflicted_macros_all_gt1     = sum(conf_class == "all_gt1"),
+    conflicted_macros_straddles_1 = sum(conf_class == "straddles_1"),
+    conflicted_macros_all_le1     = sum(conf_class == "all_le1"),
+    conflicted_macros_unresolvable = sum(conf_class == "unresolvable"),
+    # Every readable default declared on a conflicted macro. Integers only.
+    conflicted_default_values = if (length(conf_vals)) as.list(table(conf_vals)) else list()
   ),
   calls = list(
     calls_to_parameterised_macros = n_calls,
@@ -397,8 +454,19 @@ out <- list(
     # every default the name declares is > 1, so the call ran multiple
     # imputation regardless of which copy it used. `mixed` is the remainder,
     # where the answer itself is open.
+    # Every declared default resolves above 1: the call ran multiple imputation
+    # whichever copy it used, so the ambiguity does not reach the conclusion.
     conflicting_default_all_gt1 = n_conf_all_gt1,
-    conflicting_default_mixed   = n_conf_mixed,
+    # All defaults resolve and they span 1 in BOTH directions: the answer is
+    # genuinely open for this call.
+    conflicting_default_straddles_1 = n_conf_straddle,
+    # All defaults resolve and NONE exceeds 1: settled, and settled NEGATIVE --
+    # no copy of this macro performs multiple imputation. Not uncertainty.
+    conflicting_default_all_le1 = n_conf_all_le1,
+    # At least one copy declares a default the scan cannot read -- typically an
+    # empty `nimpute=`, which requires the caller to supply a value. A
+    # measurement gap, NOT evidence that the call single-imputed.
+    conflicting_default_unresolvable = n_conf_unres,
     unresolved                    = n_unresolved,
     # NOT a call: a definition that settles NIMPUTE without any caller. Counted
     # here and reported separately in `definition_settled`, never pooled into
@@ -437,8 +505,10 @@ message("\n--- CALLS ---")
 message("calls resolved from an argument: ", out$calls$resolved_from_argument)
 message("calls falling back to a default: ", out$calls$resolved_from_default)
 message("calls on a conflicting default:  ", out$calls$unresolved_conflicting_default,
-        "  (all defaults >1: ", out$calls$conflicting_default_all_gt1,
-        ", straddling 1: ", out$calls$conflicting_default_mixed, ")")
+        "\n    all defaults >1 (multiple):   ", out$calls$conflicting_default_all_gt1,
+        "\n    straddling 1 (open):          ", out$calls$conflicting_default_straddles_1,
+        "\n    all <=1 (NOT multiple):       ", out$calls$conflicting_default_all_le1,
+        "\n    a default unreadable (gap):   ", out$calls$conflicting_default_unresolvable)
 message("calls unresolved:                ", out$calls$unresolved)
 message("\n--- NIMPUTE ---")
 message("resolved values: ", out$nimpute$resolved_total)
