@@ -146,9 +146,19 @@ scanning the code that produced them.
 
 ## 7. What it promises about reproducing SAS, and what it does not
 
-**Promised.** For a study whose call states its `NIMPUTE` value, or whose own
-copy of the macro settles it, the method and `m` are known and the R
-implementation can be checked against the study's saved output.
+⚠️ **Two tiers, and the package must not blur them.**
+
+**Known.** 292 calls state their `NIMPUTE` value outright. For those the method
+and `m` are facts, and an R implementation can be checked against the study's
+saved output.
+
+**Inferred, pending validation.** 518 more are settled by the copy of the macro
+in the calling study. That is strong evidence and not proof: which copy SAS
+loaded depends on the autocall path and `%include` order at run time, and the
+scan that produced these records exactly that in its provenance. Reproducing one
+of these studies means confirming `m` against that study's saved log FIRST. The
+package should not present an inferred `m` as a known one, and neither should
+its documentation.
 
 **Not promised.** A general "reproduces the SAS corpus" guarantee. 129 of 939
 calls cannot be attributed to a method from the code at all. 38 because the

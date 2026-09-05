@@ -146,6 +146,14 @@ put("thoracic/sigma", "mult_imput_none.sas",
       "proc mi data=&data out=m nimpute=&nimpute;", "run;", "%mend;"))
 put("cardiac/rho", "driver_none.sas", c("%mi_none(data=w);"))
 
+# ⭐ mi_pmix: a MIXED call, positional then keyword, supplying NIMPUTE by
+# position. This is the population the pre-#41 gate discarded, and the counters
+# below measure it directly rather than inferring it from matching totals.
+put("cardiac/nu2", "mult_imput_pmix.sas",
+    c("%macro mi_pmix(data, nimpute, seed=);",
+      "proc mi data=&data out=m nimpute=&nimpute seed=&seed;", "run;", "%mend;"))
+put("cardiac/nu2", "driver_pmix.sas", c("%mi_pmix(w, 15, seed=3);"))
+
 # ⚠️ mi_ord: one file, one macro variable REASSIGNED between two calls. Building
 # a whole-file %let map first let the later assignment decide the earlier call,
 # resolving both to 10. Correct is 5 then 10.
@@ -179,10 +187,10 @@ num <- function(field) {
 
 expected <- list(
   # ten macros, every one binding NIMPUTE
-  macros_binding_nimpute = 13L,
+  macros_binding_nimpute = 14L,
   binding_literal = 1L,   # mi_lit
   binding_local   = 1L,   # mi_local
-  binding_param   = 11L,  # the rest
+  binding_param   = 12L,  # the rest
   # mi_conf's two copies share an expression, so this stays 0 ...
   conflicting_redefinitions = 0L,
   # ... and the disagreement shows up here instead. This is the pair the
@@ -196,9 +204,14 @@ expected <- list(
   conflicted_macros_unresolvable = 1L,   # mi_empty: 8 and unreadable
   # mi_kw, mi_pos, mi_let, mi_def, mi_unres, mi_conf, and mi_ord TWICE.
   # NOT mi_cmt -- commented out.
-  calls_to_parameterised_macros = 11L,
+  calls_to_parameterised_macros = 12L,
   # 25, 7, 1, and mi_ord's 5 and 10
-  resolved_from_argument = 5L,
+  resolved_from_argument = 6L,
+  # ⭐ measured, not inferred: mi_pmix and mi_pos both supply NIMPUTE by
+  # position; only mi_pmix's call also carries a keyword argument.
+  mixed_form_calls         = 1L,
+  nimpute_from_positional  = 2L,
+  positional_in_mixed_call = 1L,
   resolved_from_default  = 1L,   # mi_def's 10
   unresolved_conflicting_default = 4L,  # mi_conf, mi_safe, mi_empty, mi_none
   # ⭐ mi_safe: 5 or 10, both > 1, so the ANSWER survives the ambiguity.
@@ -213,10 +226,10 @@ expected <- list(
   # mi_local's 3 and mi_lit's 40 -- definitions, NOT calls, and no longer
   # pooled into the call distribution below.
   settled_by_definition_alone = 2L,
-  # 25, 7, 1, 5, 10, 10 -- calls only
-  resolved_total = 6L,
+  # 25, 7, 1, 5, 10, 15 -- calls only
+  resolved_total = 7L,
   nimpute_1   = 1L,
-  nimpute_gt1 = 5L,
+  nimpute_gt1 = 6L,
   nimpute_0   = 0L
 )
 

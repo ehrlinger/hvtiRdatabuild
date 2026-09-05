@@ -180,8 +180,9 @@ are single.** The undeterminable share falls from 619 to **129**.
 86% coverage measured, rather than 100% coverage assumed.
 
 ⚠️ **The residual 129 has two halves that need different remedies, and neither
-is reconciling the five.** Only 38 are studies whose own copies disagree with
-each other. The other 91 are calls from studies that hold **no copy at all**,
+is reconciling the five.** Only 38 are **calls** whose study holds copies that
+disagree with each other. The other 91 are calls from studies that hold **no
+copy at all**,
 which is the gap between `mult_imput` being called in 326 studies and defined in
 277: those calls reach a definition from somewhere this scan cannot see, and the
 corpus-wide map is not a substitute.
@@ -196,6 +197,24 @@ positional and keyword calls existed here, this pass would have found more. It
 found none, so that defect cost this corpus nothing.
 
 ## 5. Where this is heading
+
+⚠️ **This section and section 6 were written before the worksheet and the
+study-local pass ran, and both overturned them. They are kept as written, and
+this box says what is no longer true, because the wrong turns are the point of
+the record.**
+
+| said below | actually |
+|---|---|
+| reconciling is "small, finite" | 423 copies, 381 distinct bodies (4a) |
+| "the only route to lifting the bound" | the study-local pass lifted most (4b) |
+| 320 determinate, 619 open (section 6) | **810 determinate, 129 open** |
+| the worksheet has not been run | run 2026-09-05, as has 4b's pass |
+
+**The current next step is neither reconciliation nor another scan.** The
+residual 129 splits into 38 calls whose study holds copies that disagree, and 91
+calls from studies holding no copy, and those need different remedies. Both are
+small enough to leave alone unless a specific study needs its own answer, in
+which case that study's saved log settles it directly.
 
 Three things follow, in order of how tractable they are.
 

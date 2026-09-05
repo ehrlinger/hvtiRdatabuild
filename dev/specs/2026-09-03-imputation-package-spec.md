@@ -76,7 +76,8 @@ section 4b.
 A first run reported "925 of 939, 98.5%". It could not see conflicting macro
 defaults, and the corrected run finds 39 of them across 5 names governing 622
 calls. Every correction since has moved the figure the same way: 98.5% of 939,
-then 97.2% of 317, now 97% of 320 with two thirds of the corpus unmeasurable.
+then 97.2% of 317, then 97% of 320, and finally 98.5% of 810 once the question
+was asked per study rather than corpus-wide.
 ⭐ The direction of the answer never changed. Confidence in how much of the
 corpus it covers fell by two thirds.
 
@@ -91,18 +92,29 @@ unchanged, and §7 now clearly needs **two** taxonomy prefixes rather than one.
 
 ### Two caveats that belong with the number
 
-⚠️ **Only 292 of 939 calls state `NIMPUTE` explicitly.** The rest take a
-default: 25 from a macro whose copies agree, and **622 from a macro whose copies
-do not**. So the corpus-wide answer rests far more on institutional defaults
-than on per-study choices, and a third of it on defaults that are not even
-internally consistent. For the port: an R default of `m = 5` would reproduce
-SAS for many of these studies by construction, and per §5 it must *say* so
-rather than defaulting silently.
+⚠️ **Only 292 of 939 calls state `NIMPUTE` explicitly.** 518 more are settled by
+the copy in the calling study, and 129 are settled by nothing. So the answer
+rests far more on institutional defaults than on per-study choices. For the port:
+an R default of `m = 5` would reproduce SAS for many of these studies by
+construction, and per §5 it must *say* so rather than defaulting silently.
 
-🔴 **Whether those 622 are ambiguous about the ANSWER or only about the VALUE is
-still open, and the run meant to settle it did not.** The 2026-09-05 08:10 run
-returned `all_gt1` 3, `mixed` **619** — which reads as "the conclusion collapses"
-and does not mean that.
+⚠️ **The 292 and the 518 are not the same kind of evidence, and §7 of
+[the design](2026-09-05-hvtiRimputation-design.md) keeps them apart.** A call
+that states its value is a fact. A call settled by its study's own copy is a
+strong inference, because which copy SAS loaded depends on the autocall path at
+run time.
+
+🟢 **Whether those 622 were ambiguous about the ANSWER or only about the VALUE
+is SETTLED, and the route to settling it was not the one this section expected.**
+The history is kept below because the wrong turns are the useful part. The short
+version: resolving corpus-wide left 619 open; resolving against the calling
+study's own copy left 129.
+
+⚠️ Everything from here to the end of §2 is **historical record**. The current
+result is the table above.
+
+The 2026-09-05 08:10 run returned `all_gt1` 3, `mixed` **619** — which read as
+"the conclusion collapses" and did not mean that.
 
 ⚠️ **`mixed` was a bad field and the fault is this spec's, not the corpus's.**
 It was defined as "not all defaults resolve above 1", which merged two unrelated
@@ -133,20 +145,21 @@ negative one. `not all > 1` is a different predicate from `straddles`.
 It also classifies the conflicted macros **in pass 1**, which needs no corpus
 walk, and prints the verdict before pass 2 begins.
 
-🔴 **That run completed on 2026-09-05, and the answer is that the question
-cannot be closed from the code.** Of the five conflicted macros, **three straddle
+That run completed on 2026-09-05. Of the five conflicted macros, **three straddle
 1** and none has an unreadable default; weighted by invocation that is **619
-calls straddling, 3 safely above 1, 0 at or below, 0 unreadable**. So the 622 are
-not a measurement gap a better resolver could close, as I had argued they might
-be. They are copies of one macro disagreeing about whether to single- or
-multiply-impute, and which one a study loaded is not recoverable from the
-source.
+calls straddling, 3 safely above 1, 0 at or below, 0 unreadable**. So the 622
+were not a measurement gap a better resolver could close, as had been argued.
+They are copies of one macro disagreeing about whether to single- or
+multiply-impute.
+
+⭐ **What that framing missed, and the study-local pass found:** which copy a
+study loaded is not recoverable *from a corpus-wide map*, but each study carries
+its own copy, and resolving against that settles 518 of the 619. The residual is
+129.
 
 ⭐ **This outranks §2 and has its own record:**
-[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md).
-The short form is that a reproduction guarantee can be offered for the 292 calls
-that state their value and cannot be offered for the 622 that do not, and that
-bound is a property of the corpus rather than of the port.
+[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md),
+whose section 4b carries the study-local result.
 
 ⚠️ **A resolved call proves what value would be passed, not that the call
 executed.** A call inside a `%if` branch that never fires is counted. Read this
@@ -266,9 +279,9 @@ is pinned by the fixture, and **the corpus run was repeated on 2026-09-05** —
 the numbers in this section are from that second run.
 
 ⭐ **The review was right, and the correction was large.** The conflicting-default
-defect alone moved the evidence base from 939 calls to 317. One thing remains
-before this is SETTLED: the 622 conflicted calls have not been split into those
-whose defaults are all above 1 and those that straddle it (see the 🔴 above).
+defect alone moved the evidence base from 939 calls to 317 at the time. The 622
+were later split (3 above 1, 619 straddling) and then largely recovered by the
+study-local pass, which is why the current figure is 810.
 
 Two of the three can move them:
 
@@ -557,8 +570,8 @@ the stable part of the contract in the meantime.
 
 ## Definition of done for this spec
 
-- [ ] **§2 answered, confirmation run pending** 2026-09-04 — **both methods are
-  real and present at scale**:
+- [x] **§2 answered** 2026-09-05 — **both methods are real and present at
+  scale**:
   223 studies call `%imputsub` (single mean imputation), 326 call `%mult_imput`,
   18 call both, and 29 impute inline through neither. `mult_imput` performs
   **genuine multiple imputation** — 925 of 939 resolved calls (98.5%) pass
@@ -582,4 +595,7 @@ the stable part of the contract in the meantime.
   evidence question — **two are needed, not one** — so what remains is the
   naming decision itself, not the measurement behind it. See §7.
 - [x] **The imputation/CONSORT interaction decided** 2026-09-04 — §8.
-- [ ] Only then: a design spec for the package, and a plan.
+- [x] **A design spec for the package** 2026-09-05 —
+  [2026-09-05-hvtiRimputation-design.md](2026-09-05-hvtiRimputation-design.md).
+- [ ] A plan, which the design defers until a first real use, per the same gate
+  the `vars.sas` note applies to extraction.
