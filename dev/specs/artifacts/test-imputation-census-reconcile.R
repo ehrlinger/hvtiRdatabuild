@@ -45,6 +45,10 @@ put("vascular/thoracic-aorta/delta", "mult_imputation.sas")
 put("cardiac/epsilon", "mult_imput2.sas")
 put("cardiac/epsilon", "mult_imput_old.sas")
 
+# ⚠️ zeta's ONLY prefix match is a test file. The sibling scans credited such a
+# study with running imputation on that evidence alone.
+put("cardiac/zeta", "imputsub.test.sas")
+
 outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
 res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
@@ -83,9 +87,12 @@ checks <- list(
   # .sas only drops the .log and .lst: 2 files, still 2 studies
   list("imputsub .sas files",         num_in("imputsub", "files", "exact_sas_only"), 2L),
   list("imputsub .sas studies",       num_in("imputsub", "studies", "exact_sas_only"), 2L),
-  # no variants, so a prefix match adds nothing
-  list("imputsub variant stems",      num_in("imputsub", "distinct_stems", "prefix_only"), 0L),
-  list("imputsub variant studies",    num_in("imputsub", "studies", "prefix_only"), 0L),
+  # one variant stem -- `imputsub.test`, in one study. Mirrors the real corpus,
+  # where a partial traversal found `imputsub.test` at 312 files against 617 for
+  # the exact stem. My first draft of this fixture asserted imputsub had NO
+  # variants, which was an assumption about the corpus and was wrong.
+  list("imputsub variant stems",      num_in("imputsub", "distinct_stems", "prefix_only"), 1L),
+  list("imputsub variant studies",    num_in("imputsub", "studies", "prefix_only"), 1L),
   # mult_imput exact: 2 files, 1 study
   list("mult_imput exact files",      num_in("mult_imput", "files", "exact"), 2L),
   list("mult_imput exact studies",    num_in("mult_imput", "studies", "exact"), 1L),
@@ -95,7 +102,13 @@ checks <- list(
   list("mult_imput variant studies",  num_in("mult_imput", "studies", "prefix_only"), 2L),
   # ⭐ the shape the real corpus shows: a prefix, .sas-only match returns MORE
   # studies (3) than the exact-stem census (1), despite the extension filter.
-  list("mult_imput prefix studies",   num_in("mult_imput", "studies", "prefix_sas_only"), 3L)
+  list("mult_imput prefix studies",   num_in("mult_imput", "studies", "prefix_sas_only"), 3L),
+  # zeta's imputsub.test.sas, and epsilon's mult_imput_old.sas
+  list("imputsub test files",         num_in("imputsub", "test_files", "suspect"), 1L),
+  list("imputsub only-suspect studies", num_in("imputsub", "studies_only_suspect", "suspect"), 1L),
+  list("mult_imput dead files",       num_in("mult_imput", "dead_files", "suspect"), 1L),
+  # epsilon also holds mult_imput2.sas, so it is NOT credited on suspect evidence alone
+  list("mult_imput only-suspect studies", num_in("mult_imput", "studies_only_suspect", "suspect"), 0L)
 )
 
 fail <- 0L

@@ -74,9 +74,28 @@ executed.** A call inside a `%if` branch that never fires is counted. Read this
 as "the corpus is configured for m = 5", not "939 multiple imputations were
 run."
 
+🔴 **A third caveat, found 2026-09-04 after the runs above, and the most
+serious of the three.** A partial traversal of the share by file-name stem
+found **`imputsub.test` at 312 files**, against 617 for the exact stem
+`imputsub` — so over a third of every `imputsub` prefix match is a *test* file.
+It also found `mult_imput_dead` and `mult_imput.iso_dead`.
+
+All three scans match by **prefix**, so every one of those was counted as
+evidence that a study ran imputation. **A test fixture and a retired job are not
+that.** This is a different defect from the resolver ones below and it bears
+directly on the study counts in the table above, not merely on the `NIMPUTE`
+distribution. `imputation-census-reconcile.R` now reports `suspect.test_files`,
+`suspect.dead_files` and `suspect.studies_only_suspect` — the last being studies
+credited with imputation on no evidence but a test or dead file. **Until that
+runs, treat 223 and 326 as upper bounds.**
+
 Also worth carrying forward: **63 distinct macro names bind `NIMPUTE`**, not
 one. There is no single canonical `mult_imput` — there are 63 named variants,
-each internally consistent.
+each internally consistent. The stem traversal is consistent with that, and
+shows real structure: a `mult_imput.iso*` family, year-suffixed variants
+(`_1995`, `_2015`), and ⭐ `mult_imput5` / `mult_imput10` / `mult_imput2`, whose
+names plausibly encode `NIMPUTE` itself and would be independent corroboration
+of the m = 5 finding if so.
 
 ### How it was measured, and what the first two attempts got wrong
 

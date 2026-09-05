@@ -104,6 +104,30 @@ summarise <- function(g) {
       studies        = nstud(variant),
       by_stem        = as.list(vs)
     ),
+    # ⚠️ VARIANTS WHOSE NAME SAYS THEY DID NOT RUN. A partial traversal of the
+    # share found `imputsub.test` at 312 files -- over a third of every
+    # `imputsub` prefix match -- plus `mult_imput_dead` and `mult_imput.iso_dead`.
+    # The sibling scans match by PREFIX, so every one of these was counted as
+    # evidence that a study ran imputation. A test fixture and a retired job are
+    # not that. This is a DIFFERENT defect from the census gap and matters more:
+    # it can move the study counts in §2 directly.
+    #
+    # Reported, deliberately not filtered. Which markers really mean "did not
+    # run" here is a judgement about this corpus's conventions, not something
+    # this scan should decide silently.
+    suspect = list(
+      test_files    = sum(m & grepl("(^|[._])test([._]|$)", stem)),
+      test_studies  = nstud(m & grepl("(^|[._])test([._]|$)", stem)),
+      dead_files    = sum(m & grepl("(^|[._])(dead|old|bak|orig|backup)([._]|$)", stem)),
+      dead_studies  = nstud(m & grepl("(^|[._])(dead|old|bak|orig|backup)([._]|$)", stem)),
+      # Studies whose ONLY prefix match is a test or dead file -- these are
+      # studies the sibling scans credited with imputation on no other evidence.
+      studies_only_suspect = {
+        susp <- grepl("(^|[._])(test|dead|old|bak|orig|backup)([._]|$)", stem)
+        length(setdiff(unique(stu[m & susp & !is.na(stu)]),
+                       unique(stu[m & !susp & !is.na(stu)])))
+      }
+    ),
     extensions = as.list(sort(table(ifelse(is.na(ext[m]), "(none)", ext[m])),
                               decreasing = TRUE))
   )
