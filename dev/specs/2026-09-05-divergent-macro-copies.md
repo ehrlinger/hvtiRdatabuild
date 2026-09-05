@@ -127,6 +127,27 @@ macro names, twelve declared defaults between them, and a decision about which
 copy is canonical. It would settle §2 properly rather than through another scan,
 and it is the only route to lifting the bound in §2 for future work.
 
+⭐ **Nothing above can name the five.** Every scan here emits counts only, so the
+output says five macros disagree and not which. Reconciling starts with
+identifying them, so
+[`artifacts/imputation-reconcile-scan.R`](artifacts/imputation-reconcile-scan.R)
+does, under a narrower privacy contract stated in its header: it emits **macro
+names and declared defaults, and no study locations**. Deciding a canonical
+default needs the names and the numbers. Going and editing the copies needs the
+paths, and that is a separate decision with the study owners.
+
+Per conflicted name it reports each declared default with how many copies
+declare it, how many calls reach the name and how many rely on its default, and
+⭐ **whether the copies differ only in the default or in the body too**. That
+last one sizes the work: if the bodies agree once the header is removed,
+reconciling is a one-line edit per copy; if they do not, it is a merge and the
+default is only the visible part of the divergence. It also reports what every
+macro binding `NIMPUTE` declares, unnamed, because the institutional norm is an
+argument for what canonical ought to be.
+
+`--no-calls` runs the definitions only, in seconds over 1,134 files, which is
+where the decision content is.
+
 **State the bound rather than the headline.** Until then, anything downstream
 that quotes an imputation figure from this corpus should quote it against the
 calls whose method can be determined, and say how many could not. The first run
@@ -170,5 +191,7 @@ of the 2026-09-05 run:
 - [x] The divergence measured and its size stated
 - [x] The consequence for the migration stated as a bound
 - [x] Per-call weighting filled in from the completed 2026-09-05 run
-- [ ] The five names reconciled, or a decision recorded not to
+- [ ] The worksheet run (`imputation-reconcile-scan.R`)
+- [ ] A canonical default agreed per name, recorded here
+- [ ] The five names reconciled on the share, or a decision recorded not to
 - [ ] The same measurement run against one other macro family
