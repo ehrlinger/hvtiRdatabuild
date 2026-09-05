@@ -53,18 +53,25 @@ The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A
 | both | 18 |
 | imputing inline, through neither macro | 29 |
 
-⭐ **`mult_imput` performs genuine multiple imputation.** Of the **317** calls
-whose `NIMPUTE` can be read unambiguously, **308 (97.2%) pass `NIMPUTE > 1`** —
-`5`×266, `10`×36, `8`×3, and one each of `7`, `12`, `20`, median 5. `NIMPUTE = 1`
-— single stochastic imputation whatever the macro is called — accounts for **9
-calls**.
+⭐ **`mult_imput` performs genuine multiple imputation.** Of the **810** calls
+whose `NIMPUTE` can be read, **798 (98.5%) pass `NIMPUTE > 1`** — `5`×735,
+`10`×57, `8`×3, and one each of `7`, `12`, `20`, median 5. `NIMPUTE = 1` — single
+stochastic imputation whatever the macro is called — accounts for **12 calls**.
 
 🔴 **Read that as a bound, not a rate.** The honest statement of the result is:
 
-> Of the **320** calls whose method can be determined, **311 are multiple
-> imputation and 9 are single**. **619 of 939 calls, 66%, cannot be attributed
-> to either method**, because the macro they call exists in copies that declare
-> defaults on both sides of 1.
+> Of the **810** calls whose method can be determined, **798 are multiple
+> imputation and 12 are single**. **129 of 939 calls, 14%, cannot be attributed
+> to either method.**
+
+⭐ **An earlier version of this section put the undeterminable share at 619, and
+the difference is the question being asked, not the corpus.** Resolving a call
+against a map keyed by macro name across the whole corpus leaves 619 open.
+Resolving it against the copy in the CALLING STUDY leaves 129. Every study
+carries its own copy, so the second is the question that matches how the code
+actually ran. See
+[`2026-09-05-divergent-macro-copies.md`](2026-09-05-divergent-macro-copies.md)
+section 4b.
 
 A first run reported "925 of 939, 98.5%". It could not see conflicting macro
 defaults, and the corrected run finds 39 of them across 5 names governing 622

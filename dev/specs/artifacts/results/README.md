@@ -20,6 +20,8 @@ match. All four below used 1.1.9 over `/studies`.
 | `callsite-scan.json` | who **calls** those jobs | 2026-09-04 16:58 |
 | `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-05 07:33 |
 | `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
+| `reconcile-scan.json` | which macro names disagree, and what reconciling would take | 2026-09-05 14:43 |
+| `studylocal-scan.json` | ⭐ NIMPUTE resolved against the calling study's own copy | 2026-09-05 14:59 |
 
 ## `nimpute-scan.json` is the corrected re-run
 
@@ -51,19 +53,17 @@ confirms that the figures quoted in section 4a of
 `2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
 were right.
 
-## 🔴 One committed result still needs regenerating
+## The positional-argument provisionality is lifted
 
-**`nimpute-scan.json` may have shifted.** #41 corrected a positional-argument
-defect shared by three scans: a value supplied positionally in a call that also
-carries a keyword argument was being read as omitted. That moves a call off the
-"states its value" route and onto an inferred one. How many calls it touches in
-this corpus is unmeasured, so the 292 / 25 / 622 split and anything downstream of
-it should be treated as provisional until the scan is rerun.
+`nimpute-scan.json` was flagged after #41 corrected a positional-argument defect
+shared by three scans: a value supplied positionally in a call that also carried
+a keyword argument read as omitted. ⭐ `studylocal-scan.json`, which ran WITH the
+fix, reports `from_argument` at **292** -- identical to the corpus-wide scan,
+which ran without it. Had mixed positional and keyword calls existed here, the
+fixed pass would have found more. It found none, so the defect cost this corpus
+nothing and the numbers stand.
 
 ## Not yet run
 
-`studylocal-scan.json` -- output of `../imputation-studylocal-scan.R`, which
-resolves NIMPUTE against the calling study's own copy rather than a corpus-wide
-map. That map is what makes 619 of 939 calls look undeterminable, and this pass
-tests whether they are undeterminable at study scale too. Written and tested;
-not run.
+Nothing. Every scan in `../` has been run against `/studies` and its output is
+here.

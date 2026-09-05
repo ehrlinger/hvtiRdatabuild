@@ -159,6 +159,42 @@ which is cheaper, needs no institutional decision, and may collapse the 619 to
 something small. Reconciliation, if it is still wanted afterwards, applies to
 whatever is left.
 
+## 4b. The study-local pass, run 2026-09-05, and what it recovers
+
+4a argued that the ambiguity was partly an artifact of asking the question
+corpus-wide. Measured, it mostly was.
+
+| route | calls |
+|---|---|
+| the call states the value | 292 |
+| ⭐ **the calling study's own copy settles it** | **518** |
+| the study's own copies disagree | 38 |
+| the study holds no copy, and the corpus-wide map conflicts | 91 |
+| unresolved | 0 |
+
+**Determinate: 810 of 939, 86%.** Of those, **798 are multiple imputation and 12
+are single.** The undeterminable share falls from 619 to **129**.
+
+⭐ **The first run of all this claimed 925 of 939, 98.5%. We arrive at 798 of
+810, also 98.5%.** The number never moved. What changed is that it is now earned:
+86% coverage measured, rather than 100% coverage assumed.
+
+⚠️ **The residual 129 has two halves that need different remedies, and neither
+is reconciling the five.** Only 38 are studies whose own copies disagree with
+each other. The other 91 are calls from studies that hold **no copy at all**,
+which is the gap between `mult_imput` being called in 326 studies and defined in
+277: those calls reach a definition from somewhere this scan cannot see, and the
+corpus-wide map is not a substitute.
+
+⚠️ The inference stands as an inference. A study's own copy is strong evidence of
+what its calls ran and is not proof; the autocall path decides at run time. The
+output records that in its provenance block so it travels with the numbers.
+
+⭐ **One thing this run settles in passing.** `from_argument` is 292, identical to
+the corpus-wide scan, which ran before the positional-argument fix. Had mixed
+positional and keyword calls existed here, this pass would have found more. It
+found none, so that defect cost this corpus nothing.
+
 ## 5. Where this is heading
 
 Three things follow, in order of how tractable they are.
