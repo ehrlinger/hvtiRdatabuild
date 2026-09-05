@@ -128,6 +128,46 @@ read_statements <- function(path) {
 # skips files reports a smaller corpus than it walked and says nothing.
 unreadable_count <- function() .scan_unreadable$n
 
+# ---- SAS macro headers and calls --------------------------------------------
+# Shared because BOTH scans have to agree on what counts as passing an argument.
+# ⚠️ They did not: the reconcile scan recognised only `name = value` and counted
+# a POSITIONAL argument as though the call had omitted it, which inflated its
+# default-reliance tallies. One implementation, so the two cannot drift again.
+
+# `%macro name(p1=, p2=5)` -> name, and the parameters IN ORDER with defaults.
+# Order matters because a call may pass arguments positionally.
+parse_macro_header <- function(s) {
+  m <- regmatches(s, regexec("^ *%macro +([a-z0-9_]+) *(\\((.*)\\))? *$", s))[[1]]
+  if (!length(m)) return(NULL)
+  name <- m[2]
+  body <- if (length(m) >= 4L) m[4] else ""
+  params <- character(0); defaults <- list()
+  if (nzchar(body)) {
+    for (p in strsplit(body, ",", fixed = TRUE)[[1]]) {
+      p <- trimws(p)
+      if (!nzchar(p)) next
+      kv <- regmatches(p, regexec("^([a-z0-9_]+) *(= *(.*))?$", p))[[1]]
+      if (!length(kv)) next
+      params <- c(params, kv[2])
+      d <- if (length(kv) >= 4L) trimws(kv[4]) else ""
+      defaults[[kv[2]]] <- if (nzchar(d)) d else NA_character_
+    }
+  }
+  list(name = name, params = params, defaults = defaults)
+}
+
+# `key=value` arguments of a macro call, plus positional values in order.
+parse_call_args <- function(argstr) {
+  kw <- list(); pos <- character(0)
+  for (a in strsplit(argstr, ",", fixed = TRUE)[[1]]) {
+    a <- trimws(a)
+    if (!nzchar(a)) next
+    kv <- regmatches(a, regexec("^([a-z0-9_]+) *= *(.*)$", a))[[1]]
+    if (length(kv) == 3L) kw[[kv[2]]] <- trimws(kv[3]) else pos <- c(pos, a)
+  }
+  list(kw = kw, pos = pos)
+}
+
 # ---- output -----------------------------------------------------------------
 # Minimal JSON writer so the scans need no packages.
 to_json <- function(x, ind = 0) {
