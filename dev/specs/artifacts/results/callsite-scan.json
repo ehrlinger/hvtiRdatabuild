@@ -1,0 +1,43 @@
+{
+  "_provenance": {
+    "script": "imputation-callsite-scan.R",
+    "question": "spec 2026-09-03 S2 follow-up: who CALLS the macros, and what NIMPUTE reaches PROC MI",
+    "run_at": "2026-09-04T16:58:00-0400",
+    "root": "/studies",
+    "scope": "studies carrying a definition",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "studies_with_definition": 547,
+    "files_considered": 104666,
+    "files_read": 104664,
+    "contains_identifiers": false
+  },
+  "calls": {
+    "files_calling_imputsub": 228,
+    "files_calling_mult_imput": 863,
+    "studies_calling_imputsub": 223,
+    "studies_calling_mult_imput": 326,
+    "studies_calling_both": 18,
+    "studies_with_definition_but_no_call": 20,
+    "studies_inline_replace_no_macro": 29
+  },
+  "nimpute": {
+    "statements_total": 871,
+    "statements_absent": 0,
+    "statements_unresolved": 864,
+    "statements_resolved": 7,
+    "statements_nimpute_1": 5,
+    "statements_nimpute_gt1": 2,
+    "min": 1,
+    "median": 1,
+    "max": 5,
+    "table": {
+      "1": 5,
+      "5": 2
+    }
+  },
+  "ms_indicators": {
+    "files": 4309,
+    "studies": 562
+  }
+}
