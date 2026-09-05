@@ -2,7 +2,7 @@
   "_provenance": {
     "script": "imputation-nimpute-scan.R",
     "question": "spec 2026-09-03 S2: does mult_imput perform genuine multiple imputation?",
-    "run_at": "2026-09-05T08:10:07-0400",
+    "run_at": "2026-09-05T11:58:12-0400",
     "root": "/studies",
     "scope": "studies carrying a definition",
     "hvtiRutilities_version": "1.1.9",
@@ -21,7 +21,18 @@
     "binding_unknown": 1,
     "conflicting_redefinitions": 0,
     "conflicting_defaults": 39,
-    "macros_conflicted": 5
+    "macros_conflicted": 5,
+    "conflicted_macros_all_gt1": 2,
+    "conflicted_macros_straddles_1": 3,
+    "conflicted_macros_all_le1": 0,
+    "conflicted_macros_unresolvable": 0,
+    "conflicted_default_values": {
+      "1": 3,
+      "5": 5,
+      "8": 1,
+      "10": 2,
+      "20": 1
+    }
   },
   "calls": {
     "calls_to_parameterised_macros": 939,
@@ -30,7 +41,9 @@
     "resolved_from_default": 25,
     "unresolved_conflicting_default": 622,
     "conflicting_default_all_gt1": 3,
-    "conflicting_default_mixed": 619,
+    "conflicting_default_straddles_1": 619,
+    "conflicting_default_all_le1": 0,
+    "conflicting_default_unresolvable": 0,
     "unresolved": 0,
     "settled_by_definition_alone": 0
   },
