@@ -64,9 +64,11 @@ no_calls <- "--no-calls" %in% args
 study_of <- study_of_factory(root, .folders)
 message("taxonomy folders: ", paste(.folders, collapse = ", "))
 
-defs_files <- list.files(root, pattern = "^(imputsub|mult_imput).*\\.sas$",
-                         recursive = TRUE, full.names = TRUE,
-                         ignore.case = TRUE, no.. = TRUE)
+# ⚠️ `--defs-scope corpus` reads every .sas under the root. The worksheet's
+# per-macro copy counts are LOWER BOUNDS under the default `stems` scope: the
+# drift census found 1,555 copies of `mult_imput` where this scan found 423.
+defs_scope <- getarg("--defs-scope", "stems")
+defs_files <- definition_files(root, "^(imputsub|mult_imput)", defs_scope)
 message("definition files: ", length(defs_files))
 
 # ---- pass 1: every copy of every macro binding NIMPUTE ----------------------
@@ -236,6 +238,7 @@ out <- list(
     hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     definition_files = length(defs_files),
+    definition_scope = defs_scope,
     files_unreadable = unreadable_count(),
     # ⚠️ TRUE here, unlike the counting scans. Macro names only; no study
     # identifier, path, body or source line. See the header.
