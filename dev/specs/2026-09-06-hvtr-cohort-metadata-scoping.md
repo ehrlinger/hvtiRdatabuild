@@ -181,15 +181,17 @@ showing up in configuration rather than in code.
 `warehouse` in 185. Those are studies reading the predecessor data model without
 an intermediary, which is exactly the population a governed upstream inherits.
 
-🔴 **And a number that reopens the imputation work again.** `PROC STANDARD`
-appears in **1,292** studies' `datasets` folders and `PROC MI` in **822**. The
-imputation scans found 223 studies calling `%imputsub` and 326 calling
-`%mult_imput`, because they counted MACRO CALLS. Direct `PROC MI` use appears to
-be roughly two and a half times more common than the macro. ⚠️ Not directly
-comparable: `PROC STANDARD` without `REPLACE` is not imputation and a `PROC MI`
-may be diagnostic. But the gap is far too large to be explained that way, and
-§2's study counts are scoped to macro calls in a corpus that largely does not
-use the macro.
+⚠️ **A number that looked like it reopened the imputation work, and did not.**
+`PROC STANDARD` appears in **1,292** studies' `datasets` folders and `PROC MI` in
+**822**, against 223 studies calling `%imputsub` and 326 calling `%mult_imput`.
+That reads as direct use being far more common than the macro.
+
+⭐ **Measured on 2026-09-06 it is the opposite.** Of 1,655 `PROC MI` statements
+corpus-wide, 1,650 are inside a `%macro` body and 5 are not; two studies run it
+directly. The 822 counts studies holding a file that CONTAINS a `PROC MI`, and
+those files are overwhelmingly macro definitions. 🔴 A count of files containing a
+construct is not a count of code that runs it, which is the same error §2 already
+records against scan 1 and which was repeated here.
 
 ### `.lst`
 

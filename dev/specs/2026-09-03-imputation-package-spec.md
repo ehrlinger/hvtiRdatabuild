@@ -41,25 +41,32 @@ The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A
 
 **The question was: what did the 309 and 242 studies actually run?**
 
-### 🔴 The population this section measures is not the population that imputes
+### ✅ The macro scoping is correct, and a scare on 2026-09-06 said otherwise
 
-⚠️ **Added 2026-09-06.** Everything below counts studies that CALL a macro: 223
-`%imputsub`, 326 `%mult_imput`. `build-structure-scan.R` then found **`PROC MI`
-in 822 studies** and `PROC STANDARD` in 1,292, so direct use is roughly two and a
-half times more common than the macro.
+⚠️ **This subsection records a wrong alarm, because the way it was wrong is the
+useful part.**
 
-⚠️ Not directly comparable: a `PROC STANDARD` without `REPLACE` is not
-imputation, and a `PROC MI` may be diagnostic. But the gap is far too large to be
-explained that way. **§2 is scoped to macro calls in a corpus that largely does
-not use the macro**, which is the same class of error as the definitions that
-were not in stem-named files.
+`build-structure-scan.R` found **`PROC MI` in 822 studies** against the 326 found
+calling `%mult_imput`, and this section briefly said §2 was "scoped to macro calls
+in a corpus that largely does not use the macro".
 
-[`artifacts/imputation-direct-procmi-scan.R`](artifacts/imputation-direct-procmi-scan.R)
-covers the direct population. It is a SEPARATE scan on purpose: the resolution
-problem differs (no macro parameter in between, so `nimpute=` is a literal or a
-`%let` in the same file), and it excludes any `PROC MI` inside a `%macro` body so
-the two scans can be added without double counting. **Written and tested; not
-run.**
+⭐ **Measured, that is false.** Of 1,655 `PROC MI` statements in the corpus,
+**1,650 sit inside a `%macro` body and 5 do not**. Exactly **two studies** run
+`PROC MI` directly.
+[`artifacts/results/direct-procmi.json`](artifacts/results/direct-procmi.json).
+The corpus runs `PROC MI` almost entirely through macros, so counting macro calls
+was the right scoping all along.
+
+⚠️ **What the 822 counted was studies whose `datasets` folder holds a file
+CONTAINING a `PROC MI`, and those files are overwhelmingly macro DEFINITIONS**,
+which is consistent with the drift census's 1,555 `mult_imput` copies plus 62
+other macro names binding `NIMPUTE`.
+
+🔴 **That is the same error this document already records and it was made again.**
+Scan 1's "309 studies" turned out to be studies HOLDING A COPY rather than
+studies that RAN imputation; the lesson was written up, and a file-presence count
+was read as a usage count four hours later. A count of files containing a
+construct is not a count of code that runs it, however many times that is said.
 
 ### The answer
 
