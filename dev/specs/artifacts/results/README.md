@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All nine below used 1.1.9 over `/studies`.
+match. All ten below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -25,6 +25,7 @@ match. All nine below used 1.1.9 over `/studies`.
 | `macro-drift.json` | is the copy drift imputation's or the corpus's | 2026-09-06 09:17 |
 | `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
+| `log-verifiability.json` | ⭐ what fraction of studies could have a port verified | 2026-09-06 14:04 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -135,9 +136,17 @@ disproved.
 the SAME 1,769 calls: the corpus-wide map settles 587 of them, the study-local
 map settles 1,674.
 
+## `log-verifiability.json` and the 38 it skipped
+
+⚠️ 38 of 50,608 logs exceeded the 200 MB ceiling and were skipped, so every
+figure in that file excludes them. The count is in the provenance rather than
+absorbed silently. An earlier attempt without the ceiling pinned a core for
+twenty minutes on one large log; the prefilter did most of the eventual speedup
+and the ceiling caught the remainder.
+
 ## Not yet run
 
-`log-verifiability.json`, running as this was written. ⚠️ An earlier attempt was
-killed after pinning a core for twenty minutes on one very large log; the scan
-now has a per-file ceiling and a cheap prefilter, and reports `logs_oversized`
-so any coverage gap is visible rather than silent.
+A `build.sas` structure census and a `.lst` scan, both scoped in
+`../../2026-09-06-hvtr-cohort-metadata-scoping.md` §4. ⚠️ `.lst` carries printed
+output and inherits `log-verifiability-scan.R`'s stricter contract or does not
+get written.

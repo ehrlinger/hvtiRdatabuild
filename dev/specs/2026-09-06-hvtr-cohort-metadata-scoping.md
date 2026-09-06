@@ -134,7 +134,38 @@ about what the scan is *capable* of emitting rather than what it chooses to,
 never retaining a line, and detecting the presence of a number without reading
 it. Any `.lst` scan inherits that or does not get written.
 
-### `.log`, already built
+### `.log`, run 2026-09-06
+
+⭐ **79% of studies holding SAS code kept a log that recorded a dataset shape and
+did not error**: 1,180 studies of the 1,487 that hold any `.sas` file. Of the
+1,204 studies that kept any log at all, 1,180 kept a usable one, so retention is
+close to all-or-nothing per study rather than patchy within one.
+
+That is a far better position than the `vars` note feared, and it is the number
+its §6 has been asking for since 2026-09-02. For HVTR it bounds how much of the
+past can be described from evidence rather than inferred from code.
+
+⚠️ **Three limits, and the first is the largest.**
+
+**"Usable" means a shape was recorded, not that THE shape was.** Rung 1 wants
+rows and variables for a study's specific analysis dataset. This measures whether
+shape information exists in the study's logs at all, which is necessary and not
+sufficient. **79% is a ceiling on verifiability rather than an estimate of it.**
+
+🔴 **`vars` logs are useless for this, and the reason generalises.** 46 logs carry
+a `vars` stem, across a corpus holding 5,055 `vars.sas` copies, and **not one
+recorded a dataset shape**. The information exists, in the 48,209 logs under
+other names, because `vars.sas` is included into a larger job and its datasets
+are recorded in that job's log. ⭐ **Log naming does not follow the code that
+created the dataset**, so anything joining a port to its evidence has to work by
+content rather than by filename. That is the same lesson as `mult_imput`'s
+definitions, arriving from a different direction.
+
+**It measures logs that exist now, not logs that were produced.** A study that
+ran cleanly and was later tidied is indistinguishable from one that never kept a
+log. 38 logs were also skipped for exceeding the 200 MB ceiling.
+
+### `.log`, the scan
 
 [`artifacts/log-verifiability-scan.R`](artifacts/log-verifiability-scan.R)
 measures the fraction of studies that could have a port verified at rung 1, which

@@ -1,0 +1,60 @@
+{
+  "_provenance": {
+    "script": "log-verifiability-scan.R",
+    "question": "for what fraction of studies could a ported vars.sas be verified at rung 1?",
+    "run_at": "2026-09-06T14:02:43-0400",
+    "root": "/studies",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "logs_considered": 50608,
+    "logs_unreadable": 0,
+    "logs_oversized": 38,
+    "max_log_mb": 200,
+    "contains_identifiers": false,
+    "emits_dataset_dimensions": false
+  },
+  "logs": {
+    "read": 50570,
+    "with_shape_note": 48330,
+    "with_error": 4426,
+    "with_warning": 35692,
+    "ended_normally": 44931,
+    "usable_for_rung_1": 44032
+  },
+  "studies": {
+    "with_any_log": 1204,
+    "with_a_usable_log": 1180
+  },
+  "by_stem": [
+    {
+      "stem": "vars",
+      "logs": 46,
+      "with_shape_note": 0,
+      "usable_for_rung_1": 0
+    },
+    {
+      "stem": "build",
+      "logs": 127,
+      "with_shape_note": 121,
+      "usable_for_rung_1": 109
+    },
+    {
+      "stem": "imputsub",
+      "logs": 1,
+      "with_shape_note": 0,
+      "usable_for_rung_1": 0
+    },
+    {
+      "stem": "mult_imput",
+      "logs": 9,
+      "with_shape_note": 0,
+      "usable_for_rung_1": 0
+    },
+    {
+      "stem": "other",
+      "logs": 50425,
+      "with_shape_note": 48209,
+      "usable_for_rung_1": 43923
+    }
+  ]
+}
