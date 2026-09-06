@@ -234,6 +234,44 @@ would fall "only modestly", reasoning from pass 1 that the wider scope adds
 copies rather than macros. It more than halved, to 40. Those studies did hold
 their own definitions, in files not named after the stem.
 
+### 4c-controlled. The definition scope alone, 2026-09-06
+
+The two runs above moved the call population as well as the definition
+population, so their improvement could not be attributed. `--calls-scope` holds
+calls at the historical 104,666 files while definitions come from all 227,783:
+
+| route | defs `stems` | defs `corpus` | change |
+|---|---|---|---|
+| calls | 939 | 939 | none, by construction |
+| the call states the value | 292 | 292 | none |
+| the calling study's own copy settles it | 518 | 582 | +64 |
+| the study's own copies disagree | 38 | 54 | +16 |
+| ⭐ the study holds no copy | **91** | **11** | **-80** |
+| determinate | 810 (86%) | **874 (93%)** | +64 |
+| undeterminable | 129 | **65** | halved |
+
+⭐ **80 of the 91 studies that appeared to hold no definition of the macro they
+called did hold one, in a file not named after the stem.** Only 11 genuinely have
+none. That is the whole effect of the scoping error, isolated: it halves the
+undeterminable residual on its own.
+
+⚠️ **My prediction was wrong again, in the same direction.** I put the 91 at
+"20 to 45" and it came in at 11. Twice now I have underestimated how much the
+definition scope mattered, having first assumed the stem-named files were where
+definitions lived at all.
+
+Setting the three runs side by side decomposes the improvement cleanly:
+
+| | calls | determinate | undeterminable |
+|---|---|---|---|
+| defs `stems`, calls 939 | 939 | 810 (86%) | 129 |
+| defs `corpus`, calls 939 | 939 | 874 (93%) | 65 |
+| defs `corpus`, calls 1,769 | 1,769 | 1,674 (95%) | 94 |
+
+The definition scope takes the residual from 129 to 65. The wider call population
+then finds 830 more calls, most of them resolvable, which is why the third row
+has both a higher percentage and a larger absolute residual than the second.
+
 ### 4d. The same calls, resolved two ways
 
 The corpus-wide run over the same 1,769 calls reports **587 determinate, 33%**,

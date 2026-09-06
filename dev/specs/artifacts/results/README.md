@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All ten below used 1.1.9 over `/studies`.
+match. All eleven below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -26,6 +26,7 @@ match. All ten below used 1.1.9 over `/studies`.
 | `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
 | `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
+| `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -135,6 +136,10 @@ disproved.
 ⭐ The comparison worth reading is between the two `-wide` files themselves, over
 the SAME 1,769 calls: the corpus-wide map settles 587 of them, the study-local
 map settles 1,674.
+
+`studylocal-defsonly.json` is the controlled version, run after `--calls-scope`
+existed: wide definitions, calls held at 939. It isolates the definition scope,
+which halves the undeterminable residual from 129 to 65 on its own.
 
 ## `log-verifiability.json` and the 38 it skipped
 
