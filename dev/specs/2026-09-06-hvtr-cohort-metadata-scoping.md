@@ -1,7 +1,16 @@
 # Scoping HVTR's cohort metadata, from measurement
 
 **Date:** 2026-09-06
-**Status:** scoping. **Not a design.** HVTR has no shape yet, and this note is
+**Status:** scoping. **Not a design.**
+⚠️ **Retitled in scope 2026-09-06:** an earlier draft framed HVTR as a cohort
+metadata layer and cast the lead question as descriptive versus prescriptive
+cohort definition. HVTR is larger than that. It is the governed clinical data
+platform for HVTI, successor to CVIR then SemanticDB then HVI_DM, pulling EMR and
+registries into one model with consistent variable definitions, provenance and
+IRB-governed access, replacing a patchwork of one-off extracts with a single
+trustworthy upstream. Cohort metadata is one slice. The measurements below still
+apply; the framing in §5 was too narrow and is marked where it is.
+HVTR has no shape yet, and this note is
 deliberately a collection of what has been measured plus the questions that
 measurement cannot settle.
 **Repo:** written into `hvtiRdatabuild` because every measurement it cites was
@@ -109,17 +118,35 @@ deliberately.
 ⚠️ **`build.sas` and `.lst` have not been scanned. The scan for each depends on
 which consumer it serves, and the two want different things over the same files.**
 
-### `build.sas`
+### `build.sas`, built 2026-09-06
 
-| built for | asks |
+⚠️ An earlier version of this section said the databuild and HVTR scans would be
+different, on the reading that HVTR wanted cohort criteria. With HVTR understood
+as the governed upstream, both consumers want the same description, for different
+reasons.
+
+[`artifacts/build-structure-scan.R`](artifacts/build-structure-scan.R) describes
+a build rather than interpreting it:
+
+| it reports | who needs it |
 |---|---|
-| databuild S2 | what steps recur, and how stereotyped, so `build_dataset()` knows what to build |
-| HVTR | what a study asserts about who is in and out, and how it expresses that |
+| step SHAPES against distinct bodies | ⭐ S2: how many builds to implement |
+| DATA steps and which PROCs, by study | S2: what `build_dataset()` must cover |
+| whether builds compose (`%include`, macros) | both |
+| ⭐ which LIBREFS builds read from | HVTR: what a governed upstream replaces |
 
-These are different scans. The first is a structure census in the shape of
-`macro-drift-scan.R`. The second reads cohort criteria, which is harder, and runs
-into §2's warning immediately: criteria expressed in code are only recoverable
-where the code says them plainly.
+⭐ **The step-shape count is the one to read first.** It fingerprints the ordered
+sequence of steps rather than the text, so two builds doing the same things in
+the same order are one shape however their variable names differ. If it comes
+back small, as `vars`'s 39 behaviours did, the build layer is describable.
+
+⚠️ It does not attempt cohort criteria, derivations or variable semantics. Those
+need a decision about what HVTR is before a scan can count the right thing, and a
+scan that guessed would produce a number answering neither consumer.
+
+⚠️ Librefs are emitted only above a frequency floor (`--min-libref`, default 5
+studies). A library alias used by one study is not an institutional source, and
+emitting it would widen the contract past what the scan claims.
 
 ### `.lst`
 
@@ -128,11 +155,17 @@ where the code says them plainly.
 | databuild | what values a port can be checked against |
 | HVTR | what was actually filed, as opposed to what the code would produce |
 
-⚠️ **`.lst` carries printed output and so may carry patient values**, exactly as
-`.log` does. `log-verifiability-scan.R` sets the pattern for that: a contract
-about what the scan is *capable* of emitting rather than what it chooses to,
-never retaining a line, and detecting the presence of a number without reading
-it. Any `.lst` scan inherits that or does not get written.
+[`artifacts/lst-listing-scan.R`](artifacts/lst-listing-scan.R), built
+2026-09-06, is the rung-3 counterpart to the log scan's rung-1 figure: how many
+studies hold a model listing whose coefficients a port could be checked against.
+
+🔴 **Its contract is stricter than the log scan's, for a stronger reason.** A
+`.log` may contain patient values incidentally. **A `.lst` IS the printed output**,
+and a `PROC PRINT` listing is patient data by design rather than by accident. So
+the scan never retains a line, reads no number, and ⚠️ **detects `PROC PRINT`
+output in order to count it without reading it.** Knowing how many listings are
+patient-level print-outs matters: those are the ones nobody should open
+casually.
 
 ### `.log`, run 2026-09-06
 
