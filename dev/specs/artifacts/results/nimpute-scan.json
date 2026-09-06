@@ -2,7 +2,7 @@
   "_provenance": {
     "script": "imputation-nimpute-scan.R",
     "question": "spec 2026-09-03 S2: does mult_imput perform genuine multiple imputation?",
-    "run_at": "2026-09-05T11:58:12-0400",
+    "run_at": "2026-09-05T17:04:57-0400",
     "root": "/studies",
     "scope": "studies carrying a definition",
     "hvtiRutilities_version": "1.1.9",
@@ -45,7 +45,10 @@
     "conflicting_default_all_le1": 0,
     "conflicting_default_unresolvable": 0,
     "unresolved": 0,
-    "settled_by_definition_alone": 0
+    "settled_by_definition_alone": 0,
+    "mixed_form_calls": 0,
+    "nimpute_from_positional": 0,
+    "positional_in_mixed_call": 0
   },
   "definition_settled": {
     "n": 0,

@@ -12,30 +12,41 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All four below used 1.1.9 over `/studies`.
+match. All six below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
 | `imputation-scan.json` | which methods appear in the stem-matched jobs | 2026-09-04 15:19 |
 | `callsite-scan.json` | who **calls** those jobs | 2026-09-04 16:58 |
-| `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-05 07:33 |
+| `nimpute-scan.json` | what `NIMPUTE` reaches `PROC MI` | 2026-09-05 17:04 |
 | `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
 | `reconcile-scan.json` | which macro names disagree, and at what cost | 2026-09-05 14:43 |
 | `studylocal-scan.json` | ⭐ NIMPUTE per the calling study's own copy | 2026-09-05 14:59 |
 
-## `nimpute-scan.json` is the corrected re-run
+## `nimpute-scan.json` has been rerun twice, and this is the third file
 
-Replaced 2026-09-05 after the three resolver fixes from
+The version committed here is the **2026-09-05 17:04** run. Two earlier ones were
+replaced, and the reasons are worth keeping because both changed how the result
+should be read.
+
+**First rerun**, after the three resolver fixes from
 [#36](https://github.com/ehrlinger/hvtiRdatabuild/pull/36). ⭐ The correction was
 large: 39 conflicting macro defaults across 5 names govern **622 of 939 calls**,
-which the first run had silently resolved against whichever copy it read first.
-The evidence base is **317 calls, not 939**, and the headline is 97.2% rather
-than 98.5%. The direction is unchanged.
+which the original run had silently resolved against whichever copy it read
+first. The evidence base fell from 939 to 317. The direction did not change.
 
-⚠️ One split is still missing from this file and decides whether §2 ticks:
-whether those 622 conflicted calls straddle `NIMPUTE = 1` or sit entirely above
-it. The scan now emits `conflicting_default_all_gt1` and
-`conflicting_default_mixed`; **this file predates those fields.**
+**Second rerun**, this file, adding the four-way conflict split from
+[#42](https://github.com/ehrlinger/hvtiRdatabuild/pull/42) and the
+positional-argument counters. It carries
+`conflicting_default_all_gt1` / `_straddles_1` / `_all_le1` / `_unresolvable`,
+and the three counters below.
+
+⚠️ **Read the 317 with `studylocal-scan.json` beside it.** The 622 look
+undeterminable in THIS file because it resolves each call against a map keyed by
+macro name across the whole corpus. Resolved against the copy in the calling
+study, 518 of them settle, leaving 129. Neither file is wrong; they answer
+different questions, and the study-local one is the question that matches how the
+code ran.
 
 `census-reconcile.json` resolves the census gap: the census counted files whose
 first dot-delimited field equals the stem, which reproduces 926 and 411 to within
@@ -53,25 +64,40 @@ confirms that the figures quoted in section 4a of
 `2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
 were right.
 
-## 🔴 `nimpute-scan.json` is still provisional
+## The positional-argument question is settled, by measurement
 
-#41 corrected a positional-argument defect shared by three scans: a value
-supplied positionally in a call that also carried a keyword argument read as
-omitted.
+#41 corrected a defect shared by three scans: a value supplied positionally in a
+call that also carried a keyword argument read as omitted.
 
-⚠️ **An earlier version of this section declared the flag lifted, on the grounds
-that `studylocal-scan.json` reports `from_argument` at 292, identical to the
-corpus-wide scan which ran without the fix. That argument does not hold.** The
-study-local scan changed a second thing at the same time: it selects parameter
-names and positions from the calling study's own copy rather than one
-corpus-wide definition. So a newly recognised mixed call could be offset by a
-call classified differently for that unrelated reason, and the totals would still
-match. ⭐ Two aggregates agreeing across two different algorithms is not evidence
-that either change was inert.
+⚠️ **An earlier version of this section lifted the flag on the grounds that
+`studylocal-scan.json` reports `from_argument` at 292, identical to the
+corpus-wide scan which ran without the fix. That argument does not hold**, and is
+recorded rather than deleted. The study-local scan changed a second thing at the
+same time, selecting parameter names from the calling study's copy rather than
+one corpus-wide definition, so an offsetting pair would leave the totals matching
+either way. ⭐ Two aggregates agreeing across two different algorithms is not
+evidence that either change was inert.
 
-Settling it needs a direct measurement rather than an inference: rerun
-`imputation-nimpute-scan.R` with the fixed parser, or count mixed calls
-explicitly. Until then the 292 / 25 / 622 split is provisional.
+**Measured instead.** `nimpute-scan.json` was rerun 2026-09-05 17:04 with
+counters for exactly the population the old gate discarded:
+
+| field | value |
+|---|---|
+| `mixed_form_calls` | **0** |
+| `nimpute_from_positional` | **0** |
+| `positional_in_mixed_call` | **0** |
+
+⚠️ **Scoped to the population this scan counts, which is not the whole corpus.**
+The counters increment only for calls to a macro this scan found binding
+`NIMPUTE` through a parameter, within the studies that carry a stem-matched
+definition. So zero establishes that **none of the 939 parameterised `NIMPUTE`
+calls** is mixed-form or supplies its value by position. It does **not**
+establish that no mixed positional-and-keyword macro call exists anywhere in the
+corpus, and this counter should not be reused as a corpus-wide syntax census.
+
+Within that population the defect was inert, and a full diff of the rerun against
+the previous one moves nothing but the timestamp and those three fields. The
+292 / 25 / 622 split stands, on evidence this time.
 
 ## Not yet run
 
