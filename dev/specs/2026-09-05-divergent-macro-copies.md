@@ -278,12 +278,18 @@ only in the header or below it**. The first is a signature or a default drifting
 which is what bit the imputation macros. The second is what the macro DOES
 drifting, which is worse.
 
-⚠️ **Run `--count-only` first.** The imputation scans walked 104,666 files, but
-that was only the 547 studies holding an imputation stem; the size of the whole
-corpus is unmeasured, and a full read could be long. The counting mode lists and
-stops. `--stems` restricts to one family and `--max-files` bounds a probe.
+⚠️ **The corpus is 3,847,221 `.sas` files**, counted 2026-09-06. That is 37 times
+the imputation walk, so a full pass runs to something like half a day. It also
+retires a guess: a comment in the first scan called it "millions of files", which
+was written without measuring and happened to be right.
 
-Written and tested; not run.
+⭐ **Bound the work by root, not by file count.** Detecting drift means comparing
+every copy of a name against the others, so a subset of FILES undercounts it:
+copies outside the subset are invisible and the name reads as more consistent
+than it is. A clinical tree is a complete population for the question, and gives
+a lower bound rather than a biased estimate.
+
+Written and tested; not yet run beyond the count.
 
 ## 6. What is measured, and what is not
 

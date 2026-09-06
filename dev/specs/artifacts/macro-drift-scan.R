@@ -14,14 +14,28 @@
 #   Rscript macro-drift-scan.R --root /studies --count-only
 #   Rscript macro-drift-scan.R --root /studies --out macro-drift.json
 #
-# ⚠️ RUN `--count-only` FIRST. It lists the candidate files and stops without
-# reading any, which takes minutes rather than hours. The imputation scans walked
-# 104,666 files, but that was only the 547 studies holding an imputation stem;
-# the whole corpus is larger by an unmeasured factor. Decide on the count before
-# committing to the read.
+# ⚠️ RUN `--count-only` FIRST on any root you have not counted before. It lists
+# the candidate files and stops without reading any.
 #
-# `--stems <regex>` restricts to files whose BASENAME matches, so a family can be
-# checked on its own. `--max-files N` stops after N files, for a bounded probe.
+# ⚠️ THE CORPUS IS 3,847,221 `.sas` FILES, measured 2026-09-06. That is 37 times
+# the imputation walk, so a full pass is on the order of half a day. Bound the
+# work by ROOT, not by file count:
+#
+#   Rscript macro-drift-scan.R --root /studies/<tree> --out drift-<tree>.json
+#
+# ⭐ A clinical tree is a complete population for this question. Detecting drift
+# means comparing every copy of a name against the others, so a subset of FILES
+# undercounts it: copies outside the subset are invisible and the name looks more
+# consistent than it is. A subset of STUDIES or TREES keeps each observed name's
+# copies intact within the subset, and the result reads as a lower bound rather
+# than an estimate.
+#
+# `--stems <regex>` restricts to files whose BASENAME matches, for one family.
+# `--max-files N` bounds a smoke test. ⚠️ It samples RANDOMLY under a fixed seed
+# rather than taking the first N, because `list.files()` returns directory order
+# and the first N would be one subtree presented as a sample. It still
+# undercounts drift for the reason above, so use it to check the scan runs, not
+# to answer the question.
 #
 # HOW DRIFT IS MEASURED. For each `%macro` definition found, the body is reduced
 # to a fingerprint and the fingerprints for one name are counted. Two figures per
@@ -86,8 +100,15 @@ if (count_only) {
   quit(save = "no", status = 0)
 }
 if (!is.na(max_files) && length(files) > max_files) {
-  message("--max-files: reading the first ", max_files, " of ", length(files))
-  files <- files[seq_len(max_files)]
+  # ⚠️ Random, not the first N: list.files() returns directory order, so the
+  # head of it is one subtree wearing the costume of a sample. Seeded so a
+  # repeat run reads the same files.
+  set.seed(20260906L)
+  files <- sort(sample(files, max_files))
+  message("--max-files: reading a random ", max_files, " of the listing. ",
+          "⚠️ This UNDERCOUNTS drift, because copies of a name outside the ",
+          "sample are invisible and the name looks more consistent than it is. ",
+          "Bound by --root instead to answer the question.")
 }
 
 # ---- fingerprint ------------------------------------------------------------
@@ -161,6 +182,9 @@ out <- list(
     files_considered = length(files),
     files_unreadable = unreadable_count(),
     macro_definitions = n_defs,
+    # ⚠️ TRUE when --max-files subset the listing, in which case every drift
+    # figure below is a LOWER BOUND: copies outside the sample were not seen.
+    file_sampled = !is.na(max_files),
     # ⚠️ TRUE, like imputation-reconcile-scan.R. Macro names only, capped by
     # --top; no study identifier, path or body. See the header.
     emits_macro_names = TRUE,
