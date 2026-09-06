@@ -101,5 +101,7 @@ the previous one moves nothing but the timestamp and those three fields. The
 
 ## Not yet run
 
-Nothing. Every scan in `../` has been run against `/studies` and its output is
-here.
+`macro-drift.json` -- output of `../macro-drift-scan.R`, which asks whether the
+copy drift found in the imputation macros is a property of imputation or of the
+corpus. ⚠️ Run its `--count-only` mode first: the corpus size beyond the 547
+imputation studies is unmeasured.

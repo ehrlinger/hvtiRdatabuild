@@ -269,10 +269,21 @@ since has moved it toward a smaller and more honest number.
 **Repeat the measurement elsewhere.** We found this because §2 forced us to
 resolve a value across a definition and a call site. Nothing about the mechanism
 is specific to imputation. Any macro family distributed as per-study copies can
-have drifted the same way, and the same scan shape (read the definitions, join
-them to the call sites, report where the copies disagree) would find it. The
-`conflicting_defaults` field exists for that, and reporting it should be the
-default posture for a corpus scan, not an afterthought.
+have drifted the same way.
+
+[`artifacts/macro-drift-scan.R`](artifacts/macro-drift-scan.R) asks it of every
+macro name in the corpus rather than one family: how many names exist in several
+copies, how many of those copies are not identical, and ⭐ **whether they differ
+only in the header or below it**. The first is a signature or a default drifting,
+which is what bit the imputation macros. The second is what the macro DOES
+drifting, which is worse.
+
+⚠️ **Run `--count-only` first.** The imputation scans walked 104,666 files, but
+that was only the 547 studies holding an imputation stem; the size of the whole
+corpus is unmeasured, and a full read could be long. The counting mode lists and
+stops. `--stems` restricts to one family and `--max-files` bounds a probe.
+
+Written and tested; not run.
 
 ## 6. What is measured, and what is not
 
