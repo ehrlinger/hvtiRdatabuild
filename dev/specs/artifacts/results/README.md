@@ -25,7 +25,7 @@ match. All ten below used 1.1.9 over `/studies`.
 | `macro-drift.json` | is the copy drift imputation's or the corpus's | 2026-09-06 09:17 |
 | `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
-| `log-verifiability.json` | ⭐ what fraction of studies could have a port verified | 2026-09-06 14:04 |
+| `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
