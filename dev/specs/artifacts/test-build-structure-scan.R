@@ -63,6 +63,18 @@ put("cardiac/eps", "build.sas",
     c("libname privatelib '/someones/private/corner';",
       "data e; set privatelib.thing;", "run;"))
 
+# 🔴 IDENTIFYING NAMES THAT CLEAR THE FLOOR. The 2026-09-06 run emitted
+# `/home/mgoormas`, a personal directory naming an individual, and `st1027`, a
+# study identifier used as a libref by 247 studies. Both were COMMON, so the
+# frequency floor passed them: the floor assumes an identifying name is a rare
+# name, and a shared reference to one study's library is neither.
+# Three studies each, so both clear a floor of 2 and must still be rejected.
+for (stx in c("cardiac/i1", "cardiac/i2", "thoracic/i3")) {
+  put(stx, "build.sas",
+      c("libname home1 '/home/someuser/lib';",
+        "data z; set st9999.thing;", "run;"))
+}
+
 # ⚠️ A build OUTSIDE the taxonomy folder. Folder scoping must exclude it, so
 # nothing here reaches any count.
 d <- file.path(root, "cardiac/outside", "notafolder")
@@ -87,10 +99,10 @@ num <- function(field) {
 }
 
 expected <- list(
-  files = 5L,
-  studies = 5L,
-  # alpha/beta differ in text, gamma, delta, eps
-  distinct_bodies = 5L,
+  files = 8L,
+  studies = 8L,
+  # alpha/beta differ in text, gamma, delta, eps, and the three identical i* ones
+  distinct_bodies = 6L,
   # ⭐ THREE shapes from five builds: `data>sort>means` (alpha and beta, whose
   # text differs), `data>freq` (gamma), and a bare `data` (delta and eps).
   # ⚠️ delta and eps share a shape although their text does not: %include and a
@@ -110,44 +122,65 @@ for (nm in names(expected)) {
                   if (ok) "ok" else "FAIL"))
 }
 
-# `src` is read by alpha, beta and delta, so it clears a floor of 2 and is named.
-if (!grepl("\"name\": \"src\"", j)) {
-  message("FAIL  the shared libref src was not reported"); fail <- fail + 1L
-} else message(sprintf("%-24s %s", "shared libref reported", "ok"))
+# 🔴 THE DEFAULT IS COUNTS ONLY. Without --emit-names no name may appear at all,
+# so forgetting the flag yields a safe artifact rather than an unsafe one.
+if (grepl("\"name\":", j, fixed = TRUE)) {
+  message("FAIL  names were emitted without --emit-names"); fail <- fail + 1L
+} else message(sprintf("%-30s %s", "default emits no names", "ok"))
 
-# ⚠️ THE FLOOR ASSERTION. `privatelib` is read by one study only and must not
-# appear: a one-study library alias is not an institutional source, and emitting
-# it would widen this scan's contract past what it claims.
-if (grepl("privatelib", j, fixed = TRUE)) {
+# Now the opt-in run, which is where the filters have to hold.
+o3 <- file.path(root, "named.json")
+system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
+                   "--out", shQuote(o3), "--min-libref", "2", "--emit-names"),
+        stdout = FALSE, stderr = FALSE)
+jn <- paste(readLines(o3), collapse = " ")
+
+if (!grepl("\"name\": \"src\"", jn)) {
+  message("FAIL  the shared libref src was not reported"); fail <- fail + 1L
+} else message(sprintf("%-30s %s", "named run reports src", "ok"))
+
+if (grepl("privatelib", jn, fixed = TRUE)) {
   message("FAIL  a one-study libref was emitted despite the floor"); fail <- fail + 1L
-} else message(sprintf("%-24s %s", "one-study libref withheld", "ok"))
+} else message(sprintf("%-30s %s", "one-study libref withheld", "ok"))
+
+# 🔴 THE IDENTIFIER ASSERTIONS. Both of these clear the floor and must still be
+# rejected: a personal home directory and a study identifier.
+if (grepl("someuser", jn, fixed = TRUE) || grepl("/home/", jn, fixed = TRUE)) {
+  message("FAIL  a personal home directory was emitted"); fail <- fail + 1L
+} else message(sprintf("%-30s %s", "personal directory rejected", "ok"))
+if (grepl("st9999", jn, fixed = TRUE)) {
+  message("FAIL  a study identifier was emitted"); fail <- fail + 1L
+} else message(sprintf("%-30s %s", "study identifier rejected", "ok"))
+if (!grepl("withheld_as_identifying\": [1-9]", jn)) {
+  message("FAIL  rejections were not counted"); fail <- fail + 1L
+} else message(sprintf("%-30s %s", "rejections counted", "ok"))
 
 # `whse` is read by gamma only, also below the floor.
-if (grepl("\"name\": \"whse\"", j)) {
+if (grepl("\"name\": \"whse\"", jn)) {
   message("FAIL  whse is below the floor and was emitted"); fail <- fail + 1L
 }
 
 # ⭐ THE UPSTREAM ASSERTION. Three studies point a LIBNAME at /invented/mount/...,
 # so the two-component prefix clears a floor of 2 and is reported. This is what
 # the libref alias could not tell us.
-if (!grepl("/invented/mount", j, fixed = TRUE)) {
+if (!grepl("/invented/mount", jn, fixed = TRUE)) {
   message("FAIL  the shared LIBNAME target was not reported"); fail <- fail + 1L
 } else message(sprintf("%-24s %s", "shared LIBNAME reported", "ok"))
 
 # ⚠️ AND THE FLOOR ON PATHS. epsilon's path is used by one study and must not
 # appear: a one-study path is a study identifier, not an institutional mount.
-if (grepl("someones", j, fixed = TRUE) || grepl("private/corner", j, fixed = TRUE)) {
+if (grepl("someones", jn, fixed = TRUE) || grepl("private/corner", jn, fixed = TRUE)) {
   message("FAIL  a one-study LIBNAME path was emitted"); fail <- fail + 1L
 } else message(sprintf("%-24s %s", "one-study path withheld", "ok"))
 
 # ⚠️ And the folder scope excluded the build outside the taxonomy folder.
-if (grepl("excluded", j, fixed = TRUE)) {
+if (grepl("excluded", jn, fixed = TRUE)) {
   message("FAIL  a build outside the taxonomy folder was scanned"); fail <- fail + 1L
 }
 
 # PROC names are reported; `sort`, `means` and `freq` all appear.
 for (p in c("sort", "means", "freq")) {
-  if (!grepl(paste0("\"name\": \"", p, "\""), j)) {
+  if (!grepl(paste0("\"name\": \"", p, "\""), jn)) {
     message("FAIL  proc not reported: ", p); fail <- fail + 1L
   }
 }

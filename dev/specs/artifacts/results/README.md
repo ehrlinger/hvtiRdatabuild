@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All thirteen below used 1.1.9 over `/studies`.
+match. All twelve below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -28,7 +28,6 @@ match. All thirteen below used 1.1.9 over `/studies`.
 | `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
 | `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
-| `build-structure.json` | ⭐ what a build is made of, and what it reads from | 2026-09-06 16:03 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -151,7 +150,28 @@ absorbed silently. An earlier attempt without the ceiling pinned a core for
 twenty minutes on one large log; the prefilter did most of the eventual speedup
 and the ceiling caught the remainder.
 
-## 🔴 `build-structure.json` predates a fingerprint fix
+## 🔴 `build-structure.json` was committed and withdrawn
+
+⚠️ **It disclosed identifiers, against its own scan's stated contract.** It
+emitted `/home/mgoormas`, a personal home directory naming an individual, and
+`st1027`, a study identifier used as a libref by 247 studies. A background
+security review caught it; I did not.
+
+⭐ **The frequency floor was the wrong instrument, and that is the lesson.** It
+assumed an identifying name is a RARE name. A shared reference to one study's
+library is common AND identifying, so no floor could ever have caught it, and
+`st1027` cleared a floor of 5 by a factor of fifty.
+
+The scan now rejects the shapes that can be enumerated (personal directories,
+study identifiers) and, because that list cannot be complete, ⭐ **emits no names
+at all by default**. `--emit-names` turns them on for someone who will read the
+output before committing it, and rejected entries are counted so a reader knows
+something was withheld rather than absent.
+
+⚠️ The file was removed from the working tree but remains in this repository's
+git history, in the commits between `b2c6ad8` and its removal.
+
+## 🔴 A fingerprint fix also postdates that run
 
 The run emitted `NAs produced by integer overflow` from the body fingerprint:
 `v * seq_along(v)` on an integer vector overflows once an element exceeds 2^31,

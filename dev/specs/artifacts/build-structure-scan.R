@@ -79,6 +79,20 @@ min_libref  <- as.integer(getarg("--min-libref", "5"))
 # unlikely to survive the frequency floor below.
 path_depth  <- as.integer(getarg("--path-depth", "2"))
 count_only  <- "--count-only" %in% args
+# 🔴 NAMES ARE OPT-IN. The 2026-09-06 run emitted `/home/mgoormas`, a personal
+# home directory naming an individual, and `st1027`, a study identifier used as a
+# libref by 247 studies. Both cleared the frequency floor and both broke this
+# scan's stated contract.
+#
+# ⚠️ THE FLOOR WAS THE WRONG INSTRUMENT. It assumed an identifying name is a RARE
+# name. A shared reference to one study's library is common AND identifying, and
+# a floor can never catch that. The filter below rejects the shapes I can
+# enumerate, and I cannot enumerate them all, so the DEFAULT is now counts only:
+# forgetting the flag yields a safe artifact rather than an unsafe one.
+#
+# `--emit-names` turns them on, for someone who will read the output before
+# committing it. The provenance records which mode ran.
+emit_names  <- "--emit-names" %in% args
 
 .folders <- taxonomy_folders()
 study_of <- study_of_factory(root, .folders)
@@ -190,12 +204,32 @@ for (i in seq_along(files)) {
   if (i %% 200 == 0) message("  ", i, " / ", length(files))
 }
 
+# ⚠️ Shapes that identify a person or a study, rejected whatever their
+# frequency. This list is not exhaustive and cannot be: it is a second line
+# behind the counts-only default, not a substitute for it.
+looks_identifying <- function(x) {
+  grepl("^/home/|^/users?/|^/u/|^/export/home/", x) ||   # a personal directory
+    grepl("(^|[/_.])(st|study)[0-9]{3,}", x) ||          # a study identifier
+    grepl("(^|/)(mrn|phi|patient)", x)
+}
+
 top_of <- function(env, floor = 0L) {
   ks <- ls(env)
   n  <- vapply(ks, function(k) length(env[[k]]), integer(1))
-  ks <- ks[n >= floor]; n <- n[n >= floor]
+  keep <- n >= floor & !vapply(ks, looks_identifying, logical(1))
+  n_rejected <- sum(n >= floor & vapply(ks, looks_identifying, logical(1)))
+  ks <- ks[keep]; n <- n[keep]
   o <- order(-n)
-  lapply(head(o, top_n), function(i) list(name = ks[[i]], studies = n[[i]]))
+  list(
+    # ⭐ Counts are always safe and always emitted.
+    distinct = length(ks),
+    # ⚠️ Cleared the floor but were rejected as identifying. Counted so a reader
+    # knows something was withheld rather than absent.
+    withheld_as_identifying = n_rejected,
+    top = if (emit_names)
+      lapply(head(o, top_n), function(i) list(name = ks[[i]], studies = n[[i]]))
+    else list()
+  )
 }
 
 out <- list(
@@ -212,7 +246,7 @@ out <- list(
     files_considered = length(files),
     files_read       = n_read,
     files_unreadable = unreadable_count(),
-    emits_libref_and_proc_names = TRUE,
+    emits_names = emit_names,
     libref_floor_studies = min_libref
   ),
   builds = list(
@@ -251,10 +285,16 @@ message("steps per build:        ", out$builds$steps_min, " / ",
         out$builds$steps_median, " / ", out$builds$steps_max, "  (min/median/max)")
 message("uses %include:          ", out$builds$uses_include)
 message("calls a macro:          ", out$builds$calls_a_macro)
-message("\n--- LIBNAME TARGETS (studies) ---")
-for (l in out$libname_targets) message(sprintf("  %-40s %5d", l$name, l$studies))
-message("\n--- LIBREFS (aliases; they name nothing) ---")
-for (l in out$librefs_read) message(sprintf("  %-16s %5d", l$name, l$studies))
-message("\n--- PROCS USED (studies) ---")
-for (p in utils::head(out$procs_used, 15)) message(sprintf("  %-16s %5d", p$name, p$studies))
+show <- function(label, blk, w) {
+  message("\n--- ", label, " ---")
+  message("  distinct: ", blk$distinct,
+          "   withheld as identifying: ", blk$withheld_as_identifying)
+  if (!length(blk$top)) {
+    message("  (names withheld; pass --emit-names, and READ THE OUTPUT before ",
+            "committing it)")
+  } else for (l in blk$top) message(sprintf("  %-*s %5d", w, l$name, l$studies))
+}
+show("LIBNAME TARGETS (studies)", out$libname_targets, 40)
+show("LIBREFS (aliases; they name nothing)", out$librefs_read, 16)
+show("PROCS USED (studies)", out$procs_used, 16)
 message("\nwrote ", outfile)

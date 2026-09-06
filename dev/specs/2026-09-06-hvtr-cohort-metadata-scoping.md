@@ -155,6 +155,14 @@ filename scope. ⭐ **The earlier "82% of builds are unique" was a sampling
 artifact**: 38,877 files reduce to **6,994 distinct step shapes**, 18% rather
 than 82%. The build layer is far more stereotyped than the filename sample said.
 
+⚠️ **The artifact behind the figures below was withdrawn for disclosing
+identifiers**, and the figures are quoted from the console output rather than
+from a committed file. It emitted a personal home directory and a study
+identifier used as a libref by 247 studies. ⭐ The frequency floor could never
+have caught the second: it assumed an identifying name is a rare name, and a
+shared reference to one study's library is common and identifying at once. The
+scan now emits no names by default. See `artifacts/results/README.md`.
+
 ⭐ **The `LIBNAME` targets answer the upstream question, and the answer is
 better than feared.** The dominant target is `/&study/datasets` in 1,286 studies,
 followed by `/&study` in 1,046 and `/&study/estimates` in 821. **Builds do not
