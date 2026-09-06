@@ -97,6 +97,15 @@ put("cardiac/omicron", "mult_imput_o.sas", defn("mi_o", 3))
 put("cardiac/omicron", "helpers.sas", defn("mi_shared", 7))
 put("cardiac/omicron", "driver.sas", c("%mi_shared(data=w);"))
 
+# 🔴 pi holds NO stem-named file at all, only a driver that calls mi_shared.
+# It is therefore outside the historical call population, and must stay outside
+# it when `--defs-scope corpus` widens the DEFINITIONS. Under the coupling this
+# test was written to catch, widening definitions also widened the call
+# population and pi's call appeared, moving a denominator that should not have
+# moved. Every other fixture study carries a stem-named file, so this is the only
+# one that can tell the two flags apart.
+put("cardiac/pi", "driver.sas", c("%mi_shared(data=w);"))
+
 # zeta states the value outright, which beats every inference.
 put("cardiac/zeta", "mult_imput_z.sas", defn("mi_z", 5))
 put("cardiac/zeta", "driver.sas", c("%mi_z(data=w, nimpute=25);"))
@@ -190,7 +199,12 @@ if (!file.exists(o2)) {
   }
   for (c in list(list("wide: from_study_local", numw("from_study_local"), 3L),
                  list("wide: global_fallback_conflict",
-                      numw("global_fallback_conflict"), 1L))) {
+                      numw("global_fallback_conflict"), 1L),
+                 # 🔴 THE DECOUPLING ASSERTION. `--defs-scope` must not move the
+                 # call population: same 9 calls as the default run. Under the
+                 # coupling this is 10, because pi joins the call population when
+                 # the definitions widen.
+                 list("wide: calls unchanged", numw("calls"), 9L))) {
     ok <- identical(c[[2]], c[[3]])
     if (!ok) fail <- fail + 1L
     message(sprintf("%-30s expected %2d  got %2d  %s", c[[1]], c[[3]], c[[2]],

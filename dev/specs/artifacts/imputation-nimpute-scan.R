@@ -59,6 +59,9 @@ getarg <- function(flag, default = NULL) {
 }
 root    <- normalise_root(getarg("--root", "/studies"))
 outfile <- getarg("--out", "nimpute-scan.json")
+# ⚠️ The call population is set separately from the definition population; see
+# the note beside `calls_scope` below. `--all-studies` is kept as an alias for
+# `--calls-scope corpus`.
 all_studies <- "--all-studies" %in% args
 
 .folders <- taxonomy_folders()
@@ -74,17 +77,32 @@ defs_files <- definition_files(root, stem_re, defs_scope)
 def_studies <- unique(stats::na.omit(study_of(defs_files)))
 message("studies carrying a definition: ", length(def_studies))
 
-if (all_studies) {
+# ⚠️ THE CALL POPULATION IS SET SEPARATELY, and it did not used to be. `files`
+# was derived from the studies holding a DEFINITION, a fair proxy while
+# definitions came only from stem-named files. Once `--defs-scope corpus` made
+# every `.sas` a definition candidate, that proxy silently became "every study":
+# one flag moved the call population from 104,666 files to 226,957 without its
+# name changing, and a change in the results could no longer be attributed to
+# the definition scope alone.
+#
+#   stem-studies  studies carrying a stem-matched file. The historical scope,
+#                 and the default, so `--defs-scope` alone is a controlled change.
+#   corpus        every .sas under the root. `--all-studies` is an alias.
+calls_scope <- if (all_studies) "corpus" else getarg("--calls-scope", "stem-studies")
+
+if (identical(calls_scope, "corpus")) {
   files <- list.files(root, pattern = "\\.sas$", recursive = TRUE,
                       full.names = TRUE, ignore.case = TRUE, no.. = TRUE)
 } else {
-  dirs <- ifelse(def_studies == ".", root, file.path(root, def_studies))
+  stem_studies <- unique(stats::na.omit(study_of(
+    definition_files(root, stem_re, "stems"))))
+  dirs <- ifelse(stem_studies == ".", root, file.path(root, stem_studies))
   files <- unique(unlist(lapply(dirs, function(d) {
     list.files(d, pattern = "\\.sas$", recursive = TRUE,
                full.names = TRUE, ignore.case = TRUE, no.. = TRUE)
   }), use.names = FALSE))
 }
-message("candidate files: ", length(files))
+message("candidate files: ", length(files), "  (call scope: ", calls_scope, ")")
 
 # ---- parsing helpers --------------------------------------------------------
 
@@ -352,6 +370,7 @@ out <- list(
   definitions = list(
     files_scanned_for_definitions = length(def_scan),
     definition_scope = if ("--defs-all" %in% args) "study" else defs_scope,
+    call_scope = calls_scope,
     files_defining_a_macro   = n_def_files,
     macros_binding_nimpute   = length(defmap),
     # How the definition gets its NIMPUTE. "param" is the case that needs a
