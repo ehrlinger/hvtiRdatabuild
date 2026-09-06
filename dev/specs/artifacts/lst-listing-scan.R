@@ -131,10 +131,13 @@ stu_any <- character(0); stu_model <- character(0)
 
 for (i in seq_along(lsts)) {
   r <- inspect(lsts[[i]])
+  # ⚠️ ATTRIBUTE THE STUDY BEFORE ANY SKIP, as in log-verifiability-scan.R.
+  # `with_any_listing` is an existence metric; the oversized skip below used to
+  # come first, so a study whose only listing was oversized read as having none.
+  if (!is.na(stu[[i]])) stu_any <- c(stu_any, stu[[i]])
   if (identical(r, "oversized")) { n[["oversized"]] <- n[["oversized"]] + 1L; next }
   if (is.null(r)) { n[["unreadable"]] <- n[["unreadable"]] + 1L; next }
   n[["read"]] <- n[["read"]] + 1L
-  if (!is.na(stu[[i]])) stu_any <- c(stu_any, stu[[i]])
   if (r$model) { n[["model"]] <- n[["model"]] + 1L
                  if (!is.na(stu[[i]])) stu_model <- c(stu_model, stu[[i]]) }
   if (r$print) n[["print"]] <- n[["print"]] + 1L

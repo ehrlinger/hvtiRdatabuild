@@ -154,10 +154,14 @@ for (i in seq_along(logs)) {
   r <- inspect(logs[[i]])
   sk <- stem_of[[i]]
   logs_by_stem[[sk]] <- logs_by_stem[[sk]] + 1L
+  # ⚠️ ATTRIBUTE THE STUDY BEFORE ANY SKIP. `with_any_log` is an EXISTENCE
+  # metric and does not depend on reading the file, but the skips below used to
+  # come first, so a study whose only log was oversized reported as having no
+  # log at all. Content metrics still exclude skipped files; existence does not.
+  if (!is.na(stu[[i]])) stu_any <- c(stu_any, stu[[i]])
   if (identical(r, "oversized")) { n[["oversized"]] <- n[["oversized"]] + 1L; next }
   if (is.null(r)) { n[["unreadable"]] <- n[["unreadable"]] + 1L; next }
   n[["read"]] <- n[["read"]] + 1L
-  if (!is.na(stu[[i]])) stu_any <- c(stu_any, stu[[i]])
   if (r$shape) { n[["shape"]] <- n[["shape"]] + 1L
                  shape_by_stem[[sk]] <- shape_by_stem[[sk]] + 1L }
   if (r$error) n[["error"]] <- n[["error"]] + 1L

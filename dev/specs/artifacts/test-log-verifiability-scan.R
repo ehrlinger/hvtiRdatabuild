@@ -54,6 +54,12 @@ put("thoracic/delta", "build.log", c("ERROR: Invented failure.", ENDED))
 put("cardiac/eps", "build.log",
     c(SHAPE, "WARNING: Invented warning for a test.", ENDED))
 
+# ⚠️ oversize: a study whose ONLY log exceeds the ceiling. It must still count in
+# `with_any_log`, which is an EXISTENCE metric, while contributing to no content
+# metric. The skip used to precede study attribution, so this study reported as
+# having no log at all.
+put("cardiac/oversize", "vars.log", c(SHAPE, ENDED))
+
 # zeta: a log under a stem the scan does not name, to exercise "other".
 put("cardiac/zeta", "hazard.log", c(SHAPE, ENDED))
 
@@ -61,6 +67,8 @@ put("cardiac/zeta", "hazard.log", c(SHAPE, ENDED))
 
 outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
+# A tiny ceiling makes every fixture log "oversized" for a second run below; the
+# first run uses the default so the content metrics are exercised normally.
 res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
                           "--root", shQuote(root), "--out", shQuote(outfile)),
                stdout = TRUE, stderr = TRUE)
@@ -74,18 +82,18 @@ num <- function(field) {
 }
 
 expected <- list(
-  logs_considered = 7L,
-  read = 7L,
+  logs_considered = 8L,
+  read = 8L,
   # alpha, beta, delta/vars, eps, zeta
-  with_shape_note = 5L,
+  with_shape_note = 6L,
   with_error = 2L,             # beta, delta/build
   with_warning = 1L,           # eps
-  ended_normally = 7L,
+  ended_normally = 8L,
   # ⭐ shape AND no error: alpha, delta/vars, eps, zeta. NOT beta.
-  usable_for_rung_1 = 4L,
-  with_any_log = 6L,
+  usable_for_rung_1 = 5L,
+  with_any_log = 7L,
   # ⭐ alpha, delta, eps, zeta. gamma has no shape; beta's only log failed.
-  with_a_usable_log = 4L
+  with_a_usable_log = 5L
 )
 
 fail <- 0L
@@ -117,6 +125,25 @@ if (!grepl("\"emits_dataset_dimensions\": false", j)) {
   fail <- fail + 1L
 }
 if (!fail) message(sprintf("%-22s %s", "no log text in output", "ok"))
+
+# ⚠️ THE OVERSIZED ASSERTION. Rerun with a ceiling so small every log is skipped:
+# no content metric may fire, and yet every study must still be counted as having
+# a log. Under the old ordering `with_any_log` collapsed to 0.
+o3 <- file.path(root, "tiny.json")
+system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
+                   "--out", shQuote(o3), "--max-log-mb", "0.000001"),
+        stdout = FALSE, stderr = FALSE)
+jt <- paste(readLines(o3), collapse = " ")
+numt <- function(f) as.integer(sub(".*: *", "",
+  regmatches(jt, regexpr(paste0("\"", f, "\": *-?[0-9]+"), jt))))
+for (c in list(list("all-oversized: read", numt("read"), 0L),
+               list("all-oversized: any log", numt("with_any_log"), 7L),
+               list("all-oversized: usable", numt("with_a_usable_log"), 0L))) {
+  ok <- identical(c[[2]], c[[3]])
+  if (!ok) fail <- fail + 1L
+  message(sprintf("%-26s expected %2d  got %2d  %s", c[[1]], c[[3]], c[[2]],
+                  if (ok) "ok" else "FAIL"))
+}
 
 # --count-only reads nothing and writes nothing.
 o2 <- file.path(root, "count.json")

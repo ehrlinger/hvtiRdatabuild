@@ -194,7 +194,21 @@ rerun and does not need to be on this account.
 
 ## Not yet run
 
-A rerun of `build-structure-scan.R` and `macro-drift-scan.R` with the corrected
-fingerprint. A join between `log-verifiability.json` and `lst-listing.json` to
-measure how many studies have BOTH rung 1 and rung 3, which neither file can
-answer alone.
+⚠️ **Every committed artifact predates the review fixes of 2026-09-06 17:15 and
+should be regenerated before its numbers are quoted further.** Specifically:
+
+- `build-structure.json` and `macro-drift.json` used a fingerprint with
+  DEMONSTRATED collisions (`abba` and `baab` produced the same value), so their
+  `distinct_bodies` are undercounts with no bound. Both now use md5 where
+  `digest` is available.
+- `log-verifiability.json` and `lst-listing.json` attributed studies AFTER
+  skipping oversized files, so `with_any_log` (1,204) and `with_any_listing`
+  (1,267) can undercount studies whose only file was oversized.
+- `build-structure.json` also described its population as "builds" when it is
+  every `.sas` file under `datasets/`; the field is renamed and now reports how
+  many carry a DATA or PROC step at all.
+
+Also outstanding: a join between `log-verifiability.json` and `lst-listing.json`
+to measure how many studies have BOTH rung 1 and rung 3, which neither answers
+alone; and a `NIMPUTE` scan of the direct `PROC MI` population, which the macro
+scans never covered.
