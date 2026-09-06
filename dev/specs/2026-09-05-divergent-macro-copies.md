@@ -200,10 +200,17 @@ time, so an offsetting pair would leave the totals identical either way.
 
 Measured instead, by a rerun on 2026-09-05 at 17:04 emitting counters for it:
 **`positional_in_mixed_call` is 0**, and so are `mixed_form_calls` and
-`nimpute_from_positional`. There are no mixed positional-and-keyword calls in
-this corpus at all, and no call supplies `NIMPUTE` by position. The defect was
-inert here. A full diff of that run against the previous one moves nothing but
-the timestamp and the three new fields.
+`nimpute_from_positional`.
+
+⚠️ **Scoped to what those counters count.** They increment only for calls to a
+macro binding `NIMPUTE` through a parameter, inside the studies carrying a
+stem-matched definition. So zero says none of the **939 parameterised `NIMPUTE`
+calls** is mixed-form or supplies its value by position. It does not say that no
+mixed positional-and-keyword call exists anywhere in the corpus, and it must not
+be quoted as a syntax census.
+
+Within that population the defect was inert. A full diff of that run against the
+previous one moves nothing but the timestamp and the three new fields.
 
 ## 5. Where this is heading
 
