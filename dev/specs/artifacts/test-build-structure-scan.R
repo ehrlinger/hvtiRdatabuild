@@ -35,11 +35,13 @@ put <- function(study, file, lines) {
 # Two distinct bodies, ONE step shape. The gap between those two counts is how
 # much of the corpus variation is cosmetic, which is the number S2 needs.
 put("cardiac/alpha", "build.sas",
-    c("data one; set src.raw;", "run;",
+    c("libname src '/invented/mount/alpha';",
+      "data one; set src.raw;", "run;",
       "proc sort data=one; by id;", "run;",
       "proc means data=one;", "run;"))
 put("cardiac/beta", "build.sas",
-    c("data two; set src.other;", "run;",
+    c("libname src '/invented/mount/beta';",
+      "data two; set src.other;", "run;",
       "proc sort data=two; by key;", "run;",
       "proc means data=two;", "run;"))
 
@@ -50,13 +52,22 @@ put("thoracic/gamma", "build.sas",
 
 # delta composes: it includes another file and calls a macro.
 put("cardiac/delta", "build.sas",
-    c("%include 'vars.sas';", "%vars(data=d);",
+    c("libname src '/invented/mount/delta';",
+      "%include 'vars.sas';", "%vars(data=d);",
       "data d; set src.raw;", "run;"))
 
-# ⚠️ epsilon reads a library only IT uses. Below the floor, so its name must not
-# be emitted: a one-study libref is not an institutional source.
+# ⚠️ epsilon reads a library only IT uses, and points it at a path only it uses.
+# Both are below the floor and neither may be emitted: a one-study alias is not
+# an institutional source, and a one-study path is a study identifier.
 put("cardiac/eps", "build.sas",
-    c("data e; set privatelib.thing;", "run;"))
+    c("libname privatelib '/someones/private/corner';",
+      "data e; set privatelib.thing;", "run;"))
+
+# ⚠️ A build OUTSIDE the taxonomy folder. Folder scoping must exclude it, so
+# nothing here reaches any count.
+d <- file.path(root, "cardiac/outside", "notafolder")
+dir.create(d, recursive = TRUE, showWarnings = FALSE)
+writeLines(c("data x; set excluded.thing;", "run;"), file.path(d, "build.sas"))
 
 # ---- run --------------------------------------------------------------------
 
@@ -64,7 +75,7 @@ outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
 res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
                           "--root", shQuote(root), "--out", shQuote(outfile),
-                          "--min-libref", "2"),
+                          "--min-libref", "2", "--path-depth", "2"),
                stdout = TRUE, stderr = TRUE)
 if (!file.exists(outfile)) { cat(res, sep = "\n"); stop("scan produced no output") }
 raw <- readLines(outfile)
@@ -114,6 +125,24 @@ if (grepl("privatelib", j, fixed = TRUE)) {
 # `whse` is read by gamma only, also below the floor.
 if (grepl("\"name\": \"whse\"", j)) {
   message("FAIL  whse is below the floor and was emitted"); fail <- fail + 1L
+}
+
+# ⭐ THE UPSTREAM ASSERTION. Three studies point a LIBNAME at /invented/mount/...,
+# so the two-component prefix clears a floor of 2 and is reported. This is what
+# the libref alias could not tell us.
+if (!grepl("/invented/mount", j, fixed = TRUE)) {
+  message("FAIL  the shared LIBNAME target was not reported"); fail <- fail + 1L
+} else message(sprintf("%-24s %s", "shared LIBNAME reported", "ok"))
+
+# ⚠️ AND THE FLOOR ON PATHS. epsilon's path is used by one study and must not
+# appear: a one-study path is a study identifier, not an institutional mount.
+if (grepl("someones", j, fixed = TRUE) || grepl("private/corner", j, fixed = TRUE)) {
+  message("FAIL  a one-study LIBNAME path was emitted"); fail <- fail + 1L
+} else message(sprintf("%-24s %s", "one-study path withheld", "ok"))
+
+# ⚠️ And the folder scope excluded the build outside the taxonomy folder.
+if (grepl("excluded", j, fixed = TRUE)) {
+  message("FAIL  a build outside the taxonomy folder was scanned"); fail <- fail + 1L
 }
 
 # PROC names are reported; `sort`, `means` and `freq` all appear.

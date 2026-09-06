@@ -100,12 +100,21 @@ inspect <- function(path) {
     lines <- tryCatch(suppressWarnings(readLines(con, n = chunk, warn = FALSE)),
                       error = function(e) character(0))
     if (!length(lines)) break
-    lines <- tolower(lines)
+    # ⭐ Cheap prefilter FIRST, as `log-verifiability-scan.R` learned to do.
+    # Lowercasing every line and then running three patterns over it spends
+    # nearly all its time on listing rows that cannot match. Every heading this
+    # scan looks for contains one of these fragments, chosen to be
+    # case-insensitive WITHOUT the cost of ignore.case: "Procedure" and
+    # "procedure" both contain "rocedure", "Estimates" and "estimates" both
+    # contain "stimates".
+    keep <- grepl("rocedure|stimates|ariance|^ *[Oo]bs ", lines)
+    if (!any(keep)) { rm(lines, keep); next }
+    lines <- tolower(lines[keep])
     if (!has[["model"]] && any(grepl(RE_MODEL, lines))) has[["model"]] <- TRUE
     if (!has[["print"]] && any(grepl(RE_PRINT, lines))) has[["print"]] <- TRUE
     if (!has[["proc"]]  && any(grepl(RE_ANYPROC, lines))) has[["proc"]] <- TRUE
-    if (all(has)) { rm(lines); break }   # nothing left to learn from this file
-    rm(lines)                            # nothing survives the chunk but flags
+    if (all(has)) { rm(lines, keep); break }  # nothing left to learn here
+    rm(lines, keep)                      # nothing survives the chunk but flags
   }
   list(model = has[["model"]], print = has[["print"]], proc = has[["proc"]])
 }
