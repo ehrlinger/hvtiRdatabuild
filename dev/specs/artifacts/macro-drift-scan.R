@@ -118,25 +118,31 @@ if (!is.na(max_files) && length(files) > max_files) {
           "Bound by --root instead to answer the question.")
 }
 
-# ---- fingerprint ------------------------------------------------------------
-# Three statistics over the text. See the header: cheap, bounded in memory, and
-# not a uniqueness claim.
+# ---- fingerprint --------------------------------------------------------------
+# ⚠️ THE EARLIER FINGERPRINT COLLIDED, AND NOT ONLY IN THEORY. It was three
+# statistics -- length, character sum, position-weighted character sum -- and
+# both sums are SYMMETRIC under swapping a pair of characters around the centre,
+# so `fingerprint("abba")` and `fingerprint("baab")` returned the same value.
+# Distinct bodies could therefore merge, making `distinct_bodies` an UNDERCOUNT
+# WITH NO BOUND. An earlier note said the overflow fix left the counts unchanged;
+# that was true of overflow and said nothing about collisions, which were always
+# the larger risk and were never tested.
+#
+# ⭐ Use a real digest where one exists. `digest` is present on this corpus's
+# server and gives md5; the fallback keeps the machine running where it is not,
+# and the output RECORDS WHICH RAN so a count is never read as stronger than the
+# function that produced it.
+.fp_digest <- requireNamespace("digest", quietly = TRUE)
+fingerprint_method <- if (.fp_digest) "md5" else "weighted-sums (COLLISION-PRONE)"
 fingerprint <- function(x) {
-  if (!nzchar(x)) return("0-0-0")
-  # ⚠️ as.numeric BEFORE multiplying. `v * seq_along(v)` on an INTEGER vector
-  # overflows once any element exceeds 2^31, which needs a file of roughly 17
-  # million characters. That yields NA for the element and NA for the sum, so
-  # the third component collapses and two different files can share a
-  # fingerprint. Observed 2026-09-06 as "NAs produced by integer overflow" on a
-  # 38,878-file run, so at least one file in this corpus is that large.
-  #
-  # ⚠️ How much it moved the counts is UNMEASURED. Checked to 2.4 million
-  # characters, integer and numeric agree exactly, so only the largest files are
-  # affected and the effect is an UNDERCOUNT of distinct bodies rather than an
-  # overcount. Any body-count from a run before this fix carries that caveat.
-  v <- as.numeric(utf8ToInt(x))
-  paste(length(v), sum(v) %% 2147483647,
-        sum(v * seq_along(v)) %% 2147483647, sep = "-")
+  if (!nzchar(x)) return("empty")
+  if (.fp_digest) return(digest::digest(x, algo = "md5"))
+  # ⚠️ Fallback only. A fourth statistic weighted by the SQUARE of position
+  # breaks the symmetric-swap class above, but this is still not a hash and
+  # collisions are not excluded. `fingerprint_method` says so in the output.
+  v <- as.numeric(utf8ToInt(x)); i <- seq_along(v)
+  paste(length(v), sum(v) %% 2147483647, sum(v * i) %% 2147483647,
+        sum(v * i * i) %% 2147483647, sep = "-")
 }
 
 # ---- walk -------------------------------------------------------------------

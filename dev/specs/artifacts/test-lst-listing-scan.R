@@ -108,6 +108,25 @@ if (!grepl("\"emits_listing_values\": false", j)) {
 }
 if (!fail) message(sprintf("%-26s %s", "no listing text in output", "ok"))
 
+# ⚠️ THE OVERSIZED ASSERTION, as in the log fixture. With a ceiling so small
+# every listing is skipped, no content metric may fire and yet every study must
+# still count as having a listing. Under the old ordering this collapsed to 0.
+o3 <- file.path(root, "tiny.json")
+system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
+                   "--out", shQuote(o3), "--max-lst-mb", "0.000001"),
+        stdout = FALSE, stderr = FALSE)
+jt <- paste(readLines(o3), collapse = " ")
+numt <- function(f) as.integer(sub(".*: *", "",
+  regmatches(jt, regexpr(paste0("\"", f, "\": *-?[0-9]+"), jt))))
+for (c in list(list("all-oversized: read", numt("read"), 0L),
+               list("all-oversized: any listing", numt("with_any_listing"), 5L),
+               list("all-oversized: model", numt("with_a_model_listing"), 0L))) {
+  ok <- identical(c[[2]], c[[3]])
+  if (!ok) fail <- fail + 1L
+  message(sprintf("%-28s expected %2d  got %2d  %s", c[[1]], c[[3]], c[[2]],
+                  if (ok) "ok" else "FAIL"))
+}
+
 o2 <- file.path(root, "count.json")
 system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
                    "--out", shQuote(o2), "--count-only"),

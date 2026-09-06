@@ -56,6 +56,21 @@ put("cardiac/delta", "build.sas",
       "%include 'vars.sas';", "%vars(data=d);",
       "data d; set src.raw;", "run;"))
 
+# ⚠️ zeta exercises the macro-call metric in both directions. `%sysfunc(...)` is
+# a BUILT-IN FUNCTION and must not count as composition; `%refresh;` is a
+# parameterless USER call and must; and `%helper()` inside a %macro body is a
+# definition's internals, not the build's flow.
+put("cardiac/zeta", "build.sas",
+    c("%let n = %sysfunc(today());",
+      "%macro inner(); %helper(); %mend;",
+      "%refresh;",
+      "data z; set src.raw;", "run;"))
+
+# ⚠️ eta has NO steps at all, only an include. It must not be counted among the
+# files carrying a DATA or PROC step: the earlier version called every file in
+# the folder a build, and `steps_min = 0` was the evidence against that.
+put("cardiac/eta", "build.sas", c("%include 'other.sas';"))
+
 # ⚠️ epsilon reads a library only IT uses, and points it at a path only it uses.
 # Both are below the floor and neither may be emitted: a one-study alias is not
 # an institutional source, and a one-study path is a study identifier.
@@ -99,18 +114,24 @@ num <- function(field) {
 }
 
 expected <- list(
-  files = 8L,
-  studies = 8L,
+  files = 10L,
+  studies = 10L,
   # alpha/beta differ in text, gamma, delta, eps, and the three identical i* ones
-  distinct_bodies = 6L,
+  distinct_bodies = 8L,
   # ⭐ THREE shapes from five builds: `data>sort>means` (alpha and beta, whose
   # text differs), `data>freq` (gamma), and a bare `data` (delta and eps).
   # ⚠️ delta and eps share a shape although their text does not: %include and a
   # macro call are not steps, so delta reduces to its one DATA step. That is the
   # metric working rather than failing. Five distinct bodies, three shapes.
-  distinct_step_shapes = 3L,
-  uses_include = 1L,
-  calls_a_macro = 1L
+  # data>sort>means, data>freq, bare data, and eta's empty shape
+  distinct_step_shapes = 4L,
+  # ⭐ eta has none; every other file has at least one
+  files_with_at_least_one_step = 9L,
+  files_with_no_steps = 1L,
+  uses_include = 2L,
+  # ⭐ delta's %vars(...) and zeta's parameterless %refresh;. NOT zeta's
+  # %sysfunc (a built-in) and NOT %helper (inside a %macro body).
+  calls_a_user_macro = 2L
 )
 
 fail <- 0L

@@ -105,7 +105,7 @@ if (nzchar(folder_scope)) {
   # Keep files sitting under a directory of that name, at any depth.
   files <- files[grepl(paste0("/", folder_scope, "/"), files, fixed = TRUE)]
 }
-message("candidate builds: ", length(files),
+message("candidate files: ", length(files),
         "  (folder: ", if (nzchar(folder_scope)) folder_scope else "any",
         ", stem: ", if (nzchar(stem)) stem else "any", ")")
 if (count_only) {
@@ -113,22 +113,44 @@ if (count_only) {
   quit(save = "no", status = 0)
 }
 
+# ---- fingerprint --------------------------------------------------------------
+# ⚠️ THE EARLIER FINGERPRINT COLLIDED, AND NOT ONLY IN THEORY. It was three
+# statistics -- length, character sum, position-weighted character sum -- and
+# both sums are SYMMETRIC under swapping a pair of characters around the centre,
+# so `fingerprint("abba")` and `fingerprint("baab")` returned the same value.
+# Distinct bodies could therefore merge, making `distinct_bodies` an UNDERCOUNT
+# WITH NO BOUND. An earlier note said the overflow fix left the counts unchanged;
+# that was true of overflow and said nothing about collisions, which were always
+# the larger risk and were never tested.
+#
+# ⭐ Use a real digest where one exists. `digest` is present on this corpus's
+# server and gives md5; the fallback keeps the machine running where it is not,
+# and the output RECORDS WHICH RAN so a count is never read as stronger than the
+# function that produced it.
+.fp_digest <- requireNamespace("digest", quietly = TRUE)
+# Macro-language keywords and built-in functions that can open a statement.
+# ⚠️ Not exhaustive: SAS has many built-ins, and this list covers the ones that
+# appear statement-initially. A name missing from it is counted as a user macro,
+# so the metric errs toward over-counting composition rather than under.
+SAS_MACRO_WORDS <- c(
+  "macro", "mend", "let", "if", "then", "else", "do", "end", "to", "by",
+  "while", "until", "global", "local", "return", "goto", "put", "abort",
+  "include", "run", "quit", "sysfunc", "qsysfunc", "sysevalf", "eval",
+  "str", "nrstr", "quote", "nrquote", "bquote", "nrbquote", "unquote",
+  "scan", "qscan", "substr", "qsubstr", "upcase", "lowcase", "length",
+  "index", "sysget", "symexist", "symglobl", "symlocal", "syscall",
+  "window", "display", "input", "sysrc", "superq", "unquote")
+
+fingerprint_method <- if (.fp_digest) "md5" else "weighted-sums (COLLISION-PRONE)"
 fingerprint <- function(x) {
-  if (!nzchar(x)) return("0-0-0")
-  # ⚠️ as.numeric BEFORE multiplying. `v * seq_along(v)` on an INTEGER vector
-  # overflows once any element exceeds 2^31, which needs a file of roughly 17
-  # million characters. That yields NA for the element and NA for the sum, so
-  # the third component collapses and two different files can share a
-  # fingerprint. Observed 2026-09-06 as "NAs produced by integer overflow" on a
-  # 38,878-file run, so at least one file in this corpus is that large.
-  #
-  # ⚠️ How much it moved the counts is UNMEASURED. Checked to 2.4 million
-  # characters, integer and numeric agree exactly, so only the largest files are
-  # affected and the effect is an UNDERCOUNT of distinct bodies rather than an
-  # overcount. Any body-count from a run before this fix carries that caveat.
-  v <- as.numeric(utf8ToInt(x))
-  paste(length(v), sum(v) %% 2147483647,
-        sum(v * seq_along(v)) %% 2147483647, sep = "-")
+  if (!nzchar(x)) return("empty")
+  if (.fp_digest) return(digest::digest(x, algo = "md5"))
+  # ⚠️ Fallback only. A fourth statistic weighted by the SQUARE of position
+  # breaks the symmetric-swap class above, but this is still not a hash and
+  # collisions are not excluded. `fingerprint_method` says so in the output.
+  v <- as.numeric(utf8ToInt(x)); i <- seq_along(v)
+  paste(length(v), sum(v) %% 2147483647, sum(v * i) %% 2147483647,
+        sum(v * i * i) %% 2147483647, sep = "-")
 }
 
 studies <- study_of(files)
@@ -170,7 +192,20 @@ for (i in seq_along(files)) {
   shapes <- c(shapes, fingerprint(paste(seq_steps, collapse = ">")))
 
   if (any(grepl("^ *%include", st))) n_include <- n_include + 1L
-  if (any(grepl("^ *%[a-z0-9_]+ *\\(", st))) n_macrocall <- n_macrocall + 1L
+  # ⚠️ USER MACRO CALLS ONLY. The earlier test was `^ *%[a-z0-9_]+ *\\(`, which
+  # counted built-in macro FUNCTIONS such as %sysfunc(), %scan() and %str() as
+  # composition, missed parameterless invocations like `%refresh;`, and matched
+  # inside macro DEFINITIONS as well as at top level. It did not measure whether
+  # a build composes.
+  #
+  # Now: a statement-initial %name, with or without parentheses, that is neither
+  # a macro-language keyword nor a built-in function, and not inside a %macro
+  # body. The built-in list is not exhaustive; SAS has many, and the ones that
+  # appear at the start of a statement are the ones that matter here.
+  in_macro <- cumsum(grepl("^ *%macro\\b", st)) - cumsum(grepl("^ *%mend\\b", st))
+  cand <- grepl("^ *%[a-z0-9_]+", st) & in_macro <= 0L
+  nm_of <- sub("^ *%([a-z0-9_]+).*$", "\\1", st)
+  if (any(cand & !nm_of %in% SAS_MACRO_WORDS)) n_macrocall <- n_macrocall + 1L
 
   # The libref a SET, MERGE or FROM reads. ⚠️ A LIBREF IS AN ALIAS AND NAMES
   # NOTHING. The first run returned `library` in 74 studies and `lib` in 21,
@@ -241,6 +276,7 @@ out <- list(
     folder   = folder_scope,
     stem     = stem,
     path_depth = path_depth,
+    fingerprint = fingerprint_method,
     hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     files_considered = length(files),
@@ -249,9 +285,20 @@ out <- list(
     emits_names = emit_names,
     libref_floor_studies = min_libref
   ),
-  builds = list(
+  # ⚠️ NOT "BUILDS". This is every readable `.sas` file under the scoped folder,
+  # which includes macro libraries, included fragments, configuration and other
+  # support source. An earlier version called all 38,877 of them builds and drew
+  # a conclusion about build variety from that; `steps_min = 0` was already the
+  # evidence against it, sitting in the same output. No build-job criterion has
+  # been established, so the population is described as what it is.
+  sas_files_in_folder = list(
     files   = n_read,
     studies = length(unique(stu_seen)),
+    # ⭐ Files carrying at least one DATA or PROC step. The nearest thing to a
+    # build criterion available without one being defined, and the honest
+    # denominator for the shape counts below.
+    files_with_at_least_one_step = sum(n_steps > 0L),
+    files_with_no_steps          = sum(n_steps == 0L),
     # ⭐ How much there is to implement. `distinct_step_shapes` counts builds by
     # their SEQUENCE OF STEPS, so two builds doing the same things in the same
     # order are one shape however their text differs. `distinct_bodies` counts
@@ -263,7 +310,9 @@ out <- list(
     steps_median = if (length(n_steps)) as.numeric(stats::median(n_steps)) else NA_real_,
     steps_max    = if (length(n_steps)) max(n_steps) else 0L,
     uses_include    = n_include,
-    calls_a_macro   = n_macrocall
+    # ⚠️ Renamed: it counts files calling a USER macro at statement level,
+    # outside a %macro body. See the note at the call site.
+    calls_a_user_macro = n_macrocall
   ),
   # ⭐ The upstream question: which libraries a build reads from, by how many
   # studies read each. Floored, so a one-study name is not reported.
@@ -277,14 +326,18 @@ out <- list(
 
 writeLines(to_json(out), outfile)
 
-message("\n--- BUILDS ---")
-message("files / studies:        ", out$builds$files, " / ", out$builds$studies)
-message("distinct bodies:        ", out$builds$distinct_bodies)
-message("⭐ distinct step shapes: ", out$builds$distinct_step_shapes)
-message("steps per build:        ", out$builds$steps_min, " / ",
-        out$builds$steps_median, " / ", out$builds$steps_max, "  (min/median/max)")
-message("uses %include:          ", out$builds$uses_include)
-message("calls a macro:          ", out$builds$calls_a_macro)
+b <- out$sas_files_in_folder
+message("\n--- SAS FILES IN THE SCOPED FOLDER (not 'builds') ---")
+message("files / studies:        ", b$files, " / ", b$studies)
+message("  with >=1 DATA/PROC step: ", b$files_with_at_least_one_step,
+        "   with none: ", b$files_with_no_steps)
+message("distinct bodies:        ", b$distinct_bodies, "  (fingerprint: ",
+        fingerprint_method, ")")
+message("⭐ distinct step shapes: ", b$distinct_step_shapes)
+message("steps per file:         ", b$steps_min, " / ",
+        b$steps_median, " / ", b$steps_max, "  (min/median/max)")
+message("uses %include:          ", b$uses_include)
+message("calls a user macro:     ", b$calls_a_user_macro)
 show <- function(label, blk, w) {
   message("\n--- ", label, " ---")
   message("  distinct: ", blk$distinct,
