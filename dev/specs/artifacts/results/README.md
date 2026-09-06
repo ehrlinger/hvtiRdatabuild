@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All six below used 1.1.9 over `/studies`.
+match. All thirteen below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -22,6 +22,13 @@ match. All six below used 1.1.9 over `/studies`.
 | `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
 | `reconcile-scan.json` | which macro names disagree, and at what cost | 2026-09-05 14:43 |
 | `studylocal-scan.json` | ⭐ NIMPUTE per the calling study's own copy | 2026-09-05 14:59 |
+| `macro-drift.json` | is the copy drift imputation's or the corpus's | 2026-09-06 09:17 |
+| `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
+| `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
+| `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
+| `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
+| `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
+| `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -114,8 +121,80 @@ under-scoped by roughly four, which makes the per-macro figures lower bounds and
 puts the "no local copy" population in `studylocal-scan.json` in doubt. See
 section 4b of `../../2026-09-05-divergent-macro-copies.md`.
 
+## The two `-wide` files, and why their denominators differ
+
+`nimpute-wide.json` and `studylocal-wide.json` (2026-09-06) rerun their scans
+with `--defs-scope corpus`, taking definitions from all 227,783 `.sas` files
+rather than the 1,134 named after the stems.
+
+⚠️ **They used the coupled build, so their call population widened too**, from
+104,666 candidate files to 226,957. That is why `calls` reads 1,769 rather than
+939, and it means a change between a `-wide` file and its stem-scope counterpart
+cannot be attributed to the definition scope alone. `--calls-scope` decouples the
+two for any future run; these predate it. The wider call population is the better
+measurement regardless, since 939 was itself scoped by the assumption this work
+disproved.
+
+⭐ The comparison worth reading is between the two `-wide` files themselves, over
+the SAME 1,769 calls: the corpus-wide map settles 587 of them, the study-local
+map settles 1,674.
+
+`studylocal-defsonly.json` is the controlled version, run after `--calls-scope`
+existed: wide definitions, calls held at 939. It isolates the definition scope,
+which halves the undeterminable residual from 129 to 65 on its own.
+
+## `log-verifiability.json` and the 38 it skipped
+
+⚠️ 38 of 50,608 logs exceeded the 200 MB ceiling and were skipped, so every
+figure in that file excludes them. The count is in the provenance rather than
+absorbed silently. An earlier attempt without the ceiling pinned a core for
+twenty minutes on one large log; the prefilter did most of the eventual speedup
+and the ceiling caught the remainder.
+
+## 🔴 `build-structure.json` was committed and withdrawn
+
+⚠️ **It disclosed identifiers, against its own scan's stated contract.** It
+emitted `/home/mgoormas`, a personal home directory naming an individual, and
+`st1027`, a study identifier used as a libref by 247 studies. A background
+security review caught it; I did not.
+
+⭐ **The frequency floor was the wrong instrument, and that is the lesson.** It
+assumed an identifying name is a RARE name. A shared reference to one study's
+library is common AND identifying, so no floor could ever have caught it, and
+`st1027` cleared a floor of 5 by a factor of fifty.
+
+The scan now rejects the shapes that can be enumerated (personal directories,
+study identifiers) and, because that list cannot be complete, ⭐ **emits no names
+at all by default**. `--emit-names` turns them on for someone who will read the
+output before committing it, and rejected entries are counted so a reader knows
+something was withheld rather than absent.
+
+⚠️ The file was removed from the working tree but remains in this repository's
+git history, in the commits between `b2c6ad8` and its removal.
+
+**Replaced 2026-09-06 16:29 by a counts-only rerun**, which is the file committed
+here. ⭐ **The filter caught six identifying names on real data**: three librefs
+and three `LIBNAME` targets that cleared the frequency floor, so four more than
+the two spotted by eye would have gone out.
+
+## The fingerprint overflow changed nothing, now measured
+
+The withdrawn run emitted `NAs produced by integer overflow` from the body
+fingerprint: `v * seq_along(v)` on an integer vector overflows once an element
+exceeds 2^31, needing a file of roughly 17 million characters. It was recorded
+here as an undercount of `distinct_bodies` "by an unmeasured amount".
+
+⭐ **Measured: the amount is zero.** The corrected rerun returns 22,989 distinct
+bodies and 6,994 step shapes, identical to the run that warned. The warning was
+real and no count moved.
+
+`macro-drift.json` used the same function, and the same reasoning applies with
+more margin, since macro bodies are far smaller than whole files. It has not been
+rerun and does not need to be on this account.
+
 ## Not yet run
 
-An imputation definition pass over every `.sas` file rather than the stem-matched
-ones. The drift scan has shown that is about an hour, not the prohibitive job it
-was assumed to be.
+A rerun of `build-structure-scan.R` and `macro-drift-scan.R` with the corrected
+fingerprint. A join between `log-verifiability.json` and `lst-listing.json` to
+measure how many studies have BOTH rung 1 and rung 3, which neither file can
+answer alone.

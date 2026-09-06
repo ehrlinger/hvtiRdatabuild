@@ -212,6 +212,99 @@ be quoted as a syntax census.
 Within that population the defect was inert. A full diff of that run against the
 previous one moves nothing but the timestamp and the three new fields.
 
+### 4c. The wide-definition reruns, 2026-09-06
+
+Section 4b's residual was judged against definitions taken from files NAMED after
+the stems. Rerun with `--defs-scope corpus`, reading all 227,783 `.sas` files:
+
+| route | stem scope | corpus scope |
+|---|---|---|
+| calls | 939 | 1,769 |
+| the call states the value | 292 | 561 |
+| the calling study's own copy settles it | 518 | 1,113 |
+| the study's own copies disagree | 38 | 54 |
+| ⭐ the study holds no copy | **91** | **40** |
+| determinate | 810 (86%) | **1,674 (95%)** |
+
+⭐ **Of the 1,674 determinate calls, 1,665 are multiple imputation and 9 are
+single.** The undeterminable share falls from 129 to 94.
+
+⚠️ **My prediction was wrong and is on the record.** Before the run I said the 91
+would fall "only modestly", reasoning from pass 1 that the wider scope adds
+copies rather than macros. It more than halved, to 40. Those studies did hold
+their own definitions, in files not named after the stem.
+
+### 4c-controlled. The definition scope alone, 2026-09-06
+
+The two runs above moved the call population as well as the definition
+population, so their improvement could not be attributed. `--calls-scope` holds
+calls at the historical 104,666 files while definitions come from all 227,783:
+
+| route | defs `stems` | defs `corpus` | change |
+|---|---|---|---|
+| calls | 939 | 939 | none, by construction |
+| the call states the value | 292 | 292 | none |
+| the calling study's own copy settles it | 518 | 582 | +64 |
+| the study's own copies disagree | 38 | 54 | +16 |
+| ⭐ the study holds no copy | **91** | **11** | **-80** |
+| determinate | 810 (86%) | **874 (93%)** | +64 |
+| undeterminable | 129 | **65** | halved |
+
+⭐ **80 of the 91 studies that appeared to hold no definition of the macro they
+called did hold one, in a file not named after the stem.** Only 11 genuinely have
+none. That is the whole effect of the scoping error, isolated: it halves the
+undeterminable residual on its own.
+
+⚠️ **My prediction was wrong again, in the same direction.** I put the 91 at
+"20 to 45" and it came in at 11. Twice now I have underestimated how much the
+definition scope mattered, having first assumed the stem-named files were where
+definitions lived at all.
+
+Setting the three runs side by side decomposes the improvement cleanly:
+
+| | calls | determinate | undeterminable |
+|---|---|---|---|
+| defs `stems`, calls 939 | 939 | 810 (86%) | 129 |
+| defs `corpus`, calls 939 | 939 | 874 (93%) | 65 |
+| defs `corpus`, calls 1,769 | 1,769 | 1,674 (95%) | 94 |
+
+The definition scope takes the residual from 129 to 65. The wider call population
+then finds 830 more calls, most of them resolvable, which is why the third row
+has both a higher percentage and a larger absolute residual than the second.
+
+### 4d. The same calls, resolved two ways
+
+The corpus-wide run over the same 1,769 calls reports **587 determinate, 33%**,
+against the study-local run's **1,674, 95%**.
+
+⭐ **That is the whole thesis in one comparison.** Nothing about the corpus
+changed between those two numbers. The only difference is whether a call is
+resolved against a map keyed by macro name across the whole corpus or against
+the copy sitting in the study that made it. The first manufactures ambiguity that
+the second does not have.
+
+⚠️ Two things the corpus-wide run adds that the stem-scoped one could not see,
+and both are worse rather than better news about the code:
+
+- `conflicting_redefinitions` is **5**, where the stem scope reported **0**. Five
+  macro names bind `NIMPUTE` to a different EXPRESSION across their copies, not
+  merely to a different default.
+- `conflicting_default_straddles_1` collapses from 619 to 5, and
+  `conflicting_default_unresolvable` rises from 0 to 1,174. The wider scope finds
+  copies declaring an EMPTY `nimpute=`, so for those macros the candidate values
+  cannot even be enumerated. ⭐ That is a worse epistemic position than a
+  straddle, not a better one: "ambiguous between known values" became "the values
+  are not knowable from the definitions".
+
+⚠️ **These two runs used the COUPLED build, and their denominators are not
+comparable with the committed stem-scope results.** `--defs-scope` moved the call
+population as well as the definition population, from 104,666 candidate files to
+226,957, which is why `calls` is 1,769 rather than 939. The wider call population
+is the better measurement, since 939 was itself scoped by the assumption this
+work disproved. But the improvement from 86% to 95% cannot be attributed to the
+definition fix alone, because both changed at once. `--calls-scope` now decouples
+them for any future run.
+
 ## 5. Where this is heading
 
 ⚠️ **This section and section 6 were written before the worksheet and the

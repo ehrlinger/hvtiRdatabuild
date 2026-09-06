@@ -1,0 +1,27 @@
+{
+  "_provenance": {
+    "script": "lst-listing-scan.R",
+    "question": "what was filed, and can it check a port at rung 3?",
+    "run_at": "2026-09-06T15:40:53-0400",
+    "root": "/studies",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "listings_considered": 49307,
+    "listings_unreadable": 0,
+    "listings_oversized": 14,
+    "max_lst_mb": 200,
+    "contains_identifiers": false,
+    "emits_listing_values": false
+  },
+  "listings": {
+    "read": 49293,
+    "with_model_listing": 8397,
+    "with_print_output": 35735,
+    "with_any_procedure": 36622,
+    "with_nothing_recognised": 3126
+  },
+  "studies": {
+    "with_any_listing": 1267,
+    "with_a_model_listing": 676
+  }
+}

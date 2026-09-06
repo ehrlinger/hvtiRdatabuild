@@ -1,0 +1,44 @@
+{
+  "_provenance": {
+    "script": "build-structure-scan.R",
+    "question": "what is a study's data build made of, and what does it read from?",
+    "run_at": "2026-09-06T16:29:59-0400",
+    "root": "/studies",
+    "folder": "datasets",
+    "stem": "",
+    "path_depth": 2,
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "files_considered": 38878,
+    "files_read": 38877,
+    "files_unreadable": 0,
+    "emits_names": false,
+    "libref_floor_studies": 5
+  },
+  "builds": {
+    "files": 38877,
+    "studies": 1456,
+    "distinct_bodies": 22989,
+    "distinct_step_shapes": 6994,
+    "steps_min": 0,
+    "steps_median": 8,
+    "steps_max": 606,
+    "uses_include": 3247,
+    "calls_a_macro": 17623
+  },
+  "librefs_read": {
+    "distinct": 55,
+    "withheld_as_identifying": 3,
+    "top": {}
+  },
+  "libname_targets": {
+    "distinct": 37,
+    "withheld_as_identifying": 3,
+    "top": {}
+  },
+  "procs_used": {
+    "distinct": 73,
+    "withheld_as_identifying": 0,
+    "top": {}
+  }
+}

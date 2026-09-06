@@ -1,7 +1,16 @@
 # Scoping HVTR's cohort metadata, from measurement
 
 **Date:** 2026-09-06
-**Status:** scoping. **Not a design.** HVTR has no shape yet, and this note is
+**Status:** scoping. **Not a design.**
+⚠️ **Retitled in scope 2026-09-06:** an earlier draft framed HVTR as a cohort
+metadata layer and cast the lead question as descriptive versus prescriptive
+cohort definition. HVTR is larger than that. It is the governed clinical data
+platform for HVTI, successor to CVIR then SemanticDB then HVI_DM, pulling EMR and
+registries into one model with consistent variable definitions, provenance and
+IRB-governed access, replacing a patchwork of one-off extracts with a single
+trustworthy upstream. Cohort metadata is one slice. The measurements below still
+apply; the framing in §5 was too narrow and is marked where it is.
+HVTR has no shape yet, and this note is
 deliberately a collection of what has been measured plus the questions that
 measurement cannot settle.
 **Repo:** written into `hvtiRdatabuild` because every measurement it cites was
@@ -109,17 +118,78 @@ deliberately.
 ⚠️ **`build.sas` and `.lst` have not been scanned. The scan for each depends on
 which consumer it serves, and the two want different things over the same files.**
 
-### `build.sas`
+### `build.sas`, built 2026-09-06
 
-| built for | asks |
+⚠️ An earlier version of this section said the databuild and HVTR scans would be
+different, on the reading that HVTR wanted cohort criteria. With HVTR understood
+as the governed upstream, both consumers want the same description, for different
+reasons.
+
+[`artifacts/build-structure-scan.R`](artifacts/build-structure-scan.R) describes
+a build rather than interpreting it:
+
+| it reports | who needs it |
 |---|---|
-| databuild S2 | what steps recur, and how stereotyped, so `build_dataset()` knows what to build |
-| HVTR | what a study asserts about who is in and out, and how it expresses that |
+| step SHAPES against distinct bodies | ⭐ S2: how many builds to implement |
+| DATA steps and which PROCs, by study | S2: what `build_dataset()` must cover |
+| whether builds compose (`%include`, macros) | both |
+| ⭐ which LIBREFS builds read from | HVTR: what a governed upstream replaces |
 
-These are different scans. The first is a structure census in the shape of
-`macro-drift-scan.R`. The second reads cohort criteria, which is harder, and runs
-into §2's warning immediately: criteria expressed in code are only recoverable
-where the code says them plainly.
+⭐ **The step-shape count is the one to read first.** It fingerprints the ordered
+sequence of steps rather than the text, so two builds doing the same things in
+the same order are one shape however their variable names differ. If it comes
+back small, as `vars`'s 39 behaviours did, the build layer is describable.
+
+⚠️ It does not attempt cohort criteria, derivations or variable semantics. Those
+need a decision about what HVTR is before a scan can count the right thing, and a
+scan that guessed would produce a number answering neither consumer.
+
+⚠️ Librefs are emitted only above a frequency floor (`--min-libref`, default 5
+studies). A library alias used by one study is not an institutional source, and
+emitting it would widen the contract past what the scan claims.
+
+#### Run 2026-09-06, folder-scoped
+
+**38,877 files across 1,456 studies**, against 130 studies under the earlier
+filename scope. ⭐ **The earlier "82% of builds are unique" was a sampling
+artifact**: 38,877 files reduce to **6,994 distinct step shapes**, 18% rather
+than 82%. The build layer is far more stereotyped than the filename sample said.
+
+⚠️ **The artifact behind the figures below was withdrawn for disclosing
+identifiers**, and the figures are quoted from the console output rather than
+from a committed file. It emitted a personal home directory and a study
+identifier used as a libref by 247 studies. ⭐ The frequency floor could never
+have caught the second: it assumed an identifying name is a rare name, and a
+shared reference to one study's library is common and identifying at once. The
+scan now emits no names by default. See `artifacts/results/README.md`.
+
+⭐ **The `LIBNAME` targets answer the upstream question, and the answer is
+better than feared.** The dominant target is `/&study/datasets` in 1,286 studies,
+followed by `/&study` in 1,046 and `/&study/estimates` in 821. **Builds do not
+hardcode their paths; they parameterise them against a study macro variable.** A
+governed upstream replacing a convention is a far smaller job than one replacing
+1,456 hardcoded paths.
+
+🔴 **640 studies point a `LIBNAME` at uncustomised template boilerplate**: the
+literal text *"put the directory of your study here to save the output dataset"*.
+`/studies/xxxx` accounts for a further 196 and `/studies/xxxxxxxxx` for 15.
+Templates are copied wholesale and the placeholder is often never filled in,
+which is the same copy-without-adaptation pattern the macro drift census found,
+showing up in configuration rather than in code.
+
+⭐ **Two librefs name the warehouse directly:** `hvi_dm` in 277 studies and
+`warehouse` in 185. Those are studies reading the predecessor data model without
+an intermediary, which is exactly the population a governed upstream inherits.
+
+🔴 **And a number that reopens the imputation work again.** `PROC STANDARD`
+appears in **1,292** studies' `datasets` folders and `PROC MI` in **822**. The
+imputation scans found 223 studies calling `%imputsub` and 326 calling
+`%mult_imput`, because they counted MACRO CALLS. Direct `PROC MI` use appears to
+be roughly two and a half times more common than the macro. ⚠️ Not directly
+comparable: `PROC STANDARD` without `REPLACE` is not imputation and a `PROC MI`
+may be diagnostic. But the gap is far too large to be explained that way, and
+§2's study counts are scoped to macro calls in a corpus that largely does not
+use the macro.
 
 ### `.lst`
 
@@ -128,13 +198,67 @@ where the code says them plainly.
 | databuild | what values a port can be checked against |
 | HVTR | what was actually filed, as opposed to what the code would produce |
 
-⚠️ **`.lst` carries printed output and so may carry patient values**, exactly as
-`.log` does. `log-verifiability-scan.R` sets the pattern for that: a contract
-about what the scan is *capable* of emitting rather than what it chooses to,
-never retaining a line, and detecting the presence of a number without reading
-it. Any `.lst` scan inherits that or does not get written.
+[`artifacts/lst-listing-scan.R`](artifacts/lst-listing-scan.R), run 2026-09-06,
+is the rung-3 counterpart to the log scan's rung-1 figure.
 
-### `.log`, already built
+⭐ **676 of the 1,487 studies holding SAS code, 45%, have a listing carrying
+model coefficients**, against 79% holding a log that recorded a dataset shape.
+The verification ladder narrows sharply at the top.
+
+⚠️ **Nothing measures the overlap.** The two scans count independent populations,
+so a study may hold a listing and no usable log. 45% bounds the full ladder from
+above and is not an estimate of it. Measuring the intersection is a small join
+and has not been done.
+
+🔴 **A number that is not about verification at all: 35,735 listings, 72.5% of
+those read, appear to carry patient-level print output.** These are files on the
+share whose content is printed patient data by design. ⚠️ Read it as an upper
+bound: the detector matches the `PROC PRINT` heading OR a line beginning with
+`obs `, and the second is a heuristic that will over-match. The conservative
+figure was not separated out and should be. Even discounted, this belongs in
+front of whoever owns the share rather than only in a scan output, and it is
+directly relevant to an IRB-governed platform.
+
+🔴 **Its contract is stricter than the log scan's, for a stronger reason.** A
+`.log` may contain patient values incidentally. **A `.lst` IS the printed output**,
+and a `PROC PRINT` listing is patient data by design rather than by accident. So
+the scan never retains a line, reads no number, and ⚠️ **detects `PROC PRINT`
+output in order to count it without reading it.** Knowing how many listings are
+patient-level print-outs matters: those are the ones nobody should open
+casually.
+
+### `.log`, run 2026-09-06
+
+⭐ **79% of studies holding SAS code kept a log that recorded a dataset shape and
+did not error**: 1,180 studies of the 1,487 that hold any `.sas` file. Of the
+1,204 studies that kept any log at all, 1,180 kept a usable one, so retention is
+close to all-or-nothing per study rather than patchy within one.
+
+That is a far better position than the `vars` note feared, and it is the number
+its §6 has been asking for since 2026-09-02. For HVTR it bounds how much of the
+past can be described from evidence rather than inferred from code.
+
+⚠️ **Three limits, and the first is the largest.**
+
+**"Usable" means a shape was recorded, not that THE shape was.** Rung 1 wants
+rows and variables for a study's specific analysis dataset. This measures whether
+shape information exists in the study's logs at all, which is necessary and not
+sufficient. **79% is a ceiling on verifiability rather than an estimate of it.**
+
+🔴 **`vars` logs are useless for this, and the reason generalises.** 46 logs carry
+a `vars` stem, across a corpus holding 5,055 `vars.sas` copies, and **not one
+recorded a dataset shape**. The information exists, in the 48,209 logs under
+other names, because `vars.sas` is included into a larger job and its datasets
+are recorded in that job's log. ⭐ **Log naming does not follow the code that
+created the dataset**, so anything joining a port to its evidence has to work by
+content rather than by filename. That is the same lesson as `mult_imput`'s
+definitions, arriving from a different direction.
+
+**It measures logs that exist now, not logs that were produced.** A study that
+ran cleanly and was later tidied is indistinguishable from one that never kept a
+log. 38 logs were also skipped for exceeding the 200 MB ceiling.
+
+### `.log`, the scan
 
 [`artifacts/log-verifiability-scan.R`](artifacts/log-verifiability-scan.R)
 measures the fraction of studies that could have a port verified at rung 1, which

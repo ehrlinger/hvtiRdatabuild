@@ -61,6 +61,17 @@ root       <- normalise_root(getarg("--root", "/studies"))
 outfile    <- getarg("--out", "log-verifiability.json")
 count_only <- "--count-only" %in% args
 chunk      <- as.integer(getarg("--chunk", "20000"))
+# ⚠️ A per-file ceiling, in megabytes. Chunked reading bounds MEMORY and not
+# WORK: a single multi-gigabyte log -- a loop left running with OPTIONS MPRINT
+# would produce one -- reads for as long as it takes while the progress counter,
+# which ticks every 2,000 FILES, shows nothing at all. Observed 2026-09-06, when
+# a run sat at 8,000 of 50,608 while two larger scans on the same share ran to
+# completion, which is what ruled out contention.
+#
+# Oversized logs are SKIPPED AND COUNTED, never silently dropped: a scan that
+# quietly ignores its largest inputs reports a smaller corpus than it walked.
+# 0 disables the ceiling.
+max_mb     <- as.numeric(getarg("--max-log-mb", "200"))
 
 .folders <- taxonomy_folders()
 study_of <- study_of_factory(root, .folders)
@@ -91,6 +102,10 @@ RE_END   <- "^note: sas institute inc|^note: the sas system used"
 # holding one whole would be both wasteful and a larger PHI surface than
 # necessary. Each chunk is tested and dropped.
 inspect <- function(path) {
+  if (max_mb > 0) {
+    sz <- file.size(path)
+    if (!is.na(sz) && sz > max_mb * 1024^2) return("oversized")
+  }
   con <- tryCatch(file(path, "r", encoding = "latin1"), error = function(e) NULL)
   if (is.null(con)) return(NULL)
   on.exit(close(con), add = TRUE)
@@ -100,13 +115,21 @@ inspect <- function(path) {
     lines <- tryCatch(suppressWarnings(readLines(con, n = chunk, warn = FALSE)),
                       error = function(e) character(0))
     if (!length(lines)) break
-    lines <- tolower(lines)
+    # ⭐ Cheap anchored prefilter FIRST. Every line of interest begins with NOTE,
+    # ERROR or WARNING, and a SAS log run with OPTIONS MPRINT is mostly neither:
+    # it is program echo. Lowercasing every line and then running four patterns
+    # over it, one of them containing `.*`, spends nearly all its time on lines
+    # that cannot match. Observed 2026-09-06: a run pinned a core for twenty
+    # minutes on a single large log.
+    keep <- grepl("^(NOTE|ERROR|WARNING)", lines, ignore.case = TRUE)
+    if (!any(keep)) { rm(lines, keep); next }
+    lines <- tolower(lines[keep])
     hits <- grepl(RE_SHAPE, lines)
     if (any(hits)) { has[["shape"]] <- TRUE; n_shape <- n_shape + sum(hits) }
     if (!has[["error"]] && any(grepl(RE_ERROR, lines))) has[["error"]] <- TRUE
     if (!has[["warn"]]  && any(grepl(RE_WARN,  lines))) has[["warn"]]  <- TRUE
     if (any(grepl(RE_END, lines))) has[["end"]] <- TRUE
-    rm(lines, hits)                     # nothing survives the chunk but counters
+    rm(lines, hits, keep)               # nothing survives the chunk but counters
   }
   list(shape = has[["shape"]], n_shape = n_shape, error = has[["error"]],
        warn = has[["warn"]], end = has[["end"]])
@@ -120,8 +143,8 @@ stem_of <- rep("other", length(logs))
 for (nm in names(stems)) stem_of[grepl(stems[[nm]], base)] <- nm
 stu <- study_of(logs)
 
-n <- c(read = 0L, unreadable = 0L, shape = 0L, error = 0L, warn = 0L,
-       ended = 0L, usable = 0L)
+n <- c(read = 0L, unreadable = 0L, oversized = 0L, shape = 0L, error = 0L,
+       warn = 0L, ended = 0L, usable = 0L)
 shape_by_stem <- setNames(integer(length(stems) + 1L), c(names(stems), "other"))
 logs_by_stem  <- shape_by_stem
 usable_by_stem <- shape_by_stem
@@ -131,6 +154,7 @@ for (i in seq_along(logs)) {
   r <- inspect(logs[[i]])
   sk <- stem_of[[i]]
   logs_by_stem[[sk]] <- logs_by_stem[[sk]] + 1L
+  if (identical(r, "oversized")) { n[["oversized"]] <- n[["oversized"]] + 1L; next }
   if (is.null(r)) { n[["unreadable"]] <- n[["unreadable"]] + 1L; next }
   n[["read"]] <- n[["read"]] + 1L
   if (!is.na(stu[[i]])) stu_any <- c(stu_any, stu[[i]])
@@ -162,6 +186,10 @@ out <- list(
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     logs_considered = length(logs),
     logs_unreadable = n[["unreadable"]],
+    # ⚠️ Skipped for exceeding --max-log-mb. Counted rather than dropped: these
+    # are logs the scan did not look at, so every figure below excludes them.
+    logs_oversized = n[["oversized"]],
+    max_log_mb = max_mb,
     contains_identifiers = FALSE,
     # ⚠️ Stated in the output as well as the header: the numbers inside the
     # shape NOTEs are detected and deliberately not read. See the contract.

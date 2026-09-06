@@ -64,6 +64,19 @@ message("taxonomy folders: ", paste(.folders, collapse = ", "))
 # definition sits in a differently-named file was recorded as having none.
 defs_scope <- getarg("--defs-scope", "stems")
 defs_files <- definition_files(root, "^(imputsub|mult_imput)", defs_scope)
+
+# ⚠️ THE CALL POPULATION IS SET SEPARATELY, and it did not used to be. `files`
+# below was derived from the studies holding a DEFINITION, which was a fair
+# proxy while definitions came only from stem-named files. Once `--defs-scope
+# corpus` made every `.sas` a definition candidate, that proxy silently became
+# "every study": one flag moved the call population from 104,666 files to
+# 226,957 without its name changing, and a change in the results could no longer
+# be attributed to the definition scope alone.
+#
+#   stem-studies  studies carrying a stem-matched file. The historical scope,
+#                 and the default, so `--defs-scope` alone is a controlled change.
+#   corpus        every .sas under the root.
+calls_scope <- getarg("--calls-scope", "stem-studies")
 def_studies <- unique(stats::na.omit(study_of(defs_files)))
 message("definition files: ", length(defs_files),
         " across ", length(def_studies), " studies")
@@ -152,12 +165,21 @@ disagrees <- function(v) {
 }
 
 # ---- pass 2: calls ----------------------------------------------------------
-dirs <- ifelse(def_studies == ".", root, file.path(root, def_studies))
-files <- unique(unlist(lapply(dirs, function(d) {
-  list.files(d, pattern = "\\.sas$", recursive = TRUE,
-             full.names = TRUE, ignore.case = TRUE, no.. = TRUE)
-}), use.names = FALSE))
-message("candidate files: ", length(files))
+if (identical(calls_scope, "corpus")) {
+  files <- list.files(root, pattern = "\\.sas$", recursive = TRUE,
+                      full.names = TRUE, ignore.case = TRUE, no.. = TRUE)
+} else {
+  # The studies carrying a stem-matched file, computed from the stems whatever
+  # `--defs-scope` is, so the two flags cannot bleed into one another.
+  stem_studies <- unique(stats::na.omit(study_of(
+    definition_files(root, "^(imputsub|mult_imput)", "stems"))))
+  dirs <- ifelse(stem_studies == ".", root, file.path(root, stem_studies))
+  files <- unique(unlist(lapply(dirs, function(d) {
+    list.files(d, pattern = "\\.sas$", recursive = TRUE,
+               full.names = TRUE, ignore.case = TRUE, no.. = TRUE)
+  }), use.names = FALSE))
+}
+message("candidate files: ", length(files), "  (call scope: ", calls_scope, ")")
 
 n <- c(argument = 0L, local = 0L, local_ambiguous = 0L,
        global_ok = 0L, global_conflict = 0L, unresolved = 0L)
@@ -257,6 +279,9 @@ out <- list(
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     definition_files = length(defs_files),
     definition_scope = defs_scope,
+    # ⚠️ Recorded separately from the definition scope. A result that names only
+    # one of them cannot say which population its denominators came from.
+    call_scope = calls_scope,
     candidate_files  = length(files),
     files_unreadable = unreadable_count(),
     contains_identifiers = FALSE,

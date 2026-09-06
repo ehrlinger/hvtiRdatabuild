@@ -112,6 +112,13 @@ Against artifacts the study already holds. No SAS is run.
 2. **Per-rule attrition.** As above: turns one checkable number into one per rule.
 3. **Values.** A deterministic model listing fitted on the prepared data. Matching
    coefficients means the derived variables are right, not merely that the row count is.
+   ⭐ **Measured 2026-09-06: 676 of the 1,487 studies holding SAS code, 45%, have a
+   `.lst` carrying a model listing.**
+   [`artifacts/results/lst-listing.json`](artifacts/results/lst-listing.json).
+   ⚠️ Set that against rung 1's 79%: the ladder narrows sharply at the top, and
+   **nothing yet measures the OVERLAP.** The two scans count independent
+   populations, so a study may hold a listing and no usable log. 45% bounds the
+   full three-rung ladder from above and is not an estimate of it.
 
 Only after all three may a port feed a parity comparison. Otherwise a transcription slip in
 the port presents as a failure of whatever is being compared, which is the specific error
@@ -152,6 +159,16 @@ inherit them by accident.**
 
 Hand-porting every study is infeasible at corpus scale, so a translator reading `vars.sas`
 and emitting R is worth considering. It is worth *measuring* first.
+
+⭐ **MEASURED 2026-09-06: 1,180 of the 1,487 studies holding SAS code, 79%, kept
+a log that recorded a dataset shape and did not error.**
+[`artifacts/results/log-verifiability.json`](artifacts/results/log-verifiability.json).
+⚠️ Read it as a CEILING rather than an estimate: it establishes that shape
+information exists in a study's logs, not that the shape of the specific analysis
+dataset a port must match was recorded. 🔴 And `vars` logs themselves are useless
+for it: 46 carry a `vars` stem and none recorded a shape, because `vars.sas` is
+included into a larger job whose log holds the record. Joining a port to its
+evidence has to work by content, not by filename.
 
 **The number to get: what fraction of studies retain outputs sufficient to verify a port?**
 A translator that cannot be checked against a study's own saved results is a machine for
