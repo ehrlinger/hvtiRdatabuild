@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All twelve below used 1.1.9 over `/studies`.
+match. All thirteen below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -28,6 +28,7 @@ match. All twelve below used 1.1.9 over `/studies`.
 | `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
 | `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
+| `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -171,21 +172,25 @@ something was withheld rather than absent.
 ⚠️ The file was removed from the working tree but remains in this repository's
 git history, in the commits between `b2c6ad8` and its removal.
 
-## 🔴 A fingerprint fix also postdates that run
+**Replaced 2026-09-06 16:29 by a counts-only rerun**, which is the file committed
+here. ⭐ **The filter caught six identifying names on real data**: three librefs
+and three `LIBNAME` targets that cleared the frequency floor, so four more than
+the two spotted by eye would have gone out.
 
-The run emitted `NAs produced by integer overflow` from the body fingerprint:
-`v * seq_along(v)` on an integer vector overflows once an element exceeds 2^31,
-which needs a file of roughly 17 million characters, and at least one such file
-exists. ⚠️ **Its `distinct_bodies` of 22,989 is therefore an UNDERCOUNT** by an
-unmeasured amount, because two large files can share a fingerprint. Checked to
-2.4 million characters the integer and numeric versions agree exactly, so only
-the largest files are affected. `distinct_step_shapes` fingerprints a short step
-sequence and is not at risk.
+## The fingerprint overflow changed nothing, now measured
 
-`macro-drift.json` used the same function and carries the same caveat, though
-macro bodies are far smaller than whole files.
+The withdrawn run emitted `NAs produced by integer overflow` from the body
+fingerprint: `v * seq_along(v)` on an integer vector overflows once an element
+exceeds 2^31, needing a file of roughly 17 million characters. It was recorded
+here as an undercount of `distinct_bodies` "by an unmeasured amount".
 
-Both scans are fixed; neither has been rerun.
+⭐ **Measured: the amount is zero.** The corrected rerun returns 22,989 distinct
+bodies and 6,994 step shapes, identical to the run that warned. The warning was
+real and no count moved.
+
+`macro-drift.json` used the same function, and the same reasoning applies with
+more margin, since macro bodies are far smaller than whole files. It has not been
+rerun and does not need to be on this account.
 
 ## Not yet run
 
