@@ -41,6 +41,26 @@ The corpus contains stems suggesting **both** — `imputsub` and `mult_imput`. A
 
 **The question was: what did the 309 and 242 studies actually run?**
 
+### 🔴 The population this section measures is not the population that imputes
+
+⚠️ **Added 2026-09-06.** Everything below counts studies that CALL a macro: 223
+`%imputsub`, 326 `%mult_imput`. `build-structure-scan.R` then found **`PROC MI`
+in 822 studies** and `PROC STANDARD` in 1,292, so direct use is roughly two and a
+half times more common than the macro.
+
+⚠️ Not directly comparable: a `PROC STANDARD` without `REPLACE` is not
+imputation, and a `PROC MI` may be diagnostic. But the gap is far too large to be
+explained that way. **§2 is scoped to macro calls in a corpus that largely does
+not use the macro**, which is the same class of error as the definitions that
+were not in stem-named files.
+
+[`artifacts/imputation-direct-procmi-scan.R`](artifacts/imputation-direct-procmi-scan.R)
+covers the direct population. It is a SEPARATE scan on purpose: the resolution
+problem differs (no macro parameter in between, so `nimpute=` is a literal or a
+`%let` in the same file), and it excludes any `PROC MI` inside a `%macro` body so
+the two scans can be added without double counting. **Written and tested; not
+run.**
+
 ### The answer
 
 **Both methods are real, distinct, and present at scale.** Measured over
