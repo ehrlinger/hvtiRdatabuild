@@ -99,9 +99,23 @@ Within that population the defect was inert, and a full diff of the rerun agains
 the previous one moves nothing but the timestamp and those three fields. The
 292 / 25 / 622 split stands, on evidence this time.
 
+## 🔴 `macro-drift.json` reopens the scope of the imputation scans
+
+Run 2026-09-06 over all 227,783 `.sas` files. Its headline is that copy drift is
+the corpus's normal condition rather than imputation's peculiarity: 1,064 of the
+1,444 macro names existing in several copies have copies that disagree, and 1,062
+of those disagree below the header.
+
+⚠️ It also counts **1,555 copies of `mult_imput`** where
+`reconcile-scan.json` counted **423**, over the same root. Every imputation scan
+drew its definitions from files NAMED `^(imputsub|mult_imput)`, 1,134 of them;
+this one reads every `.sas`. So the imputation scans' definition population was
+under-scoped by roughly four, which makes the per-macro figures lower bounds and
+puts the "no local copy" population in `studylocal-scan.json` in doubt. See
+section 4b of `../../2026-09-05-divergent-macro-copies.md`.
+
 ## Not yet run
 
-`macro-drift.json` -- output of `../macro-drift-scan.R`, which asks whether the
-copy drift found in the imputation macros is a property of imputation or of the
-corpus. ⚠️ Run its `--count-only` mode first: the corpus size beyond the 547
-imputation studies is unmeasured.
+An imputation definition pass over every `.sas` file rather than the stem-matched
+ones. The drift scan has shown that is about an hour, not the prohibitive job it
+was assumed to be.
