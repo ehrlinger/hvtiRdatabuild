@@ -191,10 +191,19 @@ corpus-wide map is not a substitute.
 what its calls ran and is not proof; the autocall path decides at run time. The
 output records that in its provenance block so it travels with the numbers.
 
-⭐ **One thing this run settles in passing.** `from_argument` is 292, identical to
-the corpus-wide scan, which ran before the positional-argument fix. Had mixed
-positional and keyword calls existed here, this pass would have found more. It
-found none, so that defect cost this corpus nothing.
+⭐ **One thing settled alongside this, and settled the second time round.** #41
+corrected a defect that discarded a `NIMPUTE` value supplied by position in a
+call that also carried a keyword argument. Whether it had changed any of these
+numbers was first argued from `from_argument` coming back at 292 in both scans,
+which does not follow: the study-local pass changed a second thing at the same
+time, so an offsetting pair would leave the totals identical either way.
+
+Measured instead, by a rerun on 2026-09-05 at 17:04 emitting counters for it:
+**`positional_in_mixed_call` is 0**, and so are `mixed_form_calls` and
+`nimpute_from_positional`. There are no mixed positional-and-keyword calls in
+this corpus at all, and no call supplies `NIMPUTE` by position. The defect was
+inert here. A full diff of that run against the previous one moves nothing but
+the timestamp and the three new fields.
 
 ## 5. Where this is heading
 

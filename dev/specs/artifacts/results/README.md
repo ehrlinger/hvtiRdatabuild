@@ -53,25 +53,33 @@ confirms that the figures quoted in section 4a of
 `2026-09-05-divergent-macro-copies.md` -- read from the raw text at the time --
 were right.
 
-## 🔴 `nimpute-scan.json` is still provisional
+## The positional-argument question is settled, by measurement
 
-#41 corrected a positional-argument defect shared by three scans: a value
-supplied positionally in a call that also carried a keyword argument read as
-omitted.
+#41 corrected a defect shared by three scans: a value supplied positionally in a
+call that also carried a keyword argument read as omitted.
 
-⚠️ **An earlier version of this section declared the flag lifted, on the grounds
-that `studylocal-scan.json` reports `from_argument` at 292, identical to the
-corpus-wide scan which ran without the fix. That argument does not hold.** The
-study-local scan changed a second thing at the same time: it selects parameter
-names and positions from the calling study's own copy rather than one
-corpus-wide definition. So a newly recognised mixed call could be offset by a
-call classified differently for that unrelated reason, and the totals would still
-match. ⭐ Two aggregates agreeing across two different algorithms is not evidence
-that either change was inert.
+⚠️ **An earlier version of this section lifted the flag on the grounds that
+`studylocal-scan.json` reports `from_argument` at 292, identical to the
+corpus-wide scan which ran without the fix. That argument does not hold**, and is
+recorded rather than deleted. The study-local scan changed a second thing at the
+same time, selecting parameter names from the calling study's copy rather than
+one corpus-wide definition, so an offsetting pair would leave the totals matching
+either way. ⭐ Two aggregates agreeing across two different algorithms is not
+evidence that either change was inert.
 
-Settling it needs a direct measurement rather than an inference: rerun
-`imputation-nimpute-scan.R` with the fixed parser, or count mixed calls
-explicitly. Until then the 292 / 25 / 622 split is provisional.
+**Measured instead.** `nimpute-scan.json` was rerun 2026-09-05 17:04 with
+counters for exactly the population the old gate discarded:
+
+| field | value |
+|---|---|
+| `mixed_form_calls` | **0** |
+| `nimpute_from_positional` | **0** |
+| `positional_in_mixed_call` | **0** |
+
+No mixed positional-and-keyword calls exist in this corpus, and no call supplies
+`NIMPUTE` by position. The defect was inert here, and a full diff of the rerun
+against the 11:58 run moves nothing but the timestamp and those three fields. The
+292 / 25 / 622 split stands, on evidence this time.
 
 ## Not yet run
 
