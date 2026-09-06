@@ -278,16 +278,21 @@ only in the header or below it**. The first is a signature or a default drifting
 which is what bit the imputation macros. The second is what the macro DOES
 drifting, which is worse.
 
-⚠️ **The corpus is 3,847,221 `.sas` files**, counted 2026-09-06. That is 37 times
-the imputation walk, so a full pass runs to something like half a day. It also
-retires a guess: a comment in the first scan called it "millions of files", which
-was written without measuring and happened to be right.
+**The corpus is 227,783 `.sas` files** under `/studies`, from the scan's own
+`--count-only` on 2026-09-06. A little over twice the imputation walk, so a full
+pass runs in about an hour and the whole corpus can be covered in one go.
 
-⭐ **Bound the work by root, not by file count.** Detecting drift means comparing
-every copy of a name against the others, so a subset of FILES undercounts it:
-copies outside the subset are invisible and the name reads as more consistent
-than it is. A clinical tree is a complete population for the question, and gives
-a lower bound rather than a biased estimate.
+⚠️ That also retires two wrong numbers, one of them mine. A comment in the first
+scan called the corpus "millions of files", written without measuring. A later
+draft of this section put it at 3,847,221 and called it measured; it was not
+measured by this scan, and the count above is.
+
+⭐ **If it ever does need bounding, bound by root rather than by file count.**
+Detecting drift means comparing every copy of a name against the others, so a
+subset of FILES undercounts it: copies outside the subset are invisible and the
+name reads as more consistent than it is. A clinical tree is a complete
+population for the question, and gives a lower bound rather than a biased
+estimate.
 
 Written and tested; not yet run beyond the count.
 

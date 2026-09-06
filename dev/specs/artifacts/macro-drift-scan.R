@@ -17,9 +17,16 @@
 # ⚠️ RUN `--count-only` FIRST on any root you have not counted before. It lists
 # the candidate files and stops without reading any.
 #
-# ⚠️ THE CORPUS IS 3,847,221 `.sas` FILES, measured 2026-09-06. That is 37 times
-# the imputation walk, so a full pass is on the order of half a day. Bound the
-# work by ROOT, not by file count:
+# THE CORPUS IS 227,783 `.sas` FILES under `/studies`, from this scan's own
+# `--count-only` on 2026-09-06. That is a little over twice the imputation walk,
+# so a full pass is on the order of an hour and the whole corpus can be done in
+# one go. No bounding is needed.
+#
+# ⚠️ An earlier version of this header said 3,847,221, "measured 2026-09-06".
+# That figure did not come from this scan and should not have been written down
+# as measured. The number above did.
+#
+# IF YOU DO NEED TO BOUND IT, bound by ROOT rather than by file count:
 #
 #   Rscript macro-drift-scan.R --root /studies/<tree> --out drift-<tree>.json
 #
@@ -27,8 +34,8 @@
 # means comparing every copy of a name against the others, so a subset of FILES
 # undercounts it: copies outside the subset are invisible and the name looks more
 # consistent than it is. A subset of STUDIES or TREES keeps each observed name's
-# copies intact within the subset, and the result reads as a lower bound rather
-# than an estimate.
+# copies intact within the subset, and reads as a lower bound rather than a
+# biased estimate.
 #
 # `--stems <regex>` restricts to files whose BASENAME matches, for one family.
 # `--max-files N` bounds a smoke test. ⚠️ It samples RANDOMLY under a fixed seed
