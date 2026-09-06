@@ -112,6 +112,13 @@ Against artifacts the study already holds. No SAS is run.
 2. **Per-rule attrition.** As above: turns one checkable number into one per rule.
 3. **Values.** A deterministic model listing fitted on the prepared data. Matching
    coefficients means the derived variables are right, not merely that the row count is.
+   ⭐ **Measured 2026-09-06: 676 of the 1,487 studies holding SAS code, 45%, have a
+   `.lst` carrying a model listing.**
+   [`artifacts/results/lst-listing.json`](artifacts/results/lst-listing.json).
+   ⚠️ Set that against rung 1's 79%: the ladder narrows sharply at the top, and
+   **nothing yet measures the OVERLAP.** The two scans count independent
+   populations, so a study may hold a listing and no usable log. 45% bounds the
+   full three-rung ladder from above and is not an estimate of it.
 
 Only after all three may a port feed a parity comparison. Otherwise a transcription slip in
 the port presents as a failure of whatever is being compared, which is the specific error

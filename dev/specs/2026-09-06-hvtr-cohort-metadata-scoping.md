@@ -148,6 +148,41 @@ scan that guessed would produce a number answering neither consumer.
 studies). A library alias used by one study is not an institutional source, and
 emitting it would widen the contract past what the scan claims.
 
+#### Run 2026-09-06, folder-scoped
+
+**38,877 files across 1,456 studies**, against 130 studies under the earlier
+filename scope. ⭐ **The earlier "82% of builds are unique" was a sampling
+artifact**: 38,877 files reduce to **6,994 distinct step shapes**, 18% rather
+than 82%. The build layer is far more stereotyped than the filename sample said.
+
+⭐ **The `LIBNAME` targets answer the upstream question, and the answer is
+better than feared.** The dominant target is `/&study/datasets` in 1,286 studies,
+followed by `/&study` in 1,046 and `/&study/estimates` in 821. **Builds do not
+hardcode their paths; they parameterise them against a study macro variable.** A
+governed upstream replacing a convention is a far smaller job than one replacing
+1,456 hardcoded paths.
+
+🔴 **640 studies point a `LIBNAME` at uncustomised template boilerplate**: the
+literal text *"put the directory of your study here to save the output dataset"*.
+`/studies/xxxx` accounts for a further 196 and `/studies/xxxxxxxxx` for 15.
+Templates are copied wholesale and the placeholder is often never filled in,
+which is the same copy-without-adaptation pattern the macro drift census found,
+showing up in configuration rather than in code.
+
+⭐ **Two librefs name the warehouse directly:** `hvi_dm` in 277 studies and
+`warehouse` in 185. Those are studies reading the predecessor data model without
+an intermediary, which is exactly the population a governed upstream inherits.
+
+🔴 **And a number that reopens the imputation work again.** `PROC STANDARD`
+appears in **1,292** studies' `datasets` folders and `PROC MI` in **822**. The
+imputation scans found 223 studies calling `%imputsub` and 326 calling
+`%mult_imput`, because they counted MACRO CALLS. Direct `PROC MI` use appears to
+be roughly two and a half times more common than the macro. ⚠️ Not directly
+comparable: `PROC STANDARD` without `REPLACE` is not imputation and a `PROC MI`
+may be diagnostic. But the gap is far too large to be explained that way, and
+§2's study counts are scoped to macro calls in a corpus that largely does not
+use the macro.
+
 ### `.lst`
 
 | built for | asks |
@@ -155,9 +190,26 @@ emitting it would widen the contract past what the scan claims.
 | databuild | what values a port can be checked against |
 | HVTR | what was actually filed, as opposed to what the code would produce |
 
-[`artifacts/lst-listing-scan.R`](artifacts/lst-listing-scan.R), built
-2026-09-06, is the rung-3 counterpart to the log scan's rung-1 figure: how many
-studies hold a model listing whose coefficients a port could be checked against.
+[`artifacts/lst-listing-scan.R`](artifacts/lst-listing-scan.R), run 2026-09-06,
+is the rung-3 counterpart to the log scan's rung-1 figure.
+
+⭐ **676 of the 1,487 studies holding SAS code, 45%, have a listing carrying
+model coefficients**, against 79% holding a log that recorded a dataset shape.
+The verification ladder narrows sharply at the top.
+
+⚠️ **Nothing measures the overlap.** The two scans count independent populations,
+so a study may hold a listing and no usable log. 45% bounds the full ladder from
+above and is not an estimate of it. Measuring the intersection is a small join
+and has not been done.
+
+🔴 **A number that is not about verification at all: 35,735 listings, 72.5% of
+those read, appear to carry patient-level print output.** These are files on the
+share whose content is printed patient data by design. ⚠️ Read it as an upper
+bound: the detector matches the `PROC PRINT` heading OR a line beginning with
+`obs `, and the second is a heuristic that will over-match. The conservative
+figure was not separated out and should be. Even discounted, this belongs in
+front of whoever owns the share rather than only in a scan output, and it is
+directly relevant to an IRB-governed platform.
 
 🔴 **Its contract is stricter than the log scan's, for a stronger reason.** A
 `.log` may contain patient values incidentally. **A `.lst` IS the printed output**,

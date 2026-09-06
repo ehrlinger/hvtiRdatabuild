@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All eleven below used 1.1.9 over `/studies`.
+match. All thirteen below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -27,6 +27,8 @@ match. All eleven below used 1.1.9 over `/studies`.
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
 | `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
+| `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
+| `build-structure.json` | ⭐ what a build is made of, and what it reads from | 2026-09-06 16:03 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -149,9 +151,25 @@ absorbed silently. An earlier attempt without the ceiling pinned a core for
 twenty minutes on one large log; the prefilter did most of the eventual speedup
 and the ceiling caught the remainder.
 
+## 🔴 `build-structure.json` predates a fingerprint fix
+
+The run emitted `NAs produced by integer overflow` from the body fingerprint:
+`v * seq_along(v)` on an integer vector overflows once an element exceeds 2^31,
+which needs a file of roughly 17 million characters, and at least one such file
+exists. ⚠️ **Its `distinct_bodies` of 22,989 is therefore an UNDERCOUNT** by an
+unmeasured amount, because two large files can share a fingerprint. Checked to
+2.4 million characters the integer and numeric versions agree exactly, so only
+the largest files are affected. `distinct_step_shapes` fingerprints a short step
+sequence and is not at risk.
+
+`macro-drift.json` used the same function and carries the same caveat, though
+macro bodies are far smaller than whole files.
+
+Both scans are fixed; neither has been rerun.
+
 ## Not yet run
 
-A `build.sas` structure census and a `.lst` scan, both scoped in
-`../../2026-09-06-hvtr-cohort-metadata-scoping.md` §4. ⚠️ `.lst` carries printed
-output and inherits `log-verifiability-scan.R`'s stricter contract or does not
-get written.
+A rerun of `build-structure-scan.R` and `macro-drift-scan.R` with the corrected
+fingerprint. A join between `log-verifiability.json` and `lst-listing.json` to
+measure how many studies have BOTH rung 1 and rung 3, which neither file can
+answer alone.

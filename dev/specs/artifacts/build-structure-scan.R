@@ -101,7 +101,18 @@ if (count_only) {
 
 fingerprint <- function(x) {
   if (!nzchar(x)) return("0-0-0")
-  v <- utf8ToInt(x)
+  # ⚠️ as.numeric BEFORE multiplying. `v * seq_along(v)` on an INTEGER vector
+  # overflows once any element exceeds 2^31, which needs a file of roughly 17
+  # million characters. That yields NA for the element and NA for the sum, so
+  # the third component collapses and two different files can share a
+  # fingerprint. Observed 2026-09-06 as "NAs produced by integer overflow" on a
+  # 38,878-file run, so at least one file in this corpus is that large.
+  #
+  # ⚠️ How much it moved the counts is UNMEASURED. Checked to 2.4 million
+  # characters, integer and numeric agree exactly, so only the largest files are
+  # affected and the effect is an UNDERCOUNT of distinct bodies rather than an
+  # overcount. Any body-count from a run before this fix carries that caveat.
+  v <- as.numeric(utf8ToInt(x))
   paste(length(v), sum(v) %% 2147483647,
         sum(v * seq_along(v)) %% 2147483647, sep = "-")
 }
