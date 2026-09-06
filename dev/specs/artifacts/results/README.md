@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All six below used 1.1.9 over `/studies`.
+match. All nine below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -22,6 +22,9 @@ match. All six below used 1.1.9 over `/studies`.
 | `census-reconcile.json` | why the scans and the job census disagree | 2026-09-05 07:41 |
 | `reconcile-scan.json` | which macro names disagree, and at what cost | 2026-09-05 14:43 |
 | `studylocal-scan.json` | ⭐ NIMPUTE per the calling study's own copy | 2026-09-05 14:59 |
+| `macro-drift.json` | is the copy drift imputation's or the corpus's | 2026-09-06 09:17 |
+| `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
+| `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -114,8 +117,27 @@ under-scoped by roughly four, which makes the per-macro figures lower bounds and
 puts the "no local copy" population in `studylocal-scan.json` in doubt. See
 section 4b of `../../2026-09-05-divergent-macro-copies.md`.
 
+## The two `-wide` files, and why their denominators differ
+
+`nimpute-wide.json` and `studylocal-wide.json` (2026-09-06) rerun their scans
+with `--defs-scope corpus`, taking definitions from all 227,783 `.sas` files
+rather than the 1,134 named after the stems.
+
+⚠️ **They used the coupled build, so their call population widened too**, from
+104,666 candidate files to 226,957. That is why `calls` reads 1,769 rather than
+939, and it means a change between a `-wide` file and its stem-scope counterpart
+cannot be attributed to the definition scope alone. `--calls-scope` decouples the
+two for any future run; these predate it. The wider call population is the better
+measurement regardless, since 939 was itself scoped by the assumption this work
+disproved.
+
+⭐ The comparison worth reading is between the two `-wide` files themselves, over
+the SAME 1,769 calls: the corpus-wide map settles 587 of them, the study-local
+map settles 1,674.
+
 ## Not yet run
 
-An imputation definition pass over every `.sas` file rather than the stem-matched
-ones. The drift scan has shown that is about an hour, not the prohibitive job it
-was assumed to be.
+`log-verifiability.json`, running as this was written. ⚠️ An earlier attempt was
+killed after pinning a core for twenty minutes on one very large log; the scan
+now has a per-file ceiling and a cheap prefilter, and reports `logs_oversized`
+so any coverage gap is visible rather than silent.
