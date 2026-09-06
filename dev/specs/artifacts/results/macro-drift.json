@@ -1,0 +1,204 @@
+{
+  "_provenance": {
+    "script": "macro-drift-scan.R",
+    "question": "is the copy drift found in the imputation macros a property of imputation or of the corpus?",
+    "run_at": "2026-09-06T09:17:03-0400",
+    "root": "/studies",
+    "scope": "every .sas under root",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "files_considered": 227783,
+    "files_unreadable": 1,
+    "macro_definitions": 315871,
+    "file_sampled": false,
+    "emits_macro_names": true,
+    "fingerprint": "length + char sum + position-weighted char sum; not a hash"
+  },
+  "summary": {
+    "macro_names": 2449,
+    "names_in_one_copy": 1005,
+    "names_in_many_copies": 1444,
+    "names_drifted": 1064,
+    "names_drifted_below_header": 1062,
+    "names_drifted_header_only": 2,
+    "max_copies": 81813,
+    "max_distinct_bodies": 46763
+  },
+  "worst": [
+    {
+      "macro": "skip",
+      "copies": 81813,
+      "studies": 1396,
+      "distinct_bodies": 46763,
+      "distinct_bodies_no_hdr": 46753
+    },
+    {
+      "macro": "skkip",
+      "copies": 21209,
+      "studies": 937,
+      "distinct_bodies": 10779,
+      "distinct_bodies_no_hdr": 10776
+    },
+    {
+      "macro": "skipp",
+      "copies": 10444,
+      "studies": 922,
+      "distinct_bodies": 7346,
+      "distinct_bodies_no_hdr": 7344
+    },
+    {
+      "macro": "final",
+      "copies": 20259,
+      "studies": 1243,
+      "distinct_bodies": 3330,
+      "distinct_bodies_no_hdr": 3328
+    },
+    {
+      "macro": "model",
+      "copies": 10707,
+      "studies": 1174,
+      "distinct_bodies": 1771,
+      "distinct_bodies_no_hdr": 1771
+    },
+    {
+      "macro": "ps",
+      "copies": 7924,
+      "studies": 1104,
+      "distinct_bodies": 1771,
+      "distinct_bodies_no_hdr": 1767
+    },
+    {
+      "macro": "cgm",
+      "copies": 10069,
+      "studies": 1115,
+      "distinct_bodies": 1507,
+      "distinct_bodies_no_hdr": 1506
+    },
+    {
+      "macro": "hmmodel",
+      "copies": 3434,
+      "studies": 1177,
+      "distinct_bodies": 1408,
+      "distinct_bodies_no_hdr": 1408
+    },
+    {
+      "macro": "skiip",
+      "copies": 2176,
+      "studies": 785,
+      "distinct_bodies": 1246,
+      "distinct_bodies_no_hdr": 1246
+    },
+    {
+      "macro": "check",
+      "copies": 3953,
+      "studies": 1068,
+      "distinct_bodies": 904,
+      "distinct_bodies_no_hdr": 904
+    },
+    {
+      "macro": "final1",
+      "copies": 2958,
+      "studies": 819,
+      "distinct_bodies": 789,
+      "distinct_bodies_no_hdr": 789
+    },
+    {
+      "macro": "plots",
+      "copies": 20159,
+      "studies": 1214,
+      "distinct_bodies": 765,
+      "distinct_bodies_no_hdr": 763
+    },
+    {
+      "macro": "freq",
+      "copies": 6724,
+      "studies": 1204,
+      "distinct_bodies": 653,
+      "distinct_bodies_no_hdr": 653
+    },
+    {
+      "macro": "select",
+      "copies": 5136,
+      "studies": 1075,
+      "distinct_bodies": 653,
+      "distinct_bodies_no_hdr": 653
+    },
+    {
+      "macro": "aggregate",
+      "copies": 1441,
+      "studies": 779,
+      "distinct_bodies": 565,
+      "distinct_bodies_no_hdr": 565
+    },
+    {
+      "macro": "model_fit",
+      "copies": 2520,
+      "studies": 802,
+      "distinct_bodies": 488,
+      "distinct_bodies_no_hdr": 488
+    },
+    {
+      "macro": "pars",
+      "copies": 2759,
+      "studies": 1085,
+      "distinct_bodies": 479,
+      "distinct_bodies_no_hdr": 479
+    },
+    {
+      "macro": "propen",
+      "copies": 1982,
+      "studies": 1094,
+      "distinct_bodies": 437,
+      "distinct_bodies_no_hdr": 437
+    },
+    {
+      "macro": "mult_imput",
+      "copies": 1555,
+      "studies": 815,
+      "distinct_bodies": 421,
+      "distinct_bodies_no_hdr": 419
+    },
+    {
+      "macro": "cdfs",
+      "copies": 4123,
+      "studies": 1198,
+      "distinct_bodies": 378,
+      "distinct_bodies_no_hdr": 378
+    },
+    {
+      "macro": "imput",
+      "copies": 1612,
+      "studies": 809,
+      "distinct_bodies": 348,
+      "distinct_bodies_no_hdr": 348
+    },
+    {
+      "macro": "after",
+      "copies": 1389,
+      "studies": 661,
+      "distinct_bodies": 334,
+      "distinct_bodies_no_hdr": 334
+    },
+    {
+      "macro": "before",
+      "copies": 1394,
+      "studies": 661,
+      "distinct_bodies": 329,
+      "distinct_bodies_no_hdr": 329
+    },
+    {
+      "macro": "hold",
+      "copies": 928,
+      "studies": 236,
+      "distinct_bodies": 271,
+      "distinct_bodies_no_hdr": 271
+    },
+    {
+      "macro": "vars",
+      "copies": 5055,
+      "studies": 1299,
+      "distinct_bodies": 269,
+      "distinct_bodies_no_hdr": 39
+    }
+  ]
+}

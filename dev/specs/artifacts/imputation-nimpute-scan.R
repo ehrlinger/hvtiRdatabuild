@@ -69,9 +69,8 @@ message("taxonomy folders: ", paste(.folders, collapse = ", "))
 # Same scoping as scan 2: a call and its definition are reachable from the
 # studies that carry a stem-matched file. --all-studies lifts it.
 stem_re <- "^(imputsub|mult_imput)"
-defs_files <- list.files(root, pattern = paste0(stem_re, ".*\\.sas$"),
-                         recursive = TRUE, full.names = TRUE,
-                         ignore.case = TRUE, no.. = TRUE)
+defs_scope <- getarg("--defs-scope", "stems")
+defs_files <- definition_files(root, stem_re, defs_scope)
 def_studies <- unique(stats::na.omit(study_of(defs_files)))
 message("studies carrying a definition: ", length(def_studies))
 
@@ -95,12 +94,16 @@ message("candidate files: ", length(files))
 #   param    -> the caller supplies it; record which parameter
 #   local    -> a %let inside the body; resolvable without the caller
 #
-# SCOPE. Pass 1 reads the STEM-MATCHED files only, not all 104k. Scan 1
-# established that 1,132 of 1,134 stem-matched files define a macro, so that is
-# where the definitions are, and reading everything twice would roughly double a
-# run already measured in tens of minutes. `--defs-all` widens it to every
-# candidate file; `macros_binding_nimpute` is the number to watch if you suspect
-# a definition lives outside the stems.
+# SCOPE. ⚠️ Pass 1 reads the STEM-MATCHED files by default, and that default is
+# a LOWER BOUND rather than the definitions. An earlier version of this comment
+# argued the stem files are "where the definitions are", on the strength of scan
+# 1 finding that 1,132 of 1,134 of them define a macro. That is a statement about
+# stem files, not about definitions, and it does not follow.
+#
+# `macro-drift-scan.R` refuted it on 2026-09-06: 1,555 copies of `mult_imput`
+# exist across all 227,783 `.sas` files where the stem-matched population holds
+# 423. `--defs-scope corpus` reads all of them, at roughly an hour. `--defs-all`
+# is the intermediate STUDY scope. See scan-common.R for all three.
 def_scan <- if ("--defs-all" %in% args) files else defs_files
 message("pass 1: definitions (", length(def_scan), " files)")
 defmap <- list()          # macro name -> binding
@@ -348,6 +351,7 @@ out <- list(
   ),
   definitions = list(
     files_scanned_for_definitions = length(def_scan),
+    definition_scope = if ("--defs-all" %in% args) "study" else defs_scope,
     files_defining_a_macro   = n_def_files,
     macros_binding_nimpute   = length(defmap),
     # How the definition gets its NIMPUTE. "param" is the case that needs a

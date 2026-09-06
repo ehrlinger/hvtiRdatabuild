@@ -128,6 +128,39 @@ read_statements <- function(path) {
 # skips files reports a smaller corpus than it walked and says nothing.
 unreadable_count <- function() .scan_unreadable$n
 
+# ---- the definition population ----------------------------------------------
+# WHICH FILES COUNT AS HOLDING A MACRO DEFINITION.
+#
+# ⚠️ Every imputation scan originally took its definitions from files NAMED
+# `^(imputsub|mult_imput)`, on the assumption that a macro is defined in a file
+# named after it. `macro-drift-scan.R` refuted that on 2026-09-06: it counts
+# 1,555 copies of `mult_imput` across all 227,783 `.sas` files where the
+# stem-matched population holds 423. The definitions were under-scoped by
+# roughly four, and the assumption was a filename pattern treated as a fact.
+#
+# Three scopes, named so a result says which it used:
+#
+#   stems   files named after the stems. The original scope. Fast, and a LOWER
+#           BOUND on the definitions that exist.
+#   study   every .sas inside the studies that carry a stem-matched file.
+#   corpus  every .sas under the root. Complete, and the only scope whose
+#           per-macro counts are counts rather than lower bounds.
+#
+# ⚠️ `corpus` reads every .sas under the root. That is 227,783 files on
+# `/studies`, roughly an hour, so it is not the default: changing a default
+# silently would make new results incomparable with committed ones without
+# saying so. Pass `--defs-scope corpus` and the provenance records it.
+definition_files <- function(root, stem_re, scope = "stems", study_files = NULL) {
+  scope <- match.arg(scope, c("stems", "study", "corpus"))
+  if (identical(scope, "study")) {
+    if (is.null(study_files)) stop("scope 'study' needs study_files", call. = FALSE)
+    return(study_files)
+  }
+  pat <- if (identical(scope, "corpus")) "\\.sas$" else paste0(stem_re, ".*\\.sas$")
+  list.files(root, pattern = pat, recursive = TRUE, full.names = TRUE,
+             ignore.case = TRUE, no.. = TRUE)
+}
+
 # ---- SAS macro headers and calls --------------------------------------------
 # Shared because BOTH scans have to agree on what counts as passing an argument.
 # ⚠️ They did not: the reconcile scan recognised only `name = value` and counted

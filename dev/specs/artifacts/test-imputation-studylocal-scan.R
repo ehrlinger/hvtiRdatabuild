@@ -87,6 +87,16 @@ put("cardiac/iota", "mult_imput_mix.sas",
       "proc mi data=&data out=m nimpute=&nimpute seed=&seed;", "run;", "%mend;"))
 put("cardiac/iota", "driver.sas", c("%mi_mix(w, 30, seed=7);"))
 
+# 🔴 omicron holds a definition of mi_shared in a file NOT named after the stem,
+# and calls it. This is the case `macro-drift-scan.R` exposed: the definition
+# population was taken from stem-named files, so omicron reads as holding no
+# local copy and its call falls to the corpus-wide map. Under
+# `--defs-scope corpus` the definition is found and the call resolves locally.
+# The two runs below assert exactly that difference.
+put("cardiac/omicron", "mult_imput_o.sas", defn("mi_o", 3))
+put("cardiac/omicron", "helpers.sas", defn("mi_shared", 7))
+put("cardiac/omicron", "driver.sas", c("%mi_shared(data=w);"))
+
 # zeta states the value outright, which beats every inference.
 put("cardiac/zeta", "mult_imput_z.sas", defn("mi_z", 5))
 put("cardiac/zeta", "driver.sas", c("%mi_z(data=w, nimpute=25);"))
@@ -108,8 +118,8 @@ num <- function(field) {
 }
 
 expected <- list(
-  # alpha, beta, gamma, delta, eps3, eta, iota, zeta
-  calls = 8L,
+  # alpha, beta, gamma, delta, eps3, eta, iota, zeta, omicron
+  calls = 9L,
   # zeta's 25, eta's 12 (divergent parameter name), iota's 30 (mixed call)
   from_argument = 3L,
   # ⭐ alpha (5) and beta (1). Globally these two are the SAME undeterminable
@@ -117,7 +127,10 @@ expected <- list(
   from_study_local = 2L,
   study_local_ambiguous = 1L,  # gamma holds two copies that disagree
   global_fallback_ok = 1L,     # eps3: every copy of mi_agreed says 9
-  global_fallback_conflict = 1L,  # delta: mi_shared conflicts corpus-wide
+  # delta and omicron: mi_shared conflicts corpus-wide, and under the default
+  # stem scope omicron's own copy is invisible because its file is not named
+  # after the stem.
+  global_fallback_conflict = 2L,
   unresolved = 0L,
   # argument + study-local only: 25, 12, 30, 5, 1
   n = 5L,
@@ -155,6 +168,37 @@ if (!grepl("\"1\"", loc) || !grepl("\"5\"", loc)) {
   fail <- fail + 1L
 } else {
   message(sprintf("%-26s %s", "local route yields 1 and 5", "ok"))
+}
+
+# 🔴 THE SCOPE ASSERTION. Same fixture, `--defs-scope corpus`: omicron's
+# definition lives in `helpers.sas`, which the stem-named population cannot see.
+# Under the wider scope it is found, so omicron's call moves off the corpus-wide
+# fallback and onto its own study's copy. If these two runs agree, the flag does
+# nothing and the under-scoping is not being corrected.
+o2 <- file.path(root, "wide.json")
+system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
+                   "--out", shQuote(o2), "--defs-scope", "corpus"),
+        stdout = FALSE, stderr = FALSE)
+if (!file.exists(o2)) {
+  message("FAIL  --defs-scope corpus produced no output"); fail <- fail + 1L
+} else {
+  jw <- paste(readLines(o2), collapse = " ")
+  numw <- function(f) {
+    m <- regmatches(jw, regexpr(paste0("\"", f, "\": *-?[0-9]+"), jw))
+    if (!length(m)) stop("field not found in wide run: ", f)
+    as.integer(sub(".*: *", "", m))
+  }
+  for (c in list(list("wide: from_study_local", numw("from_study_local"), 3L),
+                 list("wide: global_fallback_conflict",
+                      numw("global_fallback_conflict"), 1L))) {
+    ok <- identical(c[[2]], c[[3]])
+    if (!ok) fail <- fail + 1L
+    message(sprintf("%-30s expected %2d  got %2d  %s", c[[1]], c[[3]], c[[2]],
+                    if (ok) "ok" else "FAIL"))
+  }
+  if (!grepl("\"definition_scope\": \"corpus\"", jw)) {
+    message("FAIL  wide run does not record its definition scope"); fail <- fail + 1L
+  }
 }
 
 unlink(root, recursive = TRUE)

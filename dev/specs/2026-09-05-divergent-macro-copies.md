@@ -269,10 +269,89 @@ since has moved it toward a smaller and more honest number.
 **Repeat the measurement elsewhere.** We found this because §2 forced us to
 resolve a value across a definition and a call site. Nothing about the mechanism
 is specific to imputation. Any macro family distributed as per-study copies can
-have drifted the same way, and the same scan shape (read the definitions, join
-them to the call sites, report where the copies disagree) would find it. The
-`conflicting_defaults` field exists for that, and reporting it should be the
-default posture for a corpus scan, not an afterthought.
+have drifted the same way.
+
+[`artifacts/macro-drift-scan.R`](artifacts/macro-drift-scan.R) asks it of every
+macro name in the corpus rather than one family: how many names exist in several
+copies, how many of those copies are not identical, and ⭐ **whether they differ
+only in the header or below it**. The first is a signature or a default drifting,
+which is what bit the imputation macros. The second is what the macro DOES
+drifting, which is worse.
+
+**The corpus is 227,783 `.sas` files** under `/studies`, from the scan's own
+`--count-only` on 2026-09-06. A little over twice the imputation walk, so a full
+pass runs in about an hour and the whole corpus can be covered in one go.
+
+⚠️ That also retires two wrong numbers, one of them mine. A comment in the first
+scan called the corpus "millions of files", written without measuring. A later
+draft of this section put it at 3,847,221 and called it measured; it was not
+measured by this scan, and the count above is.
+
+⭐ **If it ever does need bounding, bound by root rather than by file count.**
+Detecting drift means comparing every copy of a name against the others, so a
+subset of FILES undercounts it: copies outside the subset are invisible and the
+name reads as more consistent than it is. A clinical tree is a complete
+population for the question, and gives a lower bound rather than a biased
+estimate.
+
+### Run 2026-09-06, and the drift is the corpus's, not imputation's
+
+227,783 files, 1 unreadable, 315,871 macro definitions, 2,449 distinct names.
+
+| | names |
+|---|---|
+| defined in one copy only | 1,005 |
+| defined in several copies | 1,444 |
+| ⭐ **of those, copies that are not identical** | **1,064 (74%)** |
+| differing below the header | 1,062 |
+| differing in the header only | 2 |
+
+⭐ **Three quarters of every macro name that exists in more than one copy has
+copies that disagree, and almost all of them disagree in what the macro DOES,
+not merely in how it is declared.** Imputation is not a special case. It is an
+ordinary instance of the corpus's normal condition, and it only came to notice
+because §2 forced a value to be resolved across a definition and a call site.
+
+The scale dwarfs the imputation finding. `skip` exists in **81,813 copies across
+1,396 studies with 46,763 distinct bodies**; `mult_imput`'s 421 distinct bodies
+place it nineteenth. ⚠️ Note against reading the top of that list as an artifact:
+`plots` has 20,159 copies and only 765 distinct bodies, 4% unique. A body-slicing
+defect would inflate every name alike, and it does not.
+
+⭐ **`vars` is the interesting exception, and it is the family the port work
+depends on.** 5,055 copies, 269 distinct bodies, but only **39** below the
+header. Its copies drift in their signature far more than in their work, which
+is the opposite shape to everything above it.
+
+### 🔴 The result also reopens a scope question in §2
+
+`mult_imput` is defined in **1,555 copies** corpus-wide. The reconciliation
+worksheet in 4a counted **423**, and both scans read the same `/studies`.
+
+The difference is what each looked at. Every imputation scan took its definitions
+from files whose NAME matches `^(imputsub|mult_imput)`, which is 1,134 files.
+This one reads all 227,783. So `%macro mult_imput` is defined in a great many
+files not named after it, and ⚠️ **the imputation scans' definition population was
+under-scoped by roughly a factor of four.**
+
+Three consequences, none yet measured:
+
+- 4a's per-macro figures are **lower bounds**, not counts.
+- The five conflicting names and 39 conflicting defaults were found among 933
+  copies drawn from stem-named files. A wider definition population may hold
+  more.
+- 🔴 Most consequentially, section 4b's **91 calls from studies holding "no local
+  copy"** were judged against the same stem-matched population. A study whose
+  `mult_imput` definition sits in a differently-named file would have been
+  recorded as having none. That number, and the 129 undeterminable it feeds, may
+  be smaller than reported.
+
+⚠️ This does not move the direction of §2: the 292 calls that state their value
+are untouched, and nothing here suggests the 798-of-810 split is wrong. What it
+touches is the denominators and the residual. Settling it means rerunning the
+imputation definition pass over all `.sas` files rather than the stem-matched
+ones, which the drift scan has now shown is about an hour of work rather than
+the prohibitive job it was assumed to be.
 
 ## 6. What is measured, and what is not
 

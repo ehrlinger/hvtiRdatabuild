@@ -58,9 +58,12 @@ outfile <- getarg("--out", "studylocal-scan.json")
 study_of <- study_of_factory(root, .folders)
 message("taxonomy folders: ", paste(.folders, collapse = ", "))
 
-defs_files <- list.files(root, pattern = "^(imputsub|mult_imput).*\\.sas$",
-                         recursive = TRUE, full.names = TRUE,
-                         ignore.case = TRUE, no.. = TRUE)
+# ⚠️ `--defs-scope corpus` reads every .sas under the root for definitions, not
+# only the stem-named files. The 91 calls this scan reports as having "no local
+# copy" were judged against the stem-named population, so a study whose
+# definition sits in a differently-named file was recorded as having none.
+defs_scope <- getarg("--defs-scope", "stems")
+defs_files <- definition_files(root, "^(imputsub|mult_imput)", defs_scope)
 def_studies <- unique(stats::na.omit(study_of(defs_files)))
 message("definition files: ", length(defs_files),
         " across ", length(def_studies), " studies")
@@ -253,6 +256,7 @@ out <- list(
     hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
     taxonomy_folders       = paste(sort(.folders), collapse = ","),
     definition_files = length(defs_files),
+    definition_scope = defs_scope,
     candidate_files  = length(files),
     files_unreadable = unreadable_count(),
     contains_identifiers = FALSE,
