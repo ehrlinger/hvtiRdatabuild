@@ -7,7 +7,8 @@ measurement cannot settle.
 **Repo:** written into `hvtiRdatabuild` because every measurement it cites was
 produced here. The thing it scopes lives elsewhere.
 **Why now:** the `vars.sas` design note
-([2026-09-02](2026-09-02-vars-port-and-attrition-design.md)) §5 logged four decisions "for the HVTR cohort-metadata spec" and noted that the
+([2026-09-02](2026-09-02-vars-port-and-attrition-design.md)) §5 logged four
+decisions "for the HVTR cohort-metadata spec" and noted that the
 spec does not exist and has not been brainstormed. It now has a live consumer,
 so those four need answering rather than filing.
 
