@@ -1,0 +1,38 @@
+{
+  "_provenance": {
+    "script": "imputation-direct-procmi-scan.R",
+    "question": "what NIMPUTE do the studies running PROC MI directly, without the macro, use?",
+    "run_at": "2026-09-06T19:01:54-0400",
+    "root": "/studies",
+    "folder": "any",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "files_considered": 227784,
+    "files_unreadable": 1,
+    "contains_identifiers": false,
+    "excludes_procmi_inside_macros": true
+  },
+  "statements": {
+    "files_with_a_procmi": 1638,
+    "direct_procmi_statements": 5,
+    "procmi_inside_a_macro": 1650,
+    "from_a_literal": 1,
+    "from_a_let_in_the_file": 0,
+    "no_nimpute_given": 4,
+    "unresolved": 0
+  },
+  "studies": {
+    "running_procmi_directly": 2,
+    "with_a_resolved_nimpute": 1
+  },
+  "nimpute": {
+    "resolved_total": 1,
+    "nimpute_0": 0,
+    "nimpute_1": 1,
+    "nimpute_gt1": 0,
+    "median": 1,
+    "table": {
+      "1": 1
+    }
+  }
+}

@@ -12,7 +12,7 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All thirteen below used 1.1.9 over `/studies`.
+match. All fourteen below used 1.1.9 over `/studies`.
 
 | file | scan | run at |
 |---|---|---|
@@ -29,6 +29,7 @@ match. All thirteen below used 1.1.9 over `/studies`.
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
 | `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
 | `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
+| `direct-procmi.json` | ⭐ does anyone run `PROC MI` without the macro | 2026-09-06 19:35 |
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
@@ -208,7 +209,13 @@ should be regenerated before its numbers are quoted further.** Specifically:
   every `.sas` file under `datasets/`; the field is renamed and now reports how
   many carry a DATA or PROC step at all.
 
+⭐ **`direct-procmi.json` closes the question it was built for, in the opposite
+direction to the suspicion that prompted it.** 1,650 of the corpus's 1,655
+`PROC MI` statements sit inside a `%macro` body; 5 do not, across 2 studies. The
+macro-call scoping in the imputation spec's §2 was right, and the 822 studies
+`build-structure.json` reports for `PROC MI` are studies holding a file that
+CONTAINS one, which is a count of definitions rather than of runs.
+
 Also outstanding: a join between `log-verifiability.json` and `lst-listing.json`
 to measure how many studies have BOTH rung 1 and rung 3, which neither answers
-alone; and a `NIMPUTE` scan of the direct `PROC MI` population, which the macro
-scans never covered.
+alone.
