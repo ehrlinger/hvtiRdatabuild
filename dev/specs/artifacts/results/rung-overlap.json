@@ -1,0 +1,36 @@
+{
+  "_provenance": {
+    "script": "rung-overlap-scan.R",
+    "question": "how many studies can be verified at both rung 1 and rung 3?",
+    "run_at": "2026-09-07T13:10:36-0400",
+    "root": "/studies",
+    "hvtiRutilities_version": "1.1.9",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "logs_considered": 50608,
+    "listings_considered": 49307,
+    "logs_unreadable": 0,
+    "listings_unreadable": 0,
+    "logs_oversized": 38,
+    "listings_oversized": 14,
+    "max_mb": 200,
+    "contains_identifiers": false,
+    "emits_study_identifiers": false,
+    "emits_dataset_dimensions": false,
+    "emits_listing_values": false
+  },
+  "files": {
+    "logs_read": 50570,
+    "logs_usable_for_rung_1": 44032,
+    "listings_read": 49293,
+    "listings_with_a_model": 8397
+  },
+  "studies": {
+    "both_rungs": 674,
+    "rung_1_only": 506,
+    "rung_3_only": 2,
+    "either_rung": 1182,
+    "with_a_usable_log": 1180,
+    "with_a_model_listing": 676,
+    "seen_with_any_log_or_listing": 1283
+  }
+}

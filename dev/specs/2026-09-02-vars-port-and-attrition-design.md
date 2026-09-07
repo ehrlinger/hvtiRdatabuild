@@ -121,10 +121,14 @@ Against artifacts the study already holds. No SAS is run.
    two sets whose members no longer exist anywhere; the intersection is somewhere
    in [0, 676] and no rerun narrows it. 45% bounds the full three-rung ladder from
    above and is not an estimate of it.
-   ⭐ `rung-overlap-scan.R` computes the intersection inside a single walk and
-   emits only counts, because emitting the two study lists would put roughly 1,900
-   study identifiers into a committed artifact. Run 2026-09-07; see
-   `artifacts/results/README.md`.
+   ⭐ **MEASURED 2026-09-07: the intersection is 674**, so rung 3 is very nearly
+   a SUBSET of rung 1 -- 99.7% of it -- and exactly 2 studies hold a model listing
+   without a usable log.
+   [`artifacts/results/rung-overlap.json`](artifacts/results/rung-overlap.json).
+   ⭐ 45% therefore bounds the full ladder from above AND estimates it: 674 of
+   1,487, 45.3%, clear both. The ladder nests rather than narrowing, so rung 3 is
+   the binding constraint at every step and the 506 rung-1-only studies buy shape
+   checking and nothing more. ⚠️ 204 studies kept neither a log nor a listing.
 
 Only after all three may a port feed a parity comparison. Otherwise a transcription slip in
 the port presents as a failure of whatever is being compared, which is the specific error

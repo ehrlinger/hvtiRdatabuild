@@ -219,10 +219,21 @@ is the rung-3 counterpart to the log scan's rung-1 figure.
 model coefficients**, against 79% holding a log that recorded a dataset shape.
 The verification ladder narrows sharply at the top.
 
-⚠️ **Nothing measures the overlap.** The two scans count independent populations,
-so a study may hold a listing and no usable log. 45% bounds the full ladder from
-above and is not an estimate of it. Measuring the intersection is a small join
-and has not been done.
+⭐ **MEASURED 2026-09-07, and the ladder does not narrow independently -- it
+NESTS.** 674 of the 676 studies with a model listing also kept a usable log, so
+**99.7% of rung 3 sits inside rung 1** and exactly **2** studies hold a listing
+without one.
+[`artifacts/results/rung-overlap.json`](artifacts/results/rung-overlap.json).
+
+⭐ **So 45% was not merely an upper bound on the full ladder; it is within two
+studies of being the answer.** 674 of 1,487, 45.3%, clear rung 1 AND rung 3.
+The binding constraint is rung 3 throughout, and the 506 studies that clear only
+rung 1 buy shape checking and nothing above it. A verification strategy that
+improves rung-1 coverage improves nothing that rung 3 gates.
+
+⚠️ **204 studies kept neither a log nor a listing** -- 1,283 of 1,487 hold at
+least one. Those are unverifiable by any rung of this ladder, by any means, and
+they are not a subset of some other problem.
 
 🔴 **A number that is not about verification at all: 35,735 listings, 72.5% of
 those read, appear to carry patient-level print output.** These are files on the

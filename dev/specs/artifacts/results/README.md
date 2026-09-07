@@ -224,10 +224,19 @@ believed when they typed it. Neither fixture asserted on the field, so nothing
 could catch it. Both now do, against the `digest` availability they can see, and
 the drift scan derives the value instead of stating it.
 
-That run's output was NOT committed. Its numbers were almost certainly md5's --
-`build-structure.json`, produced on the same server nineteen minutes earlier,
-reports `md5` -- but an artifact that misreports its own method is worse than a
-stale one that reports honestly.
+That run's output was NOT committed. ⭐ **The honest rerun of 2026-09-07 13:04
+reports `md5` and returns the same numbers**, so the suspect run had indeed used
+md5 and only its label was wrong -- but an artifact that misreports its own
+method is worse than a stale one that reports honestly, and it was not worth
+keeping on an inference.
+
+⭐ **Against the weighted-sums run, md5 changed the drift census by nothing at
+all.** `names_in_many_copies` 1,444, `names_drifted` 1,064 and
+`names_drifted_below_header` 1,062 are unmoved. The four `+1`s -- macro names,
+names in one copy, max copies, max distinct bodies -- are all accounted for by a
+single `.sas` file that appeared on the share between the two runs
+(227,783 -> 227,784 files). ⚠️ **So the 74% drift headline never depended on the
+fingerprint**, and neither did any figure quoted from it.
 
 ## Regenerated 2026-09-07
 
@@ -241,7 +250,7 @@ magnitude was unknown, and three of them turned out to have moved nothing.
 | `log-verifiability.json` | study attributed AFTER the oversized skip | **every integer identical** |
 | `lst-listing.json` | the same ordering | **every integer identical** |
 | `build-structure.json` | fingerprint collisions; the "builds" mislabel; the macro regex | bodies +1, shapes +15, **`calls_a_user_macro` halved** |
-| `macro-drift.json` | fingerprint collisions | ⚠️ **rerun pending** -- see the provenance defect above |
+| `macro-drift.json` | fingerprint collisions | **every drift figure identical** |
 
 ⭐ **The two attribution reruns confirm a BOUNDED prediction.** `with_any_log`
 could rise by at most the 38 oversized logs and `with_any_listing` by at most the
@@ -289,5 +298,32 @@ pair differs. A drifted copy would still run and would report the overlap of two
 populations that are not the ones these artifacts describe -- which is the
 defect this whole body of work measured, in 1,064 macro names.
 
-The scan is written, tested and staged; **`rung-overlap.json` does not exist
-yet**, and no figure from it is quoted anywhere.
+### Run 2026-09-07: the ladder nests
+
+✅ **The two cross-check fields reproduced exactly** -- `with_a_usable_log` 1,180
+and `with_a_model_listing` 676, rederived from 99,915 files by an independent
+walk. The copied patterns had not drifted, so the overlap describes the same
+populations the parent artifacts do.
+
+| | studies |
+|---|---:|
+| **both rungs** | **674** |
+| rung 1 only | 506 |
+| rung 3 only | **2** |
+| either rung | 1,182 |
+| holding a log or a listing | 1,283 |
+
+⭐ **674 of the 676 studies with a model listing also kept a usable log: 99.7%.**
+Rung 3 is very nearly a subset of rung 1, not an independent population, and the
+possibility the parent notes were careful to flag -- "a study may hold a listing
+and no usable log" -- is true of exactly two studies in 1,487.
+
+⭐ **So 45% bounds the full ladder from above AND estimates it.** 674 of 1,487 is
+45.3%. Rung 3 is the binding constraint at every step, and the 506 studies that
+clear only rung 1 buy shape checking and nothing above it.
+
+⚠️ **204 studies kept neither a log nor a listing.** 1,283 of 1,487 hold at least
+one. Those studies are unverifiable at any rung of this ladder by any means.
+🔴 That comparison crosses scans -- 1,487 comes from the `.sas` census, not from
+this walk, which is why `seen_with_any_log_or_listing` is documented as not a
+denominator.
