@@ -148,12 +148,24 @@ scan that guessed would produce a number answering neither consumer.
 studies). A library alias used by one study is not an institutional source, and
 emitting it would widen the contract past what the scan claims.
 
-#### Run 2026-09-06, folder-scoped
+#### Run 2026-09-06, folder-scoped; regenerated 2026-09-07
 
 **38,877 files across 1,456 studies**, against 130 studies under the earlier
 filename scope. ⭐ **The earlier "82% of builds are unique" was a sampling
-artifact**: 38,877 files reduce to **6,994 distinct step shapes**, 18% rather
+artifact**: 38,877 files reduce to **7,009 distinct step shapes**, 18% rather
 than 82%. The build layer is far more stereotyped than the filename sample said.
+
+⚠️ **"38,877 builds" was never a population of builds**, and the scan no longer
+says it is. The field is `sas_files_in_folder`, because **1,733 of those files
+(4.5%) contain no DATA or PROC step at all**. Against the 37,144 that do, the
+step shapes are 18.9%. The conclusion is unchanged either way; the label was
+wrong and the ratio was not.
+
+⚠️ **A second figure from this run has been corrected downward by half.** The
+scan reported 17,623 files calling a macro; that regex counted `%sysfunc()` and
+other built-in FUNCTIONS as composition. Measured properly, **8,977 files
+(23.1%)** call a user macro -- just under a quarter, not nearly half.
+`uses_include` is unchanged at 3,247.
 
 ⚠️ **The artifact behind the figures below was withdrawn for disclosing
 identifiers**, and the figures are quoted from the console output rather than

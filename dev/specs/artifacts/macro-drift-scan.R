@@ -212,7 +212,17 @@ out <- list(
     # ⚠️ TRUE, like imputation-reconcile-scan.R. Macro names only, capped by
     # --top; no study identifier, path or body. See the header.
     emits_macro_names = TRUE,
-    fingerprint = "length + char sum + position-weighted char sum; not a hash"
+    # 🔴 THE METHOD, NOT A DESCRIPTION OF ONE. This was a hardcoded literal
+    # naming the OLD fingerprint, and it survived the 2026-09-06 switch to md5
+    # untouched: the run of 2026-09-07 used md5 and reported itself as using
+    # weighted sums. `build-structure-scan.R` was changed correctly in the same
+    # commit, so the artifacts disagreed about a method they shared.
+    #
+    # ⚠️ The point of recording the method was that a count is never read as
+    # stronger than the function behind it. A literal cannot do that -- it
+    # records what someone believed when they typed it. `test-macro-drift-scan.R`
+    # now asserts this field against the digest availability it can see.
+    fingerprint = fingerprint_method
   ),
   summary = list(
     macro_names            = length(nms),
@@ -251,3 +261,4 @@ for (w in out$worst) {
                   w$distinct_bodies_no_hdr))
 }
 message("\nwrote ", outfile)
+message("fingerprint:                    ", fingerprint_method)

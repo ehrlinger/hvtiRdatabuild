@@ -2,7 +2,7 @@
   "_provenance": {
     "script": "lst-listing-scan.R",
     "question": "what was filed, and can it check a port at rung 3?",
-    "run_at": "2026-09-06T15:40:53-0400",
+    "run_at": "2026-09-07T12:14:50-0400",
     "root": "/studies",
     "hvtiRutilities_version": "1.1.9",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
