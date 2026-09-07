@@ -216,6 +216,27 @@ macro-call scoping in the imputation spec's §2 was right, and the 822 studies
 `build-structure.json` reports for `PROC MI` are studies holding a file that
 CONTAINS one, which is a count of definitions rather than of runs.
 
-Also outstanding: a join between `log-verifiability.json` and `lst-listing.json`
-to measure how many studies have BOTH rung 1 and rung 3, which neither answers
-alone.
+## The rung 1 / rung 3 join, and why it needed its own scan
+
+⚠️ **Neither `log-verifiability.json` nor `lst-listing.json` can be joined to the
+other, and no rerun changes that.** Both reduce their study set with
+`length(unique(...))` before writing, so 1,180 and 676 are the sizes of two sets
+whose members no longer exist anywhere. The overlap could be anything from 0 to
+676.
+
+⭐ **`rung-overlap-scan.R` computes the join where the data lives and emits a
+scalar.** The obvious alternative -- emit both study lists and intersect them --
+would put roughly 1,900 study identifiers into a committed artifact, which is
+the class `st1027` belonged to and a larger disclosure than the one withdrawn
+above. Aggregating inside the walk is what makes it safe; a filter on the way
+out is what failed on 2026-09-06.
+
+🔴 **It copies three detection patterns from the two scans it joins, so the copy
+is guarded rather than trusted.** `test-rung-overlap-scan.R` evaluates
+`RE_SHAPE`, `RE_ERROR` and `RE_MODEL` out of all three scripts and fails if any
+pair differs. A drifted copy would still run and would report the overlap of two
+populations that are not the ones these artifacts describe -- which is the
+defect this whole body of work measured, in 1,064 macro names.
+
+The scan is written, tested and staged; **`rung-overlap.json` does not exist
+yet**, and no figure from it is quoted anywhere.
