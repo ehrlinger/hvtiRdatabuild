@@ -2,35 +2,35 @@
   "_provenance": {
     "script": "macro-drift-scan.R",
     "question": "is the copy drift found in the imputation macros a property of imputation or of the corpus?",
-    "run_at": "2026-09-06T09:17:03-0400",
+    "run_at": "2026-09-07T13:04:54-0400",
     "root": "/studies",
     "scope": "every .sas under root",
     "hvtiRutilities_version": "1.1.9",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
-    "files_considered": 227783,
+    "files_considered": 227784,
     "files_unreadable": 1,
-    "macro_definitions": 315871,
+    "macro_definitions": 315873,
     "file_sampled": false,
     "emits_macro_names": true,
-    "fingerprint": "length + char sum + position-weighted char sum; not a hash"
+    "fingerprint": "md5"
   },
   "summary": {
-    "macro_names": 2449,
-    "names_in_one_copy": 1005,
+    "macro_names": 2450,
+    "names_in_one_copy": 1006,
     "names_in_many_copies": 1444,
     "names_drifted": 1064,
     "names_drifted_below_header": 1062,
     "names_drifted_header_only": 2,
-    "max_copies": 81813,
-    "max_distinct_bodies": 46763
+    "max_copies": 81814,
+    "max_distinct_bodies": 46764
   },
   "worst": [
     {
       "macro": "skip",
-      "copies": 81813,
+      "copies": 81814,
       "studies": 1396,
-      "distinct_bodies": 46763,
-      "distinct_bodies_no_hdr": 46753
+      "distinct_bodies": 46764,
+      "distinct_bodies_no_hdr": 46754
     },
     {
       "macro": "skkip",
