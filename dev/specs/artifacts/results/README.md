@@ -318,12 +318,31 @@ Rung 3 is very nearly a subset of rung 1, not an independent population, and the
 possibility the parent notes were careful to flag -- "a study may hold a listing
 and no usable log" -- is true of exactly two studies in 1,487.
 
-⭐ **So 45% bounds the full ladder from above AND estimates it.** 674 of 1,487 is
-45.3%. Rung 3 is the binding constraint at every step, and the 506 studies that
-clear only rung 1 buy shape checking and nothing above it.
+⚠️ **674 IS AN UPPER BOUND, AND CALLING IT AN ESTIMATE OF THE FULL LADDER WAS AN
+OVERCLAIM** (caught in review of PR #47, 2026-09-07). Two limits, both of which
+this scan can never lift on its own:
 
-⚠️ **204 studies kept neither a log nor a listing.** 1,283 of 1,487 hold at least
-one. Those studies are unverifiable at any rung of this ladder by any means.
-🔴 That comparison crosses scans -- 1,487 comes from the `.sas` census, not from
-this walk, which is why `seen_with_any_log_or_listing` is documented as not a
-denominator.
+- **Rung 2 is not measured anywhere.** The ladder has three rungs and its
+  defining note requires all three. A join of rungs 1 and 3 says nothing about
+  the whole.
+- **The join is STUDY-LEVEL, not job-level.** It shows a study holds SOME usable
+  log and SOME model listing. Neither is linked to the analysis dataset a port
+  must reproduce -- which is precisely why rung 1 is documented as a ceiling, and
+  the reason applies to rung 3 unchanged.
+
+⭐ What it does establish: **674 of 1,487, 45.3%, hold BOTH kinds of evidence**,
+so rung 3 bounds the rung-1-and-3 pair almost exactly, and the 506 rung-1-only
+studies hold no values evidence at all.
+
+⚠️ **204 studies hold neither a log nor a listing.** 1,283 of 1,487 hold at least
+one. 🔴 **That is a statement about these two file populations and nothing more.**
+The scan does not inspect rung-2 attrition evidence, saved datasets or oracle
+snapshots, so the finding is that no log or listing evidence was found -- not
+that those studies cannot be verified. 🔴 The comparison also crosses scans:
+1,487 comes from the `.sas` census, not from this walk, which is why
+`seen_with_any_log_or_listing` is documented as not a denominator.
+
+⭐ **This is the third time in this body of work that co-occurrence was read as
+capability** -- after "309 studies hold a copy" and "`PROC MI` in 822 studies".
+Holding the evidence is not clearing the rung, exactly as holding the file was
+not running the macro.
