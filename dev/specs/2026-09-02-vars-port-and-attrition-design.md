@@ -125,10 +125,17 @@ Against artifacts the study already holds. No SAS is run.
    a SUBSET of rung 1 -- 99.7% of it -- and exactly 2 studies hold a model listing
    without a usable log.
    [`artifacts/results/rung-overlap.json`](artifacts/results/rung-overlap.json).
-   ⭐ 45% therefore bounds the full ladder from above AND estimates it: 674 of
-   1,487, 45.3%, clear both. The ladder nests rather than narrowing, so rung 3 is
-   the binding constraint at every step and the 506 rung-1-only studies buy shape
-   checking and nothing more. ⚠️ 204 studies kept neither a log nor a listing.
+   ⚠️ **674 REMAINS AN UPPER BOUND, and calling it an estimate of the full ladder
+   was an overclaim.** Two things it does not establish. **Rung 2 is not measured
+   at all**, and the sentence below this list requires all three, so nothing here
+   speaks to the ladder as a whole. And the join is STUDY-LEVEL: it shows a study
+   holds some usable log and some model listing, not that either pertains to the
+   analysis dataset a port must reproduce -- which is exactly why rung 1 is a
+   ceiling, for a reason that applies to rung 3 unchanged.
+   ⭐ What it does establish: **674 of 1,487, 45.3%, hold BOTH kinds of evidence**,
+   so rung 3 bounds the rung-1-and-3 pair almost exactly and the 506 rung-1-only
+   studies hold no values evidence. ⚠️ **204 studies hold neither a log nor a
+   listing**, so no rung-1 or rung-3 evidence was found for them here.
 
 Only after all three may a port feed a parity comparison. Otherwise a transcription slip in
 the port presents as a failure of whatever is being compared, which is the specific error

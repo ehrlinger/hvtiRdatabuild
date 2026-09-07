@@ -225,15 +225,22 @@ NESTS.** 674 of the 676 studies with a model listing also kept a usable log, so
 without one.
 [`artifacts/results/rung-overlap.json`](artifacts/results/rung-overlap.json).
 
-⭐ **So 45% was not merely an upper bound on the full ladder; it is within two
-studies of being the answer.** 674 of 1,487, 45.3%, clear rung 1 AND rung 3.
-The binding constraint is rung 3 throughout, and the 506 studies that clear only
-rung 1 buy shape checking and nothing above it. A verification strategy that
-improves rung-1 coverage improves nothing that rung 3 gates.
+⚠️ **It remains an UPPER BOUND on the full ladder, and saying otherwise was an
+overclaim.** **Rung 2 is not measured anywhere**, and the ladder requires all
+three. The join is also STUDY-LEVEL -- a study holds some usable log and some
+model listing, not necessarily ones pertaining to the analysis dataset a port
+must reproduce, which is the same reason rung 1 is documented as a ceiling.
 
-⚠️ **204 studies kept neither a log nor a listing** -- 1,283 of 1,487 hold at
-least one. Those are unverifiable by any rung of this ladder, by any means, and
-they are not a subset of some other problem.
+⭐ What it establishes: **674 of 1,487, 45.3%, hold BOTH kinds of evidence**, so
+rung 3 bounds the rung-1-and-3 pair almost exactly and the 506 rung-1-only
+studies hold no values evidence. A strategy that improves rung-1 coverage adds
+nothing to that pair.
+
+⚠️ **204 studies hold neither a log nor a listing** -- 1,283 of 1,487 hold at
+least one. 🔴 That is a statement about these two file populations ONLY: the scan
+does not inspect rung-2 attrition evidence, saved datasets or oracle snapshots,
+so it says no log or listing evidence was found, not that a study cannot be
+verified.
 
 🔴 **A number that is not about verification at all: 35,735 listings, 72.5% of
 those read, appear to carry patient-level print output.** These are files on the
