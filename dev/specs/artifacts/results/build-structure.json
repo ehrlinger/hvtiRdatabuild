@@ -2,11 +2,12 @@
   "_provenance": {
     "script": "build-structure-scan.R",
     "question": "what is a study's data build made of, and what does it read from?",
-    "run_at": "2026-09-06T16:29:59-0400",
+    "run_at": "2026-09-07T12:10:30-0400",
     "root": "/studies",
     "folder": "datasets",
     "stem": "",
     "path_depth": 2,
+    "fingerprint": "md5",
     "hvtiRutilities_version": "1.1.9",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
     "files_considered": 38878,
@@ -15,16 +16,18 @@
     "emits_names": false,
     "libref_floor_studies": 5
   },
-  "builds": {
+  "sas_files_in_folder": {
     "files": 38877,
     "studies": 1456,
-    "distinct_bodies": 22989,
-    "distinct_step_shapes": 6994,
+    "files_with_at_least_one_step": 37144,
+    "files_with_no_steps": 1733,
+    "distinct_bodies": 22990,
+    "distinct_step_shapes": 7009,
     "steps_min": 0,
     "steps_median": 8,
     "steps_max": 606,
     "uses_include": 3247,
-    "calls_a_macro": 17623
+    "calls_a_user_macro": 8977
   },
   "librefs_read": {
     "distinct": 55,

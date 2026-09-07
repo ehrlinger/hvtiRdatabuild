@@ -2,7 +2,7 @@
   "_provenance": {
     "script": "log-verifiability-scan.R",
     "question": "for what fraction of studies could a ported vars.sas be verified at rung 1?",
-    "run_at": "2026-09-06T14:02:43-0400",
+    "run_at": "2026-09-07T12:26:11-0400",
     "root": "/studies",
     "hvtiRutilities_version": "1.1.9",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",

@@ -178,36 +178,87 @@ here. ⭐ **The filter caught six identifying names on real data**: three libref
 and three `LIBNAME` targets that cleared the frequency floor, so four more than
 the two spotted by eye would have gone out.
 
-## The fingerprint overflow changed nothing, now measured
+## The fingerprint: two defects, both now measured
 
-The withdrawn run emitted `NAs produced by integer overflow` from the body
-fingerprint: `v * seq_along(v)` on an integer vector overflows once an element
-exceeds 2^31, needing a file of roughly 17 million characters. It was recorded
-here as an undercount of `distinct_bodies` "by an unmeasured amount".
+**The overflow changed nothing.** The withdrawn run emitted `NAs produced by
+integer overflow` from the body fingerprint: `v * seq_along(v)` on an integer
+vector overflows once an element exceeds 2^31, needing a file of roughly 17
+million characters. It was recorded here as an undercount "by an unmeasured
+amount". ⭐ Measured, the amount is zero: the corrected rerun returned exactly
+the counts of the run that warned.
 
-⭐ **Measured: the amount is zero.** The corrected rerun returns 22,989 distinct
-bodies and 6,994 step shapes, identical to the run that warned. The warning was
-real and no count moved.
+🔴 **The collisions were the larger defect, and saying so is what made the
+overflow result misleading.** That "changed nothing, now measured" read as *the
+fingerprint is sound*. It was not. Three statistics -- length, character sum,
+position-weighted character sum -- and both sums are SYMMETRIC under swapping a
+pair of characters around the centre, so `abba` and `baab` shared a value.
+Reproduced, then fixed to md5 via `digest` on 2026-09-06.
 
-`macro-drift.json` used the same function, and the same reasoning applies with
-more margin, since macro bodies are far smaller than whole files. It has not been
-rerun and does not need to be on this account.
+⭐ **Measured 2026-09-07, the effect is small and REVEALINGLY UNEVEN:**
 
-## Not yet run
+| | weighted sums | md5 | Δ |
+|---|---:|---:|---:|
+| `distinct_bodies` | 22,989 | 22,990 | +1 |
+| `distinct_step_shapes` | 6,994 | 7,009 | +15 |
 
-⚠️ **Every committed artifact predates the review fixes of 2026-09-06 17:15 and
-should be regenerated before its numbers are quoted further.** Specifically:
+0.004% of bodies collided against 0.21% of step shapes -- fifty times the rate.
+A step shape is a SHORT string over a tiny alphabet, a handful of repeated step
+names, so near-permutations of one another are common and the symmetric-swap
+class fires often. Bodies are long and character-diverse, so it almost never
+does. ⚠️ **The collision rate is a property of the input distribution, not of the
+function alone**, which is why "unbounded" was the right word for the risk and
+the wrong word for the magnitude.
 
-- `build-structure.json` and `macro-drift.json` used a fingerprint with
-  DEMONSTRATED collisions (`abba` and `baab` produced the same value), so their
-  `distinct_bodies` are undercounts with no bound. Both now use md5 where
-  `digest` is available.
-- `log-verifiability.json` and `lst-listing.json` attributed studies AFTER
-  skipping oversized files, so `with_any_log` (1,204) and `with_any_listing`
-  (1,267) can undercount studies whose only file was oversized.
-- `build-structure.json` also described its population as "builds" when it is
-  every `.sas` file under `datasets/`; the field is renamed and now reports how
-  many carry a DATA or PROC step at all.
+## 🔴 `macro-drift.json` reported a fingerprint it had not used
+
+⚠️ **The 2026-09-07 drift run recorded its method as "length + char sum +
+position-weighted char sum; not a hash" while running md5.** The field was a
+HARDCODED LITERAL at `macro-drift-scan.R:215`. `build-structure-scan.R` was
+changed to report `fingerprint_method` when both scans moved to md5;
+this one was not, and the two artifacts then disagreed about a method they
+shared.
+
+⭐ **The field existed precisely so that a count is never read as stronger than
+the function behind it, and a literal cannot do that** -- it records what someone
+believed when they typed it. Neither fixture asserted on the field, so nothing
+could catch it. Both now do, against the `digest` availability they can see, and
+the drift scan derives the value instead of stating it.
+
+That run's output was NOT committed. Its numbers were almost certainly md5's --
+`build-structure.json`, produced on the same server nineteen minutes earlier,
+reports `md5` -- but an artifact that misreports its own method is worse than a
+stale one that reports honestly.
+
+## Regenerated 2026-09-07
+
+Every artifact that predated the review fixes of 2026-09-06 17:15 has been rerun
+against the same root. ⭐ **Three of the four came back with every integer
+unchanged, and that is the useful result** -- each fix was for a defect whose
+magnitude was unknown, and three of them turned out to have moved nothing.
+
+| artifact | what the fix addressed | outcome |
+|---|---|---|
+| `log-verifiability.json` | study attributed AFTER the oversized skip | **every integer identical** |
+| `lst-listing.json` | the same ordering | **every integer identical** |
+| `build-structure.json` | fingerprint collisions; the "builds" mislabel; the macro regex | bodies +1, shapes +15, **`calls_a_user_macro` halved** |
+| `macro-drift.json` | fingerprint collisions | ⚠️ **rerun pending** -- see the provenance defect above |
+
+⭐ **The two attribution reruns confirm a BOUNDED prediction.** `with_any_log`
+could rise by at most the 38 oversized logs and `with_any_listing` by at most the
+14 oversized listings. Both were unchanged at 1,204 and 1,267, so no study's only
+log or only listing was among them. The port-verifiability figures those files
+carry -- 79% at rung 1, 45% at rung 3 -- are untouched.
+
+🔴 **`build-structure.json` changed one claim substantially.**
+`calls_a_macro` counted `%sysfunc()` and other built-in FUNCTIONS as
+composition. Renamed `calls_a_user_macro` and measured properly, it falls from
+**17,623 files (45.3%) to 8,977 (23.1%)**. Just under a quarter of the files
+under `datasets/` call a user macro, not nearly half. `uses_include` is unchanged
+at 3,247, so the `%include` half of the composition story stands.
+
+⭐ **And the rename earned its keep: 1,733 files (4.5%) contain no DATA or PROC
+step at all.** `steps_min = 0` had been in the output all along saying the
+population was not one of builds.
 
 ⭐ **`direct-procmi.json` closes the question it was built for, in the opposite
 direction to the suspicion that prompted it.** 1,650 of the corpus's 1,655

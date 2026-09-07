@@ -132,5 +132,20 @@ if (file.exists(o2)) {
 }
 
 unlink(root, recursive = TRUE)
+# ---- the fingerprint method is REPORTED, not described ----------------------
+# 🔴 `macro-drift-scan.R` recorded this as a hardcoded literal naming the old
+# weighted-sums fingerprint, and the literal survived the 2026-09-06 switch to
+# md5 untouched. The run of 2026-09-07 used md5 and said it had not. Neither
+# fixture asserted on the field, so nothing could catch it.
+#
+# ⭐ Assert against what THIS machine can see, so the check holds on a server
+# with `digest` and on one without.
+want_fp <- if (requireNamespace("digest", quietly = TRUE)) "md5" else
+  "weighted-sums (COLLISION-PRONE)"
+if (!grepl(paste0('"fingerprint": "', want_fp, '"'), j, fixed = TRUE)) {
+  message("FAIL  output does not report fingerprint method as: ", want_fp)
+  fail <- fail + 1L
+} else message(sprintf("%-26s %s", "reports its fingerprint", "ok"))
+
 if (fail) { message("\n", fail, " failure(s)"); quit(save = "no", status = 1) }
 message("\nall checks passed")

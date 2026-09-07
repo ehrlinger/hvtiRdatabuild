@@ -116,9 +116,15 @@ Against artifacts the study already holds. No SAS is run.
    `.lst` carrying a model listing.**
    [`artifacts/results/lst-listing.json`](artifacts/results/lst-listing.json).
    ⚠️ Set that against rung 1's 79%: the ladder narrows sharply at the top, and
-   **nothing yet measures the OVERLAP.** The two scans count independent
-   populations, so a study may hold a listing and no usable log. 45% bounds the
-   full three-rung ladder from above and is not an estimate of it.
+   **nothing in EITHER artifact can measure the OVERLAP.** Both scans reduce their
+   study set to a size before writing, so 1,180 and 676 are the cardinalities of
+   two sets whose members no longer exist anywhere; the intersection is somewhere
+   in [0, 676] and no rerun narrows it. 45% bounds the full three-rung ladder from
+   above and is not an estimate of it.
+   ⭐ `rung-overlap-scan.R` computes the intersection inside a single walk and
+   emits only counts, because emitting the two study lists would put roughly 1,900
+   study identifiers into a committed artifact. Run 2026-09-07; see
+   `artifacts/results/README.md`.
 
 Only after all three may a port feed a parity comparison. Otherwise a transcription slip in
 the port presents as a failure of whatever is being compared, which is the specific error
@@ -161,7 +167,9 @@ Hand-porting every study is infeasible at corpus scale, so a translator reading 
 and emitting R is worth considering. It is worth *measuring* first.
 
 ⭐ **MEASURED 2026-09-06: 1,180 of the 1,487 studies holding SAS code, 79%, kept
-a log that recorded a dataset shape and did not error.**
+a log that recorded a dataset shape and did not error.** ✅ Confirmed unchanged by
+the 2026-09-07 rerun, which corrected an ordering defect that could only have
+raised the figure: every integer in the artifact came back identical.
 [`artifacts/results/log-verifiability.json`](artifacts/results/log-verifiability.json).
 ⚠️ Read it as a CEILING rather than an estimate: it establishes that shape
 information exists in a study's logs, not that the shape of the specific analysis
