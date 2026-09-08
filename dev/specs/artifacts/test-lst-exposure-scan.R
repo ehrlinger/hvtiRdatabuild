@@ -37,6 +37,14 @@ folder <- unique(hvtiRutilities::hvti_taxonomy()$folder)[[1]]
 pad <- function(x) formatC(x, width = 40, flag = "-")
 HEAD <- pad("The PRINT Procedure")          # RE_HEADING
 OBS  <- pad("Obs   InventedCol   Another")  # RE_OBSLINE, invented headers, no rows
+UOBS <- pad("OBS   InventedCol   Another")  # 🔴 uppercase: dropped by every run
+                                            #    before 2026-09-08
+ROW  <- pad("     1   0   0")               # a numbered row. ⚠️ INVENTED ZEROS:
+                                            #    shape only, no value is real
+# 🔴 A line carrying a digit that is NOT a row. Without it, unanchoring RE_ROW
+# changes nothing, because every other non-row line here is digit-free -- the
+# fixture would confirm the anchor it never tested.
+NOTROW <- pad("(invented note 7, not a row)")
 FILL <- pad("(invented fixture line)")
 LINE <- 41L
 
@@ -76,6 +84,29 @@ add("cardiac/zeta",    "o4.lst", c(OBS, FILL),       "0600")
 add("cardiac/theta",   "o5.lst", c(OBS),             "0600")
 add("cardiac/theta",   "o6.lst", c(OBS, FILL),       "0600")
 add("cardiac/theta",   "o7.lst", c(OBS),             "0640")
+# --- obs header WITH a numbered row beneath: the corroborated population -----
+add("cardiac/kappa",  "r1.lst", c(OBS, ROW),        "0640")
+add("cardiac/kappa",  "r2.lst", c(FILL, OBS, ROW),  "0640")
+# ⭐ Uppercase header AND a row. Invisible to every run before 2026-09-08, and
+#    corroborated once seen -- so it tests the case fix and the row check at once.
+add("cardiac/lambda", "r3.lst", c(UOBS, ROW),       "0640")
+# ⚠️ A header whose row does not immediately follow. Corroboration is a LOWER
+#    bound and this file is what says so: obs header, not corroborated.
+add("cardiac/kappa",  "r4.lst", c(OBS, FILL, ROW),  "0640")
+# ⚠️ Header followed by a line CONTAINING a digit but not shaped like a row.
+#    Anchored, not corroborated; unanchored, wrongly corroborated.
+add("cardiac/kappa",  "r5.lst", c(OBS, NOTROW),     "0640")
+# ⭐ A row four lines down: inside the default window, outside a naive check.
+add("cardiac/kappa",  "r6.lst", c(OBS, FILL, FILL, FILL, ROW), "0640")
+# ⚠️ A row TEN lines down: outside the window, so it must count as "none" and
+#    the corroborated figure must stay a lower bound rather than creeping.
+add("cardiac/mu",     "r7.lst", c(OBS, rep(FILL, 9L), ROW),    "0640")
+# 🔴 A header PAST THE FIRST WINDOW BOUNDARY. Under `--chunk 1` the buffer grows
+#    beyond ROW_WINDOW before this header is reached, so the unresolved tail must
+#    be carried forward. Discarding it loses the header entirely -- a mutation
+#    that escaped every other file here, because none put a header that deep.
+add("cardiac/kappa",  "r8.lst", c(rep(FILL, 9L), OBS, ROW),    "0640")
+
 # --- neither: 2 files, one of them the FREQ discriminator --------------------
 add("cardiac/gamma",   "n1.lst", c(FILL),            "0600")
 add("cardiac/gamma",   "f1.lst", c(FREQ, FILL),      "0600")
@@ -109,27 +140,33 @@ num <- function(field) {
 }
 
 expected <- list(
-  read                        = 16L,
-  both                        = 4L,
-  heading_only                = 2L,
-  obs_only                    = 7L,
-  # ⭐ gamma's plain file AND its FREQ-heading file: a procedure heading that is
-  # not a print heading must NOT count.
+  read                        = 24L,
+  # ⚠️ ZERO in the corpus: SAS's LISTING output for PROC PRINT carries no
+  # procedure banner. The fixture still plants six, because the arm has to be
+  # shown working before its zero can be read as a finding rather than a bug.
+  with_a_print_or_report_heading = 6L,
+  # p1-p4, o1-o7, r1-r4  (r3's header is uppercase and now counts)
+  obs_header                  = 19L,
+  # ⭐ r1, r2, r3 only. p1-p4 and o1-o7 have headers with no row beneath.
+  obs_header_with_a_row_at_offset_1 = 4L,
+  # ⭐ r1, r2, r3 at offset 1; r4 at 2; r6 at 4. r5 has no row, r7's is at 10.
+  obs_header_with_a_row_in_window   = 6L,
+  obs_header_with_no_row_in_window  = 13L,
+  # ⚠️ r4's row is one line further down: corroboration is a LOWER bound.
+
+  # 🔴 r3 alone. Invisible to every run before 2026-09-08.
+  obs_header_uppercase_only   = 1L,
   neither                     = 3L,
-  any_print_pattern           = 13L,
-  with_a_procedure_heading    = 6L,
-  # alpha, delta, epsilon, beta, zeta, theta -- gamma has no print pattern
-  with_any_print_pattern      = 6L,
-  # ⭐ alpha, delta, epsilon only: beta, zeta and theta matched the heuristic alone
-  with_a_heading_backed_print = 3L,
-  # 0644 x5 and 0640 x4 are group readable; 0644 x5 are other readable
-  group_readable              = 9L,
+  any_print_pattern           = 21L,
+  # alpha, delta, epsilon, beta, zeta, theta, kappa, lambda
+  with_any_print_pattern      = 9L,
+  # ⭐ kappa and lambda only
+  with_a_corroborated_print   = 2L,
+  group_readable              = 17L,
   other_readable              = 5L,
   owner_only                  = 7L,
   distinct_owners             = 1L,
-  # ⚠️ Every file except thoracic/beta's two, whose folder is 0750. An UPPER
-  # bound in the real corpus: the scan checks the immediate directory only.
-  in_a_world_traversable_directory = 14L,
+  in_a_world_traversable_directory = 22L,
   all_listings_bytes          = bytes,
   print_matched_bytes         = print_bytes
 )
@@ -141,12 +178,31 @@ for (nm in names(expected)) {
                   if (ok) "ok" else "FAIL"))
 }
 
+# ---- the offset distribution is the layout measurement ----------------------
+# ⭐ r1, r2, r3 put a row at offset 1; r4 at offset 2; r6 at offset 4. r5 has no
+# row at all and r7's sits at offset 10, beyond the window -- both must land in
+# `none_in_window`, together with every header in p1-p4 and o1-o7.
+# 🔴 RE-READ THE MAIN OUTPUT. Later sections reassign `j` to the oversized and
+# chunked runs, and this block first sat after them -- asserting the layout
+# against a run where every detection figure is deliberately zero. It reported
+# 0 for every offset and looked like a scan defect.
+j <- paste(readLines(outfile), collapse = " ")
+for (nm in c("offset_1", "offset_2", "offset_3", "offset_4", "none_in_window")) {
+  want <- c(offset_1 = 4L, offset_2 = 1L, offset_3 = 0L, offset_4 = 1L,
+            none_in_window = 13L)[[nm]]
+  got <- num(nm)
+  ok <- identical(got, want)
+  if (!ok) fail <- fail + 1L
+  message(sprintf("distribution: %-15s expected %5d  got %5d  %s", nm, want, got,
+                  if (ok) "ok" else "FAIL"))
+}
+
 # ---- the contract -----------------------------------------------------------
 # 🔴 No listing text, no owner name, no path and no study identifier may reach
 # the output. The fixture plants distinctive words and names, and none may appear.
 me <- Sys.info()[["user"]]
 for (leak in c("invented", "Invented", "InventedCol", "PRINT Procedure", "Obs",
-               "cardiac", "thoracic", "alpha", "gamma", "FREQ", me)) {
+               "cardiac", "thoracic", "alpha", "gamma", "kappa", "FREQ", me)) {
   if (nzchar(leak) && grepl(leak, j, fixed = TRUE)) {
     message("FAIL  output contains fixture text: ", leak); fail <- fail + 1L
   }
@@ -181,9 +237,9 @@ if (!file.exists(o2)) {
   message("FAIL  the all-oversized run produced no output"); fail <- fail + 1L
 } else {
   j <- paste(readLines(o2), collapse = " ")
-  over <- list(read = 0L, any_print_pattern = 0L, both = 0L,
-               listings_oversized = 16L, print_matched_bytes = 0L,
-               group_readable = 9L, other_readable = 5L, owner_only = 7L,
+  over <- list(read = 0L, any_print_pattern = 0L, obs_header = 0L,
+               listings_oversized = 24L, print_matched_bytes = 0L,
+               group_readable = 17L, other_readable = 5L, owner_only = 7L,
                all_listings_bytes = bytes)
   for (nm in names(over)) {
     got <- num(nm)
@@ -191,6 +247,33 @@ if (!file.exists(o2)) {
     if (!ok) fail <- fail + 1L
     message(sprintf("oversized: %-18s expected %5d  got %5d  %s", nm, over[[nm]],
                     got, if (ok) "ok" else "FAIL"))
+  }
+}
+
+# ---- the corroboration survives a chunk boundary ----------------------------
+# 🔴 The adjacency check reads line i+1. When an `obs` header is the LAST line of
+# a chunk its row is the FIRST line of the next, and without a carry-over flag
+# the corroboration silently fails there. At 20,000 lines a chunk that is rare
+# enough in the corpus to look like a property of the data.
+#
+# ⭐ `--chunk 1` puts EVERY line on a boundary, so if the carry-over is broken
+# `obs_header_with_rows` collapses to zero while `obs_header` is unchanged.
+o4 <- file.path(root, "chunked.json")
+system2(rscript, c(shQuote(normalizePath(scan_script)), "--root", shQuote(root),
+                   "--out", shQuote(o4), "--chunk", "1"),
+        stdout = FALSE, stderr = FALSE)
+if (!file.exists(o4)) {
+  message("FAIL  the --chunk 1 run produced no output"); fail <- fail + 1L
+} else {
+  j <- paste(readLines(o4), collapse = " ")
+  for (nm in c("obs_header", "obs_header_with_a_row_in_window",
+               "obs_header_uppercase_only",
+               "with_a_corroborated_print")) {
+    got <- num(nm)
+    ok <- identical(got, as.integer(expected[[nm]]))
+    if (!ok) fail <- fail + 1L
+    message(sprintf("chunk=1: %-20s expected %5d  got %5d  %s", nm,
+                    expected[[nm]], got, if (ok) "ok" else "FAIL"))
   }
 }
 

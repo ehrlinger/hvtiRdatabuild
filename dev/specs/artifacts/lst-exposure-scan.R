@@ -78,6 +78,28 @@ max_mb     <- as.numeric(getarg("--max-lst-mb", "200"))
 # `both` is the confident population.
 RE_HEADING <- "the (print|report) procedure"
 RE_OBSLINE <- "^ *obs +"
+# 🔴 WHAT THE OLD PREFILTER ADMITTED, kept only to measure what it MISSED. Both
+# this scan and `lst-listing-scan.R` prefiltered raw lines with `^ *[Oo]bs `
+# BEFORE lowercasing, so a header SAS wrote as `OBS` was dropped before any
+# pattern saw it. `obs_header_uppercase_only` counts the files that costs.
+RE_OBSOLD  <- "^ *[Oo]bs "
+# ⭐ THE CORROBORATION. A `PROC PRINT` page is an `Obs` header followed by rows
+# that BEGIN with the observation number. Matching the header alone is a guess;
+# matching a header with a numbered row beneath it is a print-out.
+# ⚠️ This tests SHAPE, never content: the digits are matched and not read, which
+# keeps the no-row-count rule above intact -- a row's ordinal is not a value.
+# ⚠️ It is a LOWER bound. Only the IMMEDIATELY following line is checked, so a
+# blank or continuation line between header and rows reads as uncorroborated.
+RE_ROW     <- "^ *[0-9]+ "
+# ⭐ HOW FAR BELOW A HEADER TO LOOK. The 2026-09-08 16:10 run checked ONLY the
+# next line and corroborated 2 headers out of 36,634 -- a measurement of the
+# check failing, not of the corpus. Something sits between a SAS `Obs` header and
+# its first row essentially always; ⚠️ WHAT that is has not been established, and
+# guessing it twice would repeat the error that made this scan claim
+# `PROC PRINT` prints a procedure banner. So the OFFSET IS MEASURED rather than
+# assumed: the distribution below says where the rows actually are, and a
+# threshold can then be chosen from data.
+ROW_WINDOW <- as.integer(getarg("--row-window", "8"))
 
 .folders <- taxonomy_folders()
 study_of <- study_of_factory(root, .folders)
@@ -101,20 +123,64 @@ inspect <- function(path) {
   con <- tryCatch(file(path, "r", encoding = "latin1"), error = function(e) NULL)
   if (is.null(con)) return(NULL)
   on.exit(close(con), add = TRUE)
-  has <- c(heading = FALSE, obs = FALSE)
+  has <- c(heading = FALSE, obs = FALSE, oldform = FALSE)
+  # Counts of the offset at which the first row-shaped line appears after each
+  # `obs` header. Position ROW_WINDOW + 1 is "no row within the window".
+  offs <- integer(ROW_WINDOW + 1L)
+
+  # ⚠️ A HEADER NEEDS ROW_WINDOW LINES BENEATH IT TO BE JUDGED, so a header near
+  # the end of a chunk cannot be resolved until the next chunk arrives. `tail`
+  # holds the unresolved end of the buffer and is prepended to what follows.
+  # Every header is processed EXACTLY ONCE: only indices with a full window are
+  # evaluated, and those lines are then dropped.
+  tail <- character(0)
+  eof <- FALSE
   repeat {
     lines <- tryCatch(suppressWarnings(readLines(con, n = chunk, warn = FALSE)),
                       error = function(e) character(0))
-    if (!length(lines)) break
-    keep <- grepl("rocedure|^ *[Oo]bs ", lines)
-    if (!any(keep)) { rm(lines, keep); next }
-    lines <- tolower(lines[keep])
-    if (!has[["heading"]] && any(grepl(RE_HEADING, lines))) has[["heading"]] <- TRUE
-    if (!has[["obs"]]     && any(grepl(RE_OBSLINE, lines))) has[["obs"]]     <- TRUE
-    if (all(has)) { rm(lines, keep); break }
-    rm(lines, keep)
+    if (!length(lines)) eof <- TRUE
+    buf <- c(tail, lines)
+    if (!length(buf)) break
+
+    # At end of file every remaining header is judged on the lines that exist.
+    limit <- if (eof) length(buf) else length(buf) - ROW_WINDOW
+    if (limit > 0L) {
+      oi <- grep(RE_OBSLINE, utils::head(buf, limit), ignore.case = TRUE)
+      if (length(oi)) {
+        has[["obs"]] <- TRUE
+        if (!has[["oldform"]] && any(grepl(RE_OBSOLD, buf[oi])))
+          has[["oldform"]] <- TRUE
+        for (h in oi) {
+          hit <- ROW_WINDOW + 1L
+          for (k in seq_len(ROW_WINDOW)) {
+            j <- h + k
+            if (j > length(buf)) break
+            if (grepl(RE_ROW, buf[[j]])) { hit <- k; break }
+          }
+          offs[[hit]] <- offs[[hit]] + 1L
+        }
+      }
+      if (!has[["heading"]]) {
+        seg <- utils::head(buf, limit)
+        keep <- grepl("rocedure", seg)
+        if (any(keep) && any(grepl(RE_HEADING, tolower(seg[keep]))))
+          has[["heading"]] <- TRUE
+      }
+      tail <- if (limit < length(buf)) buf[(limit + 1L):length(buf)] else character(0)
+    } else {
+      tail <- buf
+    }
+    rm(lines, buf)                       # nothing survives but flags and counts
+    if (eof) break
   }
-  list(heading = has[["heading"]], obs = has[["obs"]])
+  list(heading = has[["heading"]], obs = has[["obs"]],
+       offsets = offs,
+       # Offset 1 exactly: the definition the 16:10 run used, kept so the two
+       # runs remain comparable.
+       rows1 = offs[[1L]] > 0L,
+       # Anywhere in the window.
+       rowsw = sum(offs[seq_len(ROW_WINDOW)]) > 0L,
+       missed_old = has[["obs"]] && !has[["oldform"]])
 }
 
 # ---- reachability -----------------------------------------------------------
@@ -142,9 +208,12 @@ dir_mode <- function(d) {
 
 stu <- study_of(lsts)
 n <- c(read = 0L, unreadable = 0L, oversized = 0L,
-       heading_only = 0L, obs_only = 0L, both = 0L, neither = 0L)
+       heading = 0L, obs = 0L, obs_rows = 0L, obs_rows_w = 0L,
+       missed_old = 0L, neither = 0L)
+# ⭐ The layout measurement: how far below an `obs` header its first row sits.
+offsets_total <- integer(ROW_WINDOW + 1L)
 bytes_all <- 0; bytes_print <- 0
-s_any <- character(length(lsts)); s_conf <- character(length(lsts))
+s_any <- character(length(lsts)); s_rows <- character(length(lsts))
 group_r <- 0L; other_r <- 0L; owner_only <- 0L; dir_other_x <- 0L
 owners <- character(length(lsts))
 modes <- integer(0)
@@ -177,20 +246,26 @@ for (i in seq_along(lsts)) {
   if (identical(r, "oversized")) { n[["oversized"]] <- n[["oversized"]] + 1L; next }
   if (is.null(r)) { n[["unreadable"]] <- n[["unreadable"]] + 1L; next }
   n[["read"]] <- n[["read"]] + 1L
-  k <- if (r$heading && r$obs) "both" else if (r$heading) "heading_only" else
-       if (r$obs) "obs_only" else "neither"
-  n[[k]] <- n[[k]] + 1L
-  if (k != "neither") {
+  if (r$heading) n[["heading"]] <- n[["heading"]] + 1L
+  if (r$obs) {
+    n[["obs"]] <- n[["obs"]] + 1L
+    if (r$missed_old) n[["missed_old"]] <- n[["missed_old"]] + 1L
+    offsets_total <- offsets_total + r$offsets
+    if (r$rows1) n[["obs_rows"]] <- n[["obs_rows"]] + 1L
+    if (r$rowsw) n[["obs_rows_w"]] <- n[["obs_rows_w"]] + 1L
+  }
+  if (!r$heading && !r$obs) n[["neither"]] <- n[["neither"]] + 1L
+  if (r$heading || r$obs) {
     if (!is.na(sz)) bytes_print <- bytes_print + sz
     if (!is.na(stu[[i]])) s_any[[i]] <- stu[[i]]
-    # ⭐ The CONFIDENT population: a procedure heading, not the `obs` heuristic
-    # alone. `heading_only` and `both` both qualify.
-    if (r$heading && !is.na(stu[[i]])) s_conf[[i]] <- stu[[i]]
+    # ⭐ The CORROBORATED population: a header with a numbered row beneath it,
+    # not a header alone.
+    if (r$rowsw && !is.na(stu[[i]])) s_rows[[i]] <- stu[[i]]
   }
   if (i %% 2000 == 0) message("  ", i, " / ", length(lsts))
 }
 
-any_print <- n[["heading_only"]] + n[["obs_only"]] + n[["both"]]
+any_print <- n[["read"]] - n[["neither"]]
 gb <- function(b) round(b / 1024^3, 2)
 
 out <- list(
@@ -216,18 +291,41 @@ out <- list(
   ),
   detection = list(
     read = unname(n[["read"]]),
-    # ⭐ The bracket. `both` is confident; `obs_only` is the weakest evidence and
-    # is what `lst-listing-scan.R`'s single figure silently folded in.
-    both = unname(n[["both"]]),
-    heading_only = unname(n[["heading_only"]]),
-    obs_only = unname(n[["obs_only"]]),
+    # ⚠️ Measured 2026-09-08 as ZERO across 49,298 files. SAS's classic LISTING
+    # output for PROC PRINT carries NO procedure banner -- it prints the column
+    # header and the rows -- so the arm this scan first called "the one to
+    # trust" cannot fire on the file type it was built for.
+    with_a_print_or_report_heading = unname(n[["heading"]]),
+    obs_header = unname(n[["obs"]]),
+    # ⭐ THE FIGURE TO QUOTE. A header with a numbered row beneath it.
+    # Offset 1 exactly -- the 16:10 definition, kept for comparability. It
+    # returned 2 of 36,634, which measured the CHECK failing, not the corpus.
+    obs_header_with_a_row_at_offset_1 = unname(n[["obs_rows"]]),
+    # ⭐ Anywhere in the window. THE FIGURE TO QUOTE once the distribution below
+    # shows the window covers where rows actually are.
+    obs_header_with_a_row_in_window = unname(n[["obs_rows_w"]]),
+    obs_header_with_no_row_in_window =
+      unname(n[["obs"]] - n[["obs_rows_w"]]),
+    row_window = ROW_WINDOW,
+    # 🔴 Files whose every `obs` header was uppercase, which the old `^ *[Oo]bs `
+    # prefilter dropped before any pattern saw it. These are NEW to this run and
+    # are the only reason `obs_header` may exceed the earlier 35,739.
+    obs_header_uppercase_only = unname(n[["missed_old"]]),
     neither = unname(n[["neither"]]),
-    any_print_pattern = unname(any_print),
-    with_a_procedure_heading = unname(n[["both"]] + n[["heading_only"]])
+    any_print_pattern = unname(any_print)
   ),
   studies = list(
     with_any_print_pattern = length(unique(s_any[nzchar(s_any)])),
-    with_a_heading_backed_print = length(unique(s_conf[nzchar(s_conf)]))
+    # ⭐ Studies holding at least one CORROBORATED print-out: a header with a
+    # numbered row beneath it, not a header alone.
+    with_a_corroborated_print = length(unique(s_rows[nzchar(s_rows)]))
+  ),
+  # ⭐ WHERE THE ROWS ACTUALLY ARE, per header occurrence rather than per file.
+  # ⚠️ If the mass sits at the far edge of the window the window is too small and
+  # this is a lower bound; if it sits at "none" the row pattern itself is wrong.
+  row_offset_distribution = setNames(
+    as.list(offsets_total),
+    c(paste0("offset_", seq_len(ROW_WINDOW)), "none_in_window")
   ),
   reachability = list(
     # ⚠️ Over ALL listings, including oversized ones: too large to inspect is not
@@ -249,16 +347,25 @@ out <- list(
 )
 
 writeLines(to_json(out), outfile)
-message("\n--- DETECTION (the bracket) ---")
+message("\n--- DETECTION ---")
 message("read:                      ", out$detection$read)
-message("  heading AND obs line:    ", out$detection$both, "   <- confident")
-message("  heading only:            ", out$detection$heading_only)
-message("  ⚠️ obs line only:         ", out$detection$obs_only, "   <- weakest evidence")
+message("  print/report heading:    ", out$detection$with_a_print_or_report_heading)
+message("  obs header:              ", out$detection$obs_header)
+message("  ⭐ row within ", out$detection$row_window, " lines:  ",
+        out$detection$obs_header_with_a_row_in_window, "   <- corroborated")
+message("  row at offset 1 only:    ",
+        out$detection$obs_header_with_a_row_at_offset_1)
+message("  no row in window:        ",
+        out$detection$obs_header_with_no_row_in_window)
+message("  🔴 uppercase-only obs:    ", out$detection$obs_header_uppercase_only,
+        "   <- missed by every run before 2026-09-08")
 message("  neither:                 ", out$detection$neither)
-message("  any print pattern:       ", out$detection$any_print_pattern)
+message("\n--- WHERE THE ROWS ARE (per header) ---")
+for (nm in names(out$row_offset_distribution))
+  message(sprintf("  %-16s %d", nm, out$row_offset_distribution[[nm]]))
 message("\n--- STUDIES ---")
 message("with any print pattern:    ", out$studies$with_any_print_pattern)
-message("⭐ with heading-backed:     ", out$studies$with_a_heading_backed_print)
+message("⭐ with a corroborated one: ", out$studies$with_a_corroborated_print)
 message("\n--- REACHABILITY (no file was read for these) ---")
 message("group readable:            ", out$reachability$group_readable)
 message("⚠️ other readable:          ", out$reachability$other_readable)
