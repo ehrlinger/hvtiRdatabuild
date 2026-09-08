@@ -466,12 +466,34 @@ exactly the misnaming §2 went looking for. Against `si`, that reading is the
 correct one and the objection dissolves. The objection was never to the string;
 it was to the string standing unaccompanied.
 
-⚠️ **Adding the prefixes did not require templates, and this was checked rather
-than assumed.** Every cross-check in `hvtiRutilities` and `hvtiRtemplates` runs
-templates → taxonomy (`test-templates.R:48`), never the reverse, and
-`hvti_non_prefixes()` does not hold either string. A taxonomy entry with no
-template is therefore safe. `00_datasets/si.qmd` and `mi.qmd` can follow on
-their own schedule.
+⚠️ **Adding the prefixes did not require templates**, and
+`hvti_non_prefixes()` holds neither string, so no disjointness check fires.
+`00_datasets/si.qmd` and `mi.qmd` can follow on their own schedule.
+
+🔴 **CORRECTED 2026-09-08 — it did require a job-catalog row, and the sentence
+that stood here said the opposite.** The original text read: *"Every
+cross-check in `hvtiRutilities` and `hvtiRtemplates` runs templates →
+taxonomy, never the reverse … A taxonomy entry with no template is therefore
+safe. Checked rather than assumed."*
+
+**`hvtiRtemplates/tests/testthat/test-roadmap.R:112` runs the reverse
+direction** — it asserts that every taxonomy prefix has a row in `hvtiR`'s
+`inst/extdata/jobs.json`, and its own comment says why: *"A prefix added
+upstream in `hvtiRutilities` fails here until the roadmap accounts for it,
+which is the whole point."* Adding `si` and `mi` turned that suite red until
+[hvtiR#54](https://github.com/ehrlinger/hvtiR/pull/54) added the rows.
+
+⭐ **The failure is in the word "every".** Two of the three relevant files were
+read (`test-templates.R`, `test-taxonomy.R`) and the result was reported as
+exhaustive. "Checked rather than assumed" was itself the assumption — a
+partial search reported as a complete one, which is the same shape as the
+scans this project keeps finding, where a convention turned out to be a bad
+index into the corpus. A claim of the form *"nothing anywhere does X"* needs a
+search that can be shown to have covered everywhere, not a reading of the
+files one expected to matter.
+
+The narrow conclusion survives: a taxonomy entry needs no **template**. It
+does need a **catalog row**, which is a different artifact in a third repo.
 
 Coordinate with the per-folder re-parse (`hvtiRtemplates/dev/specs/2026-09-02-per-folder-naming-parse-handoff.md`); the taxonomy is being re-derived and this is the moment to add prefixes rather than after.
 
