@@ -62,10 +62,18 @@ that quietly does one when the caller expects the other is a worse failure than
 no package at all, and a `method=` argument with a default is exactly that
 failure wearing an argument name. Two functions cannot be confused by omission.
 
-⚠️ Names are deliberately absent here. They are gated on the taxonomy prefixes,
-which are open, and `mi` is a poor choice for either taken alone because it
-reads as multiple imputation to a statistician. Inventing names now is how they
-become permanent.
+🟢 **NAMED 2026-09-08 — `impute_mean()` and `impute_multiple()`**, with the
+taxonomy prefixes `si` and `mi` that gated them
+([hvtiRutilities#104](https://github.com/ehrlinger/hvtiRutilities/pull/104)).
+Spelled out rather than abbreviated to a package stem: this section's whole
+argument is that the two must be unconfusable, and four saved characters do not
+buy enough to soften that.
+
+`impute_mean()` ships in
+[hvtiRimputation#1](https://github.com/ehrlinger/hvtiRimputation/pull/1);
+`impute_multiple()` is named and not yet built.
+
+<details><summary>History (superseded 2026-09-08)</summary>⚠️ Names are deliberately absent here. They are gated on the taxonomy prefixes, which are open, and <code>mi</code> is a poor choice for either taken alone because it reads as multiple imputation to a statistician. Inventing names now is how they become permanent.</details>
 
 ## 4. `m` is an argument, never an inherited default
 
@@ -81,10 +89,17 @@ exceed 1, with a median of 5.
 Three consequences:
 
 - **`m` is an explicit argument** on the multiple-imputation function.
-- **If it has a default, that default is ours.** Documenting it as "matches
-  SAS" would be false: SAS did more than one thing. If the default is 5 because
-  735 of 810 determinate calls used 5, the documentation says exactly that, and
-  says it is a choice.
+- 🔴 **SUPERSEDED 2026-09-08 — `m` gets NO default at all.** This bullet said
+  that if `m` had a default, that default was ours and must be documented as a
+  choice rather than as parity. Migration Principle #5 (union of behaviours,
+  exposed as arguments) goes further and rules the default out: **three of the
+  five divergent macro names straddle `NIMPUTE=1`**, so a plurality default
+  silently converts a single-imputation call site into multiple imputation — a
+  change of method under an unchanged call, not a conservative error in either
+  direction. The reasoning is
+  [`Claude/Tasks/Imputation spec - apply the union rule to NIMPUTE`] in the
+  vault. `hvtiRimputation` applies the same rule to `impute_mean()`'s `vars`,
+  which `PROC STANDARD` would otherwise default to every numeric column.
 - ⭐ **A study being reproduced takes its `m` from that study's own saved
   output, not from the macro it called.** The macro cannot tell you; the log
   can. This is the same rule
@@ -199,7 +214,8 @@ guess at that interface.
 
 ## Definition of done for this note
 
-- [ ] Function names agreed, once the taxonomy prefixes are
+- [x] **Function names agreed** 2026-09-08 — `impute_mean()` and
+      `impute_multiple()`, once the taxonomy prefixes were (`si`, `mi`)
 - [ ] The `hvtiPlotR` annotation-stage interface exists, so §8 can be built to it
 - [ ] A first real use, in one study, exercising §5's return shape
 - [ ] Only then: an implementation plan
