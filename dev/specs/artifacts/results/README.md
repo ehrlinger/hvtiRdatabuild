@@ -290,6 +290,49 @@ macro-call scoping in the imputation spec's §2 was right, and the 822 studies
 `build-structure.json` reports for `PROC MI` are studies holding a file that
 CONTAINS one, which is a count of definitions rather than of runs.
 
+## `lst-exposure-scan.R`: the print-out figure, split and reachable
+
+⚠️ **`lst-listing.json`'s 35,735 is a pattern match, not a finding about
+content.** `RE_PRINT` is `^ *obs +|the (print|report) procedure` as ONE pattern:
+a reliable heading OR any line beginning with `obs `. A file matching the second
+may be a print-out, or may have a column labelled that way. Reading it as
+"35,735 listings carry patient data" is the same noun-to-verb step that produced
+three corrected overclaims in this directory.
+
+🔴 **The artifact cannot decompose it, and arithmetic on the existing fields
+does not either.** 46,167 files carry some flag and 36,622 carry a procedure
+heading, so at most 9,545 print matches came from a file with no heading at all
+-- but that is not a lower bound on heading-backed detection, because a file can
+match `the freq procedure` for one flag and `obs ` for the other. The split
+needs a run that records it.
+
+⭐ **And exposure is CONTENT TIMES REACHABILITY, of which only content has been
+measured.** 35,735 print-outs in owner-only directories is an inventory item;
+the same files readable by everyone on a shared research volume is a different
+conversation. A mode bit is not content, so measuring it discloses nothing.
+
+The scan therefore reports a BRACKET (`both` / `heading_only` / `obs_only`), the
+study counts that never existed, POSIX readability, and volume in BYTES.
+
+🔴 **No row count, deliberately.** A `PROC PRINT` row count is a cohort size, and
+`log-verifiability-scan.R` already declined to read the N and M out of a shape
+NOTE for that reason. Adding it here would drift into a disclosure a sibling
+scan refused on purpose.
+
+🔴 **No owner name.** Owners are counted, never named -- the aggregate-inside,
+emit-a-scalar pattern from `rung-overlap-scan.R`. ⚠️ The artifact withdrawn on
+2026-09-06 disclosed a personal home directory, which is this exact class of
+value; the difference is aggregation, not filtering.
+
+⚠️ **Two limits the output states about itself.** `mode_bits_look_uniform` says
+whether a network filesystem synthesised one mode for every file, in which case
+the reachability figures describe the mount rather than any per-file decision.
+And `in_a_world_traversable_directory` checks the IMMEDIATE directory only, so it
+over-counts: a file in an open folder under a private parent is not reachable.
+
+**Not yet run.** `lst-exposure.json` does not exist and no figure from it is
+quoted.
+
 ## The rung 1 / rung 3 join, and why it needed its own scan
 
 ⚠️ **Neither `log-verifiability.json` nor `lst-listing.json` can be joined to the
