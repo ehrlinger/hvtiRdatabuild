@@ -561,17 +561,45 @@ removing any.
 | Column | Meaning |
 |---|---|
 | `imputed_any` | row level: did this row have any value filled? |
-| `complete_case_pass` | row level: would this row have survived complete-case? |
+| `complete_case_pass` | row level: would this row have survived complete-case, *before* imputing? |
+| `analysis_pass` | row level: is this row complete *after* imputing? (added 2026-09-08 — see below) |
 
 **Row level, not counts.** 984 is **not** the sum of the per-variable missing
 counts — a row missing three covariates is dropped once — so only a row-wise
 evaluation gets it right, and it is the number that catches a port which
 imputed the *wrong variable list* yet still reached 2,696.
 
-The counterfactual is then `imputed_any & !complete_case_pass`. ⚠️ **That needs
-an accessor; it is not free.** Either hvtiPlotR gains one alongside the
-annotation constructor, or the caller reads `tracker$data` directly — which
-works today but hard-codes column names the tracker owns. Prefer the accessor.
+🔴 **CORRECTED 2026-09-08 — the counterfactual is
+`analysis_pass & !complete_case_pass`, and the two columns above are not
+enough to compute it.**
+
+This section originally said the counterfactual was
+`imputed_any & !complete_case_pass`. **That overcounts.** It is `TRUE` for a
+row that had a value filled but is *still* incomplete because a column outside
+the imputed set is missing — a row that never enters the analysis, and so was
+kept by nothing.
+
+⭐ **The two formulas agree only when imputation completes every row**, which
+is exactly the study this section was written from: its analysis set is 2,696
+of 2,696, so post-imputation completeness is uniformly `TRUE` and the wrong
+formula returns the right 984. **The error was invisible from the case that
+produced it**, and no test built from that study could have caught it. Found
+in review of `hvtiRimputation`
+[#1](https://github.com/ehrlinger/hvtiRimputation/pull/1), where the same
+expression had been carried into the package's own documentation and README.
+
+Consequences:
+
+- **A third row-level column, `analysis_pass`.** It is not derivable from the
+  other two.
+- `hvtiRimputation` ships `analysis_pass()` and `kept_by_imputation()`, the
+  latter being the only supported way to compute the transition. Callers
+  should not assemble the expression themselves.
+- ⚠️ **This still needs an accessor on the tracker side; it is not free.**
+  Either hvtiPlotR gains one alongside the annotation constructor, or the
+  caller reads `tracker$data` directly — which works today but hard-codes
+  column names the tracker owns. Prefer the accessor. That accessor must
+  compute the corrected transition, not the original expression.
 
 ### Division of labour
 
@@ -612,8 +640,9 @@ the same verification reason.
 ⚠️ **This spec's §8 is therefore blocked on another package's roadmap.** The
 design is decided; the mechanism it depends on does not exist yet. Nothing in
 `hvtiRimputation` should be written against the annotation stage until #131
-lands, and the two columns it emits (`imputed_any`, `complete_case_pass`) are
-the stable part of the contract in the meantime.
+lands, and the columns it emits (`imputed_any`, `complete_case_pass` and,
+since 2026-09-08, `analysis_pass`) are the stable part of the contract in the
+meantime.
 
 ## Definition of done for this spec
 
