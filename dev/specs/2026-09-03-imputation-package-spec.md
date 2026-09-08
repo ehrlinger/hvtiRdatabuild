@@ -446,12 +446,32 @@ imputation and 326 call multiple imputation, with 18 doing both — they are
 different job types by the same test that split `dc` into five, and 18 studies
 running both means a single prefix could not even label those unambiguously.
 
-Two prefixes are therefore required. **Which two is still an open decision**, and
-`mi` is a poor choice for either taken alone: it reads as multiple imputation to
-a statistician, so using it for the single-imputation job would repeat at the
-taxonomy level exactly the misnaming §2 went looking for. Note also that the
-corpus carries **63 distinct macro names** binding `NIMPUTE`, so a prefix is
-labelling a job type, not a macro.
+Two prefixes are therefore required. Note also that the corpus carries **63
+distinct macro names** binding `NIMPUTE`, so a prefix is labelling a job type,
+not a macro.
+
+🟢 **DECIDED 2026-09-08 — the two prefixes are `si` and `mi`**, both in the
+`datasets` folder, landed in `hvti_taxonomy()` via
+[hvtiRutilities#104](https://github.com/ehrlinger/hvtiRutilities/pull/104).
+
+| prefix | name |
+|---|---|
+| `si` | Single imputation |
+| `mi` | Multiple imputation |
+
+⭐ **`mi` survives only because it is PAIRED.** This section's objection was to
+`mi` taken *alone* — it reads as multiple imputation to a statistician, so
+using it for the single-imputation job would repeat at the taxonomy level
+exactly the misnaming §2 went looking for. Against `si`, that reading is the
+correct one and the objection dissolves. The objection was never to the string;
+it was to the string standing unaccompanied.
+
+⚠️ **Adding the prefixes did not require templates, and this was checked rather
+than assumed.** Every cross-check in `hvtiRutilities` and `hvtiRtemplates` runs
+templates → taxonomy (`test-templates.R:48`), never the reverse, and
+`hvti_non_prefixes()` does not hold either string. A taxonomy entry with no
+template is therefore safe. `00_datasets/si.qmd` and `mi.qmd` can follow on
+their own schedule.
 
 Coordinate with the per-folder re-parse (`hvtiRtemplates/dev/specs/2026-09-02-per-folder-naming-parse-handoff.md`); the taxonomy is being re-derived and this is the moment to add prefixes rather than after.
 
@@ -618,9 +638,13 @@ the stable part of the contract in the meantime.
   [2026-09-05-divergent-macro-copies.md](2026-09-05-divergent-macro-copies.md).
 - [x] **§6 settled** 2026-09-04 — its own package, by maintainer decision. The
   §6 test itself was not run; see §6 for why the decision fails safe anyway.
-- [ ] **Taxonomy prefixes agreed**, coordinated with the re-parse. §2 answered the
-  evidence question — **two are needed, not one** — so what remains is the
-  naming decision itself, not the measurement behind it. See §7.
+- [x] **Taxonomy prefixes agreed** 2026-09-08 — **`si` and `mi`**, both in the
+  `datasets` folder, landed via
+  [hvtiRutilities#104](https://github.com/ehrlinger/hvtiRutilities/pull/104).
+  §2 had answered the evidence question — **two are needed, not one** — leaving
+  only the naming decision, which the maintainer took directly. `mi` is
+  acceptable *paired* with `si`; this section's objection was to `mi` standing
+  alone. See §7.
 - [x] **The imputation/CONSORT interaction decided** 2026-09-04 — §8.
 - [x] **A design spec for the package** 2026-09-05 —
   [2026-09-05-hvtiRimputation-design.md](2026-09-05-hvtiRimputation-design.md).
