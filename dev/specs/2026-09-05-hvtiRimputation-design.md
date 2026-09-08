@@ -188,8 +188,14 @@ they start whether their study is inside it.
 ## 8. Relationship to the attrition record
 
 Decided in §8 of the package spec and unchanged here: imputation enters the
-CONSORT tracker as an **annotation stage** carrying row-level `imputed_any` and
-`complete_case_pass`, not as an exclusion.
+CONSORT tracker as an **annotation stage** carrying row-level `imputed_any`,
+`complete_case_pass` and — corrected 2026-09-08 — `analysis_pass`, not as an
+exclusion.
+
+🔴 **The counterfactual is `analysis_pass & !complete_case_pass`**, not
+`imputed_any & !complete_case_pass`, which overcounts rows that had a value
+filled and remain incomplete on a column outside the imputed set. The two
+agree only when imputation completes every row. See the package spec's §8.
 
 The reason is arithmetic. Rows kept only because a covariate was filled in are
 not excluded, and they are not fully observed either, and a record with no
