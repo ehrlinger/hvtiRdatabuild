@@ -2,9 +2,15 @@
 
 **Date:** 2026-09-03
 **Repo:** written into `hvtiRdatabuild` because that is where [#33](https://github.com/ehrlinger/hvtiRdatabuild/issues/33) lives and where the work would land if the answer is "a layer, not a package."
-**Status:** designed, nothing built. §6 and §8 are **decided** (2026-09-04); §2 is
-**answered as a bound** and the census discrepancy is **resolved** (2026-09-05).
-§7 remains open as a naming decision.
+**Status:** §2, §6, §7 and §8 are all settled — §6 and §8 **decided**
+(2026-09-04), §2 **answered as a bound** with its census discrepancy
+**resolved** (2026-09-05), §7 **decided** (2026-09-08). No longer "nothing
+built": [`hvtiRimputation`](https://github.com/ehrlinger/hvtiRimputation) 0.1.0
+ships single mean imputation.
+**Updated:** 2026-09-08 — §7 decided, the prefixes are `si` and `mi`
+([hvtiRutilities#104](https://github.com/ehrlinger/hvtiRutilities/pull/104),
+[hvtiR#54](https://github.com/ehrlinger/hvtiR/pull/54)); and the package was
+created, [hvtiRimputation#1](https://github.com/ehrlinger/hvtiRimputation/pull/1).
 **Updated:** 2026-09-05 — §2 measured to completion. ⚠️ 619 of 939 calls (66%)
 cannot be attributed to either method, because the macros they call exist in
 copies that disagree; see
