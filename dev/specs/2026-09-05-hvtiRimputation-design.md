@@ -1,8 +1,11 @@
 # Designing `hvtiRimputation`
 
 **Date:** 2026-09-05
-**Status:** design. Nothing is built, and the function names are placeholders
-pending the taxonomy prefixes (§7 of the package spec).
+**Status:** design, and now partly built.
+[`hvtiRimputation`](https://github.com/ehrlinger/hvtiRimputation) 0.1.0 ships
+`impute_mean()`; `impute_multiple()` is named and not yet built. The taxonomy
+prefixes the names were gated on are decided — `si` and `mi`, §7 of the package
+spec — so the names below are no longer placeholders.
 **Repo:** written into `hvtiRdatabuild` because the spec it follows lives here.
 The package it designs does not, and will not.
 **Follows:** [`2026-09-03-imputation-package-spec.md`](2026-09-03-imputation-package-spec.md),
