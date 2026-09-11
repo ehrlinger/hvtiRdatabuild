@@ -31,14 +31,14 @@ affordances live in `CLAUDE.md`, which imports this file.
 
 ## The automated gates
 
-| workflow             | fails on                       |
-|----------------------|--------------------------------|
-| `R-CMD-check.yaml`   | `R CMD check` across platforms |
-| `check-manual.yaml`  | the PDF manual build           |
-| `lint.yaml`          | `lintr::lint_package()`        |
-| `pkgdown.yaml`       | the site build                 |
-| `house-style.yaml`   | the composed house style       |
-| `test-coverage.yaml` | coverage upload                |
+| workflow | fails on |
+|----|----|
+| `R-CMD-check.yaml` | `R CMD check` across platforms |
+| `check-manual.yaml` | the PDF manual build |
+| `lint.yaml` | [`lintr::lint_package()`](https://lintr.r-lib.org/reference/lint.html) |
+| `pkgdown.yaml` | the site build |
+| `house-style.yaml` | the composed house style |
+| `test-coverage.yaml` | coverage upload |
 
 ## PHI and credentials — the rules that matter most
 
