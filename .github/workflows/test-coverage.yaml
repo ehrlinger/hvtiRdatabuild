@@ -3,16 +3,19 @@
 on:
   # A commit that only touches the generated house-style artifact cannot change
   # the package: .claude is in .Rbuildignore, so it is excluded from the built
-  # package, and no step in this workflow reads it from the checkout. Running
-  # this on such a commit burns runner minutes and queues ahead of checks that
-  # can actually fail.
+  # package, and no step in this workflow reads it from the checkout. A push
+  # that touches only .claude therefore skips this run.
+  #
+  # A pull request never skips it. This workflow reports a required status
+  # check in the `protect main` ruleset, and a required check whose workflow
+  # never starts never reports, so a .claude-only pull request waits on it
+  # forever and cannot merge. ehrlinger/hvtiR#65, a house-style recompose, sat
+  # at "Expected -- Waiting for status to be reported" for exactly that reason.
   push:
     paths-ignore:
       - '.claude/**'
     branches: [main]
   pull_request:
-    paths-ignore:
-      - '.claude/**'
 
 name: test-coverage.yaml
 
