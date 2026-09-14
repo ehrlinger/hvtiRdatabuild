@@ -33,10 +33,21 @@ test_that("validation normalizes vars to a character vector", {
   expect_equal(b$expect, list())
 })
 
-test_that("the declaration hash ignores formatting and tracks content", {
+test_that("the declaration hash tracks content and rule order", {
   a <- eda_set()
   expect_identical(.declaration_sha(a), .declaration_sha(eda_set()))
   b <- eda_set(exclude = rev(eda_set()$exclude))
   expect_false(identical(.declaration_sha(a), .declaration_sha(b)))
   expect_match(.declaration_sha(a), "^[0-9a-f]{64}$")
+})
+
+test_that("comments and layout in _study.yml do not change the hash", {
+  cfg <- local_study(list(eda = eda_set()))
+  h1 <- .declaration_sha(.set_raw("eda", cfg))
+  txt <- readLines(cfg$file)
+  txt <- c("# a comment at the top", txt, "", "# and one at the end")
+  txt <- sub("^(  )(id:)", "\\1id:   ", txt)
+  writeLines(txt, cfg$file)
+  h2 <- .declaration_sha(.set_raw("eda", cfg))
+  expect_identical(h1, h2)
 })

@@ -1,4 +1,6 @@
 # Analysis sets: a declared, checkpointed selection of the built dataset.
+# Design doc reference, not commented code
+# nolint next: commented_code_linter
 # Design: dev/specs/2026-09-14-analysis-sets-design.md.
 
 .set_keys <- c("id", "vars", "exclude", "expect")
@@ -67,8 +69,7 @@
 # Re-serialized, so comments and layout in _study.yml do not change the hash
 # while any change to id, vars, the rules or their order does.
 .declaration_sha <- function(raw) {
-  digest::digest(jsonlite::toJSON(raw, auto_unbox = TRUE),
-                 algo = "sha256", serialize = FALSE)
+  digest::digest(yaml::as.yaml(raw), algo = "sha256", serialize = FALSE)
 }
 
 .set_paths <- function(name, cfg) {
