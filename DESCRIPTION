@@ -29,10 +29,12 @@ Imports:
     utils,
     yaml
 Remotes:
+    ehrlinger/hvtiPlotR,
     ehrlinger/hvtiRutilities
 Suggests:
     arrow,
     dplyr,
+    hvtiPlotR,
     keyring,
     knitr,
     odbc,
