@@ -58,3 +58,54 @@ test_that("comments and layout in _study.yml do not change the hash", {
   h2 <- .declaration_sha(.set_raw("eda", cfg))
   expect_identical(h1, h2)
 })
+
+exclusion_data <- function() {
+  data.frame(ccfid = 1:6, age = c(10, 15, 40, NA, 50, 60),
+             aggrc = c(NA, 1, NA, 2, 3, 4))
+}
+rule_block <- function(rules) {
+  list(id = "ccfid", vars = "age", exclude = rules, expect = list())
+}
+
+test_that("first match wins and attrition counts each rule once", {
+  skip_if_not_installed("hvtiPlotR")
+  b <- rule_block(list(list(reason = "No aggrecan", when = "is.na(aggrc)"),
+                       list(reason = "Under 18", when = "age < 18")))
+  ex <- .apply_exclusions(exclusion_data(), b, "eda")
+  # row 1 matches both rules: counted under rule 1 only
+  expect_equal(ex$attrition$n_excluded, c(2L, 1L))
+  expect_equal(ex$attrition$n_before, c(6L, 4L))
+  expect_equal(ex$attrition$n_after, c(4L, 3L))
+  expect_equal(ex$keep, c(FALSE, FALSE, FALSE, TRUE, TRUE, TRUE))
+})
+
+test_that("NA in a predicate excludes nothing", {
+  skip_if_not_installed("hvtiPlotR")
+  b <- rule_block(list(list(reason = "Under 18", when = "age < 18")))
+  ex <- .apply_exclusions(exclusion_data(), b, "eda")
+  expect_true(ex$keep[4])  # age is NA
+})
+
+test_that("a predicate cannot see the global environment", {
+  skip_if_not_installed("hvtiPlotR")
+  assign("hv_test_cutoff", 18, envir = globalenv())
+  withr::defer(rm("hv_test_cutoff", envir = globalenv()))
+  b <- rule_block(list(list(reason = "Young", when = "age < hv_test_cutoff")))
+  expect_error(.apply_exclusions(exclusion_data(), b, "eda"),
+               "analysis set `eda`, rule 1.*hv_test_cutoff")
+})
+
+test_that("bad predicates are named", {
+  skip_if_not_installed("hvtiPlotR")
+  d <- exclusion_data()
+  expect_error(.apply_exclusions(d, rule_block(list(list(reason = "x", when = "age <"))),
+                                 "eda"), "rule 1.*does not parse")
+  expect_error(.apply_exclusions(d, rule_block(list(list(reason = "x", when = "age"))),
+                                 "eda"), "rule 1.*one TRUE/FALSE per row")
+})
+
+test_that("no rules keeps every row and needs no hvtiPlotR", {
+  ex <- .apply_exclusions(exclusion_data(), rule_block(list()), "eda")
+  expect_true(all(ex$keep))
+  expect_equal(nrow(ex$attrition), 0L)
+})

@@ -72,6 +72,64 @@
   digest::digest(yaml::as.yaml(raw), algo = "sha256", serialize = FALSE)
 }
 
+# Evaluate one rule with the data as its environment and base R as the parent,
+# so a predicate sees the columns and base functions and nothing else. A
+# predicate naming a global variable is an error here rather than a silent
+# lookup, which is why rules are not handed to hv_consort_exclude() as-is: its
+# data mask encloses the search path.
+.eval_rule <- function(d, rule, name, k) {
+  where <- paste0("analysis set `", name, "`, rule ", k, " (`", rule$when, "`)")
+  expr <- tryCatch(str2lang(rule$when), error = function(e) {
+    stop(where, ": `when` does not parse: ", conditionMessage(e), call. = FALSE)
+  })
+  v <- tryCatch(eval(expr, list2env(as.list(d), parent = baseenv())),
+                error = function(e) stop(where, ": ", conditionMessage(e), call. = FALSE))
+  if (!is.logical(v) || length(v) != nrow(d))
+    stop(where, " must give one TRUE/FALSE per row (", nrow(d), "); it gave ",
+         length(v), " value(s) of type ", typeof(v), ".", call. = FALSE)
+  # SAS `if <missing> then delete` does not delete.
+  !is.na(v) & v
+}
+
+.apply_exclusions <- function(d, block, name) {
+  rules <- block$exclude
+  empty <- data.frame(rule = integer(), reason = character(), n_before = integer(),
+                      n_excluded = integer(), n_after = integer())
+  if (!length(rules)) return(list(keep = rep(TRUE, nrow(d)), attrition = empty))
+  if (!requireNamespace("hvtiPlotR", quietly = TRUE))
+    stop("analysis set `", name, "` declares exclusions, which need hvtiPlotR. ",
+         "Install it with pak::pak(\"ehrlinger/hvtiPlotR\").", call. = FALSE)
+
+  flag_cols <- paste0(".hv_rule_", seq_along(rules))
+  work <- d
+  for (k in seq_along(rules)) work[[flag_cols[k]]] <- .eval_rule(d, rules[[k]], name, k)
+
+  tracker <- do.call(hvtiPlotR::hv_consort_start,
+                     list(work, as.name(block$id), pass_col = ".hv_start"))
+  formulas <- lapply(seq_along(rules), function(k) {
+    eval(call("~", as.name(flag_cols[k]), rules[[k]]$reason), baseenv())
+  })
+  tracker <- do.call(hvtiPlotR::hv_consort_exclude,
+                     c(list(tracker, label = "Analysis set", col = ".hv_reason",
+                            pass_col = ".hv_keep"), formulas))
+
+  reason <- tracker$data$.hv_reason
+  # Per-rule counts are tabulated here because hv_consort_summary() counts per
+  # stage, not per reason (hvtiPlotR#129). Remove this when #129 ships.
+  n_excl <- vapply(rules, function(r) sum(reason == r$reason, na.rm = TRUE), integer(1))
+  n_after <- nrow(d) - cumsum(n_excl)
+  list(
+    keep = tracker$data$.hv_keep,
+    attrition = data.frame(
+      rule = seq_along(rules),
+      reason = vapply(rules, function(r) r$reason, character(1)),
+      n_before = as.integer(c(nrow(d), utils::head(n_after, -1L))),
+      n_excluded = as.integer(n_excl),
+      n_after = as.integer(n_after)
+    )
+  )
+}
+
 .set_paths <- function(name, cfg) {
   list(
     parquet  = file.path(cfg$root, "datasets", paste0(name, ".parquet")),
