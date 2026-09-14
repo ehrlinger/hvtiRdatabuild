@@ -116,7 +116,8 @@ Two exports.
    `datasets/<name>.parquet`, then `datasets/<name>.set.yml`, then the manifest entry
    through `hvtiRutilities::update_manifest(file = <parquet>, n_rows =, n_cols =,
    source = "analysis set <name> of <built>")`.
-8. Return the sidecar contents invisibly, with the attrition table printed.
+8. Return the sidecar contents invisibly; the attrition table is in the returned
+   sidecar and nothing is printed (no chatty output in function bodies).
 
 ### `read_analysis_set(name, cfg = study_config())`
 
@@ -125,7 +126,7 @@ Reads `datasets/<name>.parquet` after three checks. Any failure **stops**, namin
 
 | check | stale when |
 |---|---|
-| parent | the sidecar's `parent.sha256` differs from `built`'s current manifest entry `sha256` |
+| parent | the sidecar's `parent.sha256` differs from `built`'s current manifest entry `sha256`, or `built`'s size or mtime differs from the sidecar's |
 | declaration | the sidecar's `declaration_sha256` differs from the hash of the set's current `_study.yml` block |
 | integrity | the parquet's SHA-256 differs from its manifest entry |
 
@@ -144,6 +145,8 @@ set: eda
 parent:
   file: built080426.sas7bdat
   sha256: <64 hex>
+  size: <bytes>
+  mtime: <timestamp>
 declaration_sha256: <64 hex>
 written: 2026-09-14T15:02:11
 counts: {n: 2696, n_events: 412, n_censored: 2284}

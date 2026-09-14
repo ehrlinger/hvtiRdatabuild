@@ -250,3 +250,57 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   )
   invisible(side)
 }
+
+#' Read an analysis set
+#'
+#' @description
+#' Reads the analysis set `name` written by [write_analysis_set()], after
+#' checking that it is current. It stops, naming the `write_analysis_set()` call
+#' that fixes it, when the built dataset has changed since the set was written,
+#' when the set's declaration in `_study.yml` has changed, or when the parquet no
+#' longer matches its manifest entry. A stale set is never rebuilt silently:
+#' its exclusions are decisions, and a changed attrition should be looked at.
+#'
+#' @param name Character(1). The set's name in `_study.yml`.
+#' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
+#'
+#' @return A data frame of the set's columns and rows, with the per-rule
+#'   attrition table attached as `attr(x, "attrition")`.
+#'
+#' @seealso [write_analysis_set()]
+#' @export
+read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
+  if (!requireNamespace("arrow", quietly = TRUE))
+    stop("read_analysis_set() needs arrow. Install it with ",
+         "install.packages(\"arrow\").", call. = FALSE)
+  raw <- .set_raw(name, cfg)
+  p <- .set_paths(name, cfg)
+  fix <- paste0('Run write_analysis_set("', name, '").')
+  if (!file.exists(p$parquet) || !file.exists(p$sidecar))
+    stop("analysis set `", name, "` has not been written. ", fix, call. = FALSE)
+  side <- yaml::read_yaml(p$sidecar)
+
+  now <- .built_state(cfg)
+  same <- function(a, b) identical(as.character(a), as.character(b))
+  if (!same(side$parent$sha256, now$sha256) ||
+        !same(side$parent$size, now$size) ||
+        !same(side$parent$mtime, now$mtime)) {
+    stop("analysis set `", name, "`: the built dataset has changed since the set ",
+         "was written. ", fix, call. = FALSE)
+  }
+  if (!same(side$declaration_sha256, .declaration_sha(raw))) {
+    stop("analysis set `", name, "`: its declaration in _study.yml has changed ",
+         "since the set was written. ", fix, call. = FALSE)
+  }
+  m <- yaml::read_yaml(p$manifest)
+  e <- Filter(function(x) identical(x$file, basename(p$parquet)), m$datasets)
+  actual_sha <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
+  if (!length(e) || !same(e[[1L]]$sha256, actual_sha)) {
+    stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",
+         "manifest entry. ", fix, call. = FALSE)
+  }
+
+  d <- as.data.frame(arrow::read_parquet(p$parquet))
+  attr(d, "attrition") <- do.call(rbind, lapply(side$attrition, as.data.frame))
+  d
+}

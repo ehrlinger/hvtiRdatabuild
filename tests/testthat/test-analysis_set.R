@@ -111,11 +111,13 @@ test_that("no rules keeps every row and needs no hvtiPlotR", {
 })
 
 test_that("write produces parquet, sidecar and manifest entry", {
-  skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
   side <- write_analysis_set("eda", cfg)
   p <- .set_paths("eda", cfg)
-  expect_true(file.exists(p$parquet)); expect_true(file.exists(p$sidecar))
+  expect_true(file.exists(p$parquet))
+  expect_true(file.exists(p$sidecar))
   out <- arrow::read_parquet(p$parquet)
   expect_equal(names(out), c("age", "aggrc", "dead", "iv_dead"))
   expect_equal(nrow(out), 18L)  # 20 rows, 1 with NA aggrc, then 1 under 18 not already excluded
@@ -126,7 +128,8 @@ test_that("write produces parquet, sidecar and manifest entry", {
 })
 
 test_that("the sidecar and manifest carry no identifier value", {
-  skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
   write_analysis_set("eda", cfg)
   p <- .set_paths("eda", cfg)
@@ -136,17 +139,20 @@ test_that("the sidecar and manifest carry no identifier value", {
 })
 
 test_that("an expect mismatch writes nothing", {
-  skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set(expect = list(n = 99))))
   expect_error(write_analysis_set("eda", cfg), "expected n = 99, got 18")
   p <- .set_paths("eda", cfg)
-  expect_false(file.exists(p$parquet)); expect_false(file.exists(p$sidecar))
+  expect_false(file.exists(p$parquet))
+  expect_false(file.exists(p$sidecar))
   m <- yaml::read_yaml(p$manifest)
   expect_false("eda.parquet" %in% vapply(m$datasets, function(e) e$file, character(1)))
 })
 
 test_that("missing columns and a non-unique id are errors", {
-  skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(a = eda_set(vars = c("age", "nope")),
                           b = eda_set(id = "junk")))
   expect_error(write_analysis_set("a", cfg), "not in the built dataset: nope")
@@ -154,11 +160,61 @@ test_that("missing columns and a non-unique id are errors", {
 })
 
 test_that("attrition is written as one YAML entry per rule", {
-  skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
   side <- write_analysis_set("eda", cfg)
   p <- .set_paths("eda", cfg)
   expect_equal(side$attrition[[1]]$reason, "No aggrecan")
   expect_equal(side$attrition[[1]]$n_excluded, 1L)
   expect_equal(yaml::read_yaml(p$sidecar)$attrition[[2]]$n_after, 18L)
+})
+
+test_that("read round-trips the written set with its attrition", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  d <- read_analysis_set("eda", cfg)
+  expect_equal(nrow(d), 18L)
+  expect_equal(attr(d, "attrition")$n_excluded, c(1L, 1L))
+})
+
+test_that("an unwritten set says how to write it", {
+  skip_if_not_installed("arrow")
+  cfg <- local_study(list(eda = eda_set()))
+  expect_error(read_analysis_set("eda", cfg), 'write_analysis_set\\("eda"\\)')
+})
+
+test_that("a rewritten built dataset makes the set stale", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  f <- hvtiRutilities::built_path(cfg)
+  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
+  expect_error(read_analysis_set("eda", cfg), "built dataset has changed")
+})
+
+test_that("an edited rule makes the set stale", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  y <- yaml::read_yaml(cfg$file)
+  y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
+  yaml::write_yaml(y, cfg$file)
+  expect_error(read_analysis_set("eda", cfg), "declaration .* has changed")
+})
+
+test_that("a corrupted parquet fails the integrity check", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  p <- .set_paths("eda", cfg)
+  con <- file(p$parquet, "ab")
+  writeBin(as.raw(0), con)
+  close(con)
+  expect_error(read_analysis_set("eda", cfg), "does not match its manifest")
 })
