@@ -43,3 +43,13 @@ and pull the modules the study declares. The pull is read-only.
   : Pull the enabled warehouse modules for a study
 - [`print(`*`<pull_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
   : Print a pull result
+
+## Analysis sets
+
+Write and read declared, checkpointed selections of a study’s built
+dataset.
+
+- [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+  : Write an analysis set
+- [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+  : Read an analysis set
