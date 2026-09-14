@@ -377,9 +377,9 @@ test_that("write produces parquet, sidecar and manifest entry", {
   expect_true(file.exists(p$parquet)); expect_true(file.exists(p$sidecar))
   out <- arrow::read_parquet(p$parquet)
   expect_equal(names(out), c("age", "aggrc", "dead", "iv_dead"))
-  expect_equal(nrow(out), 17L)  # 20 rows, 1 with NA aggrc, then 2 under 18
-  expect_equal(side$counts$n, 17L)
-  expect_equal(side$counts$n_events + side$counts$n_censored, 17L)
+  expect_equal(nrow(out), 18L)  # 20 rows, 1 with NA aggrc, then 1 under 18 not already excluded
+  expect_equal(side$counts$n, 18L)
+  expect_equal(side$counts$n_events + side$counts$n_censored, 18L)
   m <- yaml::read_yaml(p$manifest)
   expect_true("eda.parquet" %in% vapply(m$datasets, function(e) e$file, character(1)))
 })
@@ -397,7 +397,7 @@ test_that("the sidecar and manifest carry no identifier value", {
 test_that("an expect mismatch writes nothing", {
   skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set(expect = list(n = 99))))
-  expect_error(write_analysis_set("eda", cfg), "expected n = 99, got 17")
+  expect_error(write_analysis_set("eda", cfg), "expected n = 99, got 18")
   p <- .set_paths("eda", cfg)
   expect_false(file.exists(p$parquet)); expect_false(file.exists(p$sidecar))
   m <- yaml::read_yaml(p$manifest)
@@ -547,8 +547,8 @@ test_that("read round-trips the written set with its attrition", {
   skip_if_not_installed("arrow"); skip_if_not_installed("hvtiPlotR")
   cfg <- written_study()
   d <- read_analysis_set("eda", cfg)
-  expect_equal(nrow(d), 17L)
-  expect_equal(attr(d, "attrition")$n_excluded, c(1L, 2L))
+  expect_equal(nrow(d), 18L)
+  expect_equal(attr(d, "attrition")$n_excluded, c(1L, 1L))
 })
 
 test_that("an unwritten set says how to write it", {
