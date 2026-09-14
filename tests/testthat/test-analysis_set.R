@@ -44,10 +44,17 @@ test_that("the declaration hash tracks content and rule order", {
 test_that("comments and layout in _study.yml do not change the hash", {
   cfg <- local_study(list(eda = eda_set()))
   h1 <- .declaration_sha(.set_raw("eda", cfg))
-  txt <- readLines(cfg$file)
-  txt <- c("# a comment at the top", txt, "", "# and one at the end")
-  txt <- sub("^(  )(id:)", "\\1id:   ", txt)
-  writeLines(txt, cfg$file)
+  old <- readLines(cfg$file)
+  # Extra spaces after a real key, whatever its indentation.
+  new <- sub("^(\\s*)id:\\s*", "\\1id:      ", old)
+  # A comment inside the set block, and one at the top of the file.
+  i <- grep("^\\s*eda:\\s*$", new)
+  new <- append(new, "    # a comment inside the set block", after = i)
+  new <- c("# a comment at the top", new)
+  # Guard: the edit must really change the file, or this test proves nothing.
+  expect_true(any(grepl("id:      ", new, fixed = TRUE)))
+  expect_length(i, 1L)
+  writeLines(new, cfg$file)
   h2 <- .declaration_sha(.set_raw("eda", cfg))
   expect_identical(h1, h2)
 })
