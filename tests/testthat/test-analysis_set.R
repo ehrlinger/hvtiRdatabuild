@@ -19,6 +19,8 @@ test_that("validation rejects unknown keys, missing id/vars, bad rules", {
                                         list(reason = "a", when = "age > 2")))),
                "duplicate reason")
   expect_error(v(eda_set(expect = list(rows = 3))), "`expect`.*rows")
+  expect_error(v(eda_set(expect = 99)), "`expect`.*named list")
+  expect_error(v(eda_set(expect = list(99))), "`expect`.*named list")
 })
 
 test_that("a set may not be named like the built dataset", {
@@ -39,6 +41,14 @@ test_that("the declaration hash tracks content and rule order", {
   b <- eda_set(exclude = rev(eda_set()$exclude))
   expect_false(identical(.declaration_sha(a), .declaration_sha(b)))
   expect_match(.declaration_sha(a), "^[0-9a-f]{64}$")
+})
+
+test_that("the declaration hash ignores mapping key order", {
+  a <- eda_set(expect = list(n = 18, n_events = 9))
+  b <- a[c("expect", "exclude", "vars", "id")]
+  b$expect <- b$expect[c("n_events", "n")]
+  b$exclude <- lapply(b$exclude, function(rule) rule[c("when", "reason")])
+  expect_identical(.declaration_sha(a), .declaration_sha(b))
 })
 
 test_that("comments and layout in _study.yml do not change the hash", {
@@ -95,6 +105,17 @@ test_that("a predicate cannot see the global environment", {
                "analysis set `eda`, rule 1.*hv_test_cutoff")
 })
 
+test_that("a predicate error never prints identifier values", {
+  d <- exclusion_data()
+  d$ccfid <- 910001:910006
+  b <- rule_block(list(list(reason = "bad rule", when = "stop(ccfid)")))
+  err <- expect_error(.apply_exclusions(d, b, "eda"), "evaluation failed")
+  leaked <- vapply(as.character(d$ccfid), function(id) {
+    grepl(id, err$message, fixed = TRUE)
+  }, logical(1))
+  expect_false(any(leaked))
+})
+
 test_that("bad predicates are named", {
   skip_if_not_installed("hvtiPlotR")
   d <- exclusion_data()
@@ -108,6 +129,15 @@ test_that("no rules keeps every row and needs no hvtiPlotR", {
   ex <- .apply_exclusions(exclusion_data(), rule_block(list()), "eda")
   expect_true(all(ex$keep))
   expect_equal(nrow(ex$attrition), 0L)
+})
+
+test_that("tracker scratch columns cannot overwrite built columns", {
+  b <- rule_block(list(list(reason = "young", when = "age < 18")))
+  for (column in c(".hv_rule_1", ".hv_start", ".hv_reason", ".hv_keep")) {
+    d <- exclusion_data()
+    d[[column]] <- seq_len(nrow(d))
+    expect_error(.apply_exclusions(d, b, "eda"), "reserved scratch column")
+  }
 })
 
 test_that("write produces parquet, sidecar and manifest entry", {
@@ -170,6 +200,30 @@ test_that("attrition is written as one YAML entry per rule", {
   expect_equal(yaml::read_yaml(p$sidecar)$attrition[[2]]$n_after, 18L)
 })
 
+test_that("the parent checkpoint uses a canonical UTC timestamp", {
+  cfg <- local_study(list(eda = eda_set()))
+  expect_match(.built_state(cfg)$mtime, "Z$")
+})
+
+test_that("a built rewrite during materialization writes nothing", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  original_read <- hvtiRutilities::read_built
+  testthat::local_mocked_bindings(
+    read_built = function(cfg) {
+      out <- original_read(cfg)
+      cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
+      out
+    },
+    .package = "hvtiRutilities"
+  )
+  expect_error(write_analysis_set("eda", cfg), "changed while it was being read")
+  p <- .set_paths("eda", cfg)
+  expect_false(file.exists(p$parquet))
+  expect_false(file.exists(p$sidecar))
+})
+
 test_that("read round-trips the written set with its attrition", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
@@ -178,6 +232,16 @@ test_that("read round-trips the written set with its attrition", {
   d <- read_analysis_set("eda", cfg)
   expect_equal(nrow(d), 18L)
   expect_equal(attr(d, "attrition")$n_excluded, c(1L, 1L))
+})
+
+test_that("a no-rule set reads back with typed empty attrition", {
+  skip_if_not_installed("arrow")
+  cfg <- local_study(list(eda = eda_set(exclude = list())))
+  write_analysis_set("eda", cfg)
+  attrition <- attr(read_analysis_set("eda", cfg), "attrition")
+  expect_s3_class(attrition, "data.frame")
+  expect_named(attrition, c("rule", "reason", "n_before", "n_excluded", "n_after"))
+  expect_equal(nrow(attrition), 0L)
 })
 
 test_that("an unwritten set says how to write it", {

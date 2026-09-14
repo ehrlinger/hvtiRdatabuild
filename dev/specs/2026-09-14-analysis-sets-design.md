@@ -106,7 +106,8 @@ Two exports.
 ### `write_analysis_set(name, cfg = study_config())`
 
 1. Read the declaration for `name`; error if absent, naming the sets that exist.
-2. `d <- read_built(cfg)`.
+2. Capture the built dataset's manifest hash, size, and UTC mtime before and
+   after `d <- read_built(cfg)`; stop without writing if they differ.
 3. Validate `id` (present, unique) and `vars` (all present).
 4. Apply the exclusions (section 4) and keep `vars`.
 5. Derive counts: `n` always; `n_events` and `n_censored` when the study's
@@ -157,9 +158,10 @@ attrition:
 packages: {hvtiRdatabuild: 0.2.1, hvtiRutilities: 1.1.8, arrow: 21.0.0}
 ```
 
-The declaration hash is SHA-256 over the set's block re-serialized with
-`yaml::as.yaml()`, so whitespace and comment edits do not make a set stale while any
-change to `id`, `vars`, `exclude` or `expect` does.
+The declaration hash is SHA-256 over the set's block with mapping keys sorted
+recursively, then re-serialized with `yaml::as.yaml()`. Whitespace, comments,
+and mapping-key order do not make a set stale, while any change to `id`, `vars`,
+the order or content of `exclude`, or `expect` does.
 
 The sidecar holds counts only. **No identifier is written**, which keeps it safe to
 commit beside `manifest.yaml`.

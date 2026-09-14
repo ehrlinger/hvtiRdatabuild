@@ -59,6 +59,11 @@
          "rule needs its own reason, because attrition is counted by reason.",
          call. = FALSE)
   expect <- raw$expect %||% list()
+  valid_names <- !length(expect) || (!is.null(names(expect)) && all(nzchar(names(expect))) &&
+                                       !anyDuplicated(names(expect)))
+  if (!is.list(expect) || !valid_names) {
+    stop(where, ": `expect` must be a named list of counts.", call. = FALSE)
+  }
   bad <- setdiff(names(expect), .expect_keys)
   if (length(bad))
     stop(where, ": `expect` has unknown count(s): ", paste(bad, collapse = ", "),
@@ -68,8 +73,15 @@
 
 # Re-serialized, so comments and layout in _study.yml do not change the hash
 # while any change to id, vars, the rules or their order does.
+.canonical_mapping <- function(x) {
+  if (!is.list(x)) return(x)
+  if (!is.null(names(x))) x <- x[order(names(x))]
+  lapply(x, .canonical_mapping)
+}
+
 .declaration_sha <- function(raw) {
-  digest::digest(yaml::as.yaml(raw), algo = "sha256", serialize = FALSE)
+  canonical <- .canonical_mapping(raw)
+  digest::digest(yaml::as.yaml(canonical), algo = "sha256", serialize = FALSE)
 }
 
 # Evaluate one rule with the data as its environment and base R as the parent,
@@ -82,8 +94,13 @@
   expr <- tryCatch(str2lang(rule$when), error = function(e) {
     stop(where, ": `when` does not parse: ", conditionMessage(e), call. = FALSE)
   })
-  v <- tryCatch(eval(expr, list2env(as.list(d), parent = baseenv())),
-                error = function(e) stop(where, ": ", conditionMessage(e), call. = FALSE))
+  v <- tryCatch(
+    eval(expr, list2env(as.list(d), parent = baseenv())),
+    error = function(e) {
+      stop(where, ": evaluation failed; details are suppressed because they may ",
+           "contain row-level data.", call. = FALSE)
+    }
+  )
   if (!is.logical(v) || length(v) != nrow(d))
     stop(where, " must give one TRUE/FALSE per row (", nrow(d), "); it gave ",
          length(v), " value(s) of type ", typeof(v), ".", call. = FALSE)
@@ -93,14 +110,20 @@
 
 .apply_exclusions <- function(d, block, name) {
   rules <- block$exclude
-  empty <- data.frame(rule = integer(), reason = character(), n_before = integer(),
-                      n_excluded = integer(), n_after = integer())
-  if (!length(rules)) return(list(keep = rep(TRUE, nrow(d)), attrition = empty))
+  if (!length(rules)) {
+    return(list(keep = rep(TRUE, nrow(d)), attrition = .empty_attrition()))
+  }
   if (!requireNamespace("hvtiPlotR", quietly = TRUE))
     stop("analysis set `", name, "` declares exclusions, which need hvtiPlotR. ",
          "Install it with pak::pak(\"ehrlinger/hvtiPlotR\").", call. = FALSE)
 
   flag_cols <- paste0(".hv_rule_", seq_along(rules))
+  scratch_cols <- c(flag_cols, ".hv_start", ".hv_reason", ".hv_keep")
+  collisions <- intersect(scratch_cols, names(d))
+  if (length(collisions)) {
+    stop("analysis set `", name, "`: reserved scratch column(s) already exist: ",
+         paste(collisions, collapse = ", "), ".", call. = FALSE)
+  }
   work <- d
   for (k in seq_along(rules)) work[[flag_cols[k]]] <- .eval_rule(d, rules[[k]], name, k)
 
@@ -127,6 +150,13 @@
       n_excluded = as.integer(n_excl),
       n_after = as.integer(n_after)
     )
+  )
+}
+
+.empty_attrition <- function() {
+  data.frame(
+    rule = integer(), reason = character(), n_before = integer(),
+    n_excluded = integer(), n_after = integer()
   )
 }
 
@@ -161,7 +191,18 @@
   info <- file.info(p)
   list(file = cfg$built, sha256 = e[[1L]]$sha256,
        size = if (file.exists(p)) format(info$size, scientific = FALSE) else NA_character_,
-       mtime = if (file.exists(p)) format(info$mtime, "%Y-%m-%d %H:%M:%OS3") else NA_character_)
+       mtime = if (file.exists(p)) {
+         format(info$mtime, "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
+       } else {
+         NA_character_
+       })
+}
+
+.same_built_state <- function(a, b) {
+  fields <- c("file", "sha256", "size", "mtime")
+  all(vapply(fields, function(field) {
+    identical(as.character(a[[field]]), as.character(b[[field]]))
+  }, logical(1)))
 }
 
 #' Write an analysis set
@@ -194,7 +235,14 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
          "install.packages(\"arrow\").", call. = FALSE)
   raw <- .set_raw(name, cfg)
   b <- .set_validate(raw, name, cfg)
+  parent_before <- .built_state(cfg)
   d <- hvtiRutilities::read_built(cfg)
+  parent_after <- .built_state(cfg)
+  if (!.same_built_state(parent_before, parent_after)) {
+    stop("analysis set `", name, "`: the built dataset changed while it was being read. ",
+         "Nothing was written; run write_analysis_set(\"", name, "\") again.",
+         call. = FALSE)
+  }
 
   absent <- setdiff(c(b$id, b$vars), names(d))
   if (length(absent))
@@ -230,7 +278,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   attrition <- unname(lapply(seq_len(nrow(ex$attrition)), function(i) as.list(ex$attrition[i, ])))
   side <- list(
     set = name,
-    parent = .built_state(cfg),
+    parent = parent_after,
     declaration_sha256 = .declaration_sha(raw),
     written = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
     counts = counts,
@@ -301,6 +349,11 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   }
 
   d <- as.data.frame(arrow::read_parquet(p$parquet))
-  attr(d, "attrition") <- do.call(rbind, lapply(side$attrition, as.data.frame))
+  attrition <- if (length(side$attrition)) {
+    do.call(rbind, lapply(side$attrition, as.data.frame))
+  } else {
+    .empty_attrition()
+  }
+  attr(d, "attrition") <- attrition
   d
 }
