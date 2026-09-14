@@ -35,6 +35,13 @@ reference:
   - dw_pull
   - print.pull_result
 
+- title: "Analysis sets"
+  desc: >
+    Write and read declared, checkpointed selections of a study's built dataset.
+  contents:
+  - write_analysis_set
+  - read_analysis_set
+
 articles:
 - title: "Getting Started"
   contents:
