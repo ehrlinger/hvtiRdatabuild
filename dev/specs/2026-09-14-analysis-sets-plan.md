@@ -82,14 +82,21 @@ local_study <- function(sets = list(), env = parent.frame()) {
 }
 
 eda_set <- function(...) {
-  utils::modifyList(list(
+  b <- list(
     id = "ccfid",
     vars = c("age", "aggrc", "dead", "iv_dead"),
     exclude = list(
       list(reason = "No aggrecan", when = "is.na(aggrc)"),
       list(reason = "Under 18", when = "age < 18")
     )
-  ), list(...))
+  )
+  args <- list(...)
+  # Top-level replacement, not utils::modifyList(): modifyList merges nested
+  # lists and ignores unnamed elements, so a replacement `exclude` never took.
+  # b[names(args)] <- args keeps an explicit NULL (eda_set(id = NULL)) as a
+  # NULL-valued entry, which is what the "missing id" test needs.
+  b[names(args)] <- args
+  b
 }
 ```
 
