@@ -41,13 +41,15 @@ set parquet files.
 
 ## Declaring an analysis set
 
-Add the columns, exclusions, and expected counts under `analysis_sets:` in
-`_study.yml`, then write the checkpoint once and read that exact selection in
-downstream jobs:
+Add the patient-identifier column (`id`), selected columns (`vars`),
+exclusions, and expected counts under `analysis_sets:` in `_study.yml`. From
+the study root, load the utilities configuration, then write the checkpoint
+once and read that exact selection in downstream jobs:
 
 ```r
-write_analysis_set("eda", config)
-eda <- read_analysis_set("eda", config)
+set_config <- hvtiRutilities::study_config()
+write_analysis_set("eda", set_config)
+eda <- read_analysis_set("eda", set_config)
 ```
 
 The sidecar records the parent dataset, declaration hash, row counts, and
