@@ -32,6 +32,18 @@ test_that("a set may not be named like the built dataset", {
   expect_error(.set_validate(.set_raw("built", cfg), "built", cfg), "same name")
 })
 
+test_that("a set may not be named like a registered named dataset", {
+  cfg <- local_study(list(eda = eda_set()))
+  cfg$additional_datasets <- list(
+    eda_source = list(built = "eda.csv", cohort = NULL)
+  )
+
+  expect_error(
+    .set_validate(.set_raw("eda", cfg), "eda", cfg),
+    "registered dataset"
+  )
+})
+
 test_that("validation normalizes vars to a character vector", {
   cfg <- local_study(list(eda = eda_set()))
   b <- .set_validate(.set_raw("eda", cfg), "eda", cfg)
@@ -163,6 +175,28 @@ test_that("write produces parquet, sidecar and manifest entry", {
   expect_equal(side$counts$n_events + side$counts$n_censored, 18L)
   m <- yaml::read_yaml(p$manifest)
   expect_true("eda.parquet" %in% vapply(m$datasets, function(e) e$file, character(1)))
+})
+
+test_that("write preserves an adopted legacy datasets layout", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  numbered <- c("00_datasets", "10_descriptive", "20_distributions",
+                "30_analyses", "40_graphs", "50_documents",
+                "90_estimates")
+  legacy <- c("datasets", "descriptive", "distributions", "analyses",
+              "graphs", "documents", "estimates")
+  for (i in seq_along(numbered)) {
+    file.rename(file.path(cfg$root, numbered[[i]]),
+                file.path(cfg$root, legacy[[i]]))
+  }
+  cfg <- hvtiRutilities::study_config(cfg$root)
+
+  write_analysis_set("eda", cfg)
+
+  expect_true(file.exists(file.path(cfg$root, "datasets", "eda.parquet")))
+  expect_true(file.exists(file.path(cfg$root, "datasets", "eda.set.yml")))
+  expect_false(file.exists(file.path(cfg$root, "00_datasets")))
 })
 
 test_that("the sidecar and manifest carry no identifier value", {

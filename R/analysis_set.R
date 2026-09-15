@@ -26,9 +26,16 @@
   if (!grepl("^[a-z][a-z0-9_]*$", name))
     stop(where, ": a set name is lower-case letters, digits and underscores, ",
          "starting with a letter.", call. = FALSE)
-  if (identical(name, tools::file_path_sans_ext(cfg$built)))
-    stop(where, " has the same name as the built dataset, and its parquet would ",
-         "overwrite the built dataset's cache. Rename the set.", call. = FALSE)
+  additional <- vapply(
+    cfg$additional_datasets %||% list(),
+    function(dataset) dataset$built,
+    character(1)
+  )
+  registered <- tools::file_path_sans_ext(c(cfg$built, additional))
+  if (name %in% registered)
+    stop(where, " has the same name as a registered dataset, and its parquet ",
+         "would overwrite that dataset or its cache. Rename the set.",
+         call. = FALSE)
   unknown <- setdiff(names(raw), .set_keys)
   if (length(unknown))
     stop(where, " has unknown key(s): ", paste(unknown, collapse = ", "),

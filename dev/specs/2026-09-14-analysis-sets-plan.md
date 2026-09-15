@@ -225,9 +225,10 @@ test_that("the declaration hash ignores formatting and tracks content", {
 }
 
 .set_paths <- function(name, cfg) {
+  datasets <- hvtiRutilities::study_dir("datasets", cfg$root)
   list(
-    parquet  = file.path(cfg$root, "datasets", paste0(name, ".parquet")),
-    sidecar  = file.path(cfg$root, "datasets", paste0(name, ".set.yml")),
+    parquet  = file.path(datasets, paste0(name, ".parquet")),
+    sidecar  = file.path(datasets, paste0(name, ".set.yml")),
     manifest = file.path(cfg$root, "manifest.yaml")
   )
 }

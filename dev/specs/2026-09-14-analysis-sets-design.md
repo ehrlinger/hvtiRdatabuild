@@ -143,7 +143,7 @@ labels as attributes), with the attrition table attached as `attr(, "attrition")
 ## 6. The sidecar
 
 ```yaml
-# datasets/eda.set.yml
+# <logical datasets directory>/eda.set.yml
 set: eda
 parent:
   file: built080426.sas7bdat
