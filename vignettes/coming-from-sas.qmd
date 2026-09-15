@@ -57,15 +57,17 @@ to be invisible becomes reviewable.
 
 ## Port the downstream dataset, not its first consumer
 
-A `bd.SAStoR.sas` job can look like a file-format adapter: it reads `built`,
-keeps a shorter variable list, and writes `builtr` for R. The useful boundary
-is not SAS versus R, however. The output is a downstream data contract that may
-feed descriptive summaries, models, tables, and figures long after the first
-job that happened to read it.
+A `bd.SAStoR.sas` job, often copied from `tp.bd.SAStoR.sas`, can look like a
+file-format adapter: it reads `built`, keeps a shorter variable list, and writes
+`builtr` for R. The useful boundary is not SAS versus R, however. The output is
+a downstream data contract that may feed descriptive summaries, models,
+tables, and figures long after the first job that happened to read it.
 
 Port that pattern as an analysis set. Declare the columns and any row
-exclusions once under `analysis_sets:` in `_study.yml`, then let every
-downstream job that needs that contract read the same checkpoint:
+exclusions once under `analysis_sets:` in the setup manifest, `_study.yml`,
+then let every downstream job that needs that contract read the same
+checkpoint. This is not the warehouse-build `study.yaml` read by
+`read_study_config()`:
 
 ```yaml
 analysis_sets:
@@ -79,15 +81,15 @@ analysis_sets:
       - follow_up
     expect:
       n: 1200
-      n_events: 180
-      n_censored: 1020
 ```
 
 The names and counts above are synthetic. Name a set for the dataset contract,
 such as `primary_analysis`, rather than for its first consumer, such as a
 particular plot. Add another set only when the study has a genuinely different
 population or variable contract. If the SAS step keeps every row, omit
-`exclude`; the `vars` list alone expresses its projection.
+`exclude`; the `vars` list alone expresses its projection. Add `n_events` and
+`n_censored` expectations only when `vars` contains the event column registered
+in `_study.yml`; `write_analysis_set()` calculates both from that column.
 
 Write the checkpoint explicitly after the built dataset is ready:
 
