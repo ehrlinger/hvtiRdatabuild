@@ -14,6 +14,7 @@ test_that("validation rejects unknown keys, missing id/vars, bad rules", {
   expect_error(v(eda_set(derive = "x")), "unknown key.*derive")
   expect_error(v(eda_set(id = NULL)), "`id`")
   expect_error(v(eda_set(vars = NULL)), "`vars`")
+  expect_error(v(eda_set(vars = c("age", "age"))), "duplicate.*age")
   expect_error(v(eda_set(exclude = list(list(reason = "x")))), "rule 1.*`when`")
   expect_error(v(eda_set(exclude = list(list(reason = "a", when = "age > 1"),
                                         list(reason = "a", when = "age > 2")))),
@@ -21,6 +22,9 @@ test_that("validation rejects unknown keys, missing id/vars, bad rules", {
   expect_error(v(eda_set(expect = list(rows = 3))), "`expect`.*rows")
   expect_error(v(eda_set(expect = 99)), "`expect`.*named list")
   expect_error(v(eda_set(expect = list(99))), "`expect`.*named list")
+  expect_error(v(eda_set(expect = list(n = 18.9))), "`expect: n`.*whole")
+  expect_error(v(eda_set(expect = list(n = -1))), "`expect: n`.*non-negative")
+  expect_error(v(eda_set(expect = list(n = c(18, 19)))), "`expect: n`.*single")
 })
 
 test_that("a set may not be named like the built dataset", {

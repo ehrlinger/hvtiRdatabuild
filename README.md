@@ -15,11 +15,14 @@ them against the legacy SAS datasets they replace.
 
 ## Status
 
-Slices S0 (Verify) and S1 (Pull). `snapshot_oracle()` and `compare_built()`
+Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4.
+`snapshot_oracle()` and `compare_built()`
 verify an R-built dataset against its SAS oracle. `read_study_config()`,
 `dw_connect()`, `dw_modules()`, `dw_pull()`, and `print.pull_result()` read a
-study's warehouse modules into R. The rest of the pipeline — `build_dataset()`,
-`derive_vars()` — arrives in S2–S3.
+study's warehouse modules into R. `write_analysis_set()` materializes a
+declared selection from a built dataset, and `read_analysis_set()` refuses a
+stale checkpoint. The build and derivation stages — `build_dataset()` and
+`derive_vars()` — remain future work.
 
 ## Installation
 
@@ -33,7 +36,25 @@ field in `DESCRIPTION` points `remotes`/`pak` at `ehrlinger/hvtiRutilities`, so
 the command above pulls it in automatically. Installing with plain
 `install.packages()` will fail to resolve it.
 
-`arrow` is an optional dependency, required only for writing oracle snapshots.
+`arrow` is an optional dependency required for oracle snapshots and analysis
+set parquet files.
+
+## Declaring an analysis set
+
+Add the patient-identifier column (`id`), selected columns (`vars`),
+exclusions, and expected counts under `analysis_sets:` in `_study.yml`. From
+the study root, load the utilities configuration, then write the checkpoint
+once and read that exact selection in downstream jobs:
+
+```r
+set_config <- hvtiRutilities::study_config()
+write_analysis_set("eda", set_config)
+eda <- read_analysis_set("eda", set_config)
+```
+
+The sidecar records the parent dataset, declaration hash, row counts, and
+per-rule attrition. If the parent or declaration changes, reading stops and
+names the `write_analysis_set()` call that refreshes it.
 
 ## Pulling warehouse modules for a study
 
