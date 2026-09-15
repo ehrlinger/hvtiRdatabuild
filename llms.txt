@@ -10,7 +10,7 @@ verifies them against the legacy SAS datasets they replace.
 
 ## Status
 
-Slices S0 (Verify) and S1 (Pull).
+Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4.
 [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 and
 [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
@@ -21,8 +21,12 @@ verify an R-built dataset against its SAS oracle.
 [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md),
 and
 [`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
-read a study’s warehouse modules into R. The rest of the pipeline —
-`build_dataset()`, `derive_vars()` — arrives in S2–S3.
+read a study’s warehouse modules into R.
+[`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+materializes a declared selection from a built dataset, and
+[`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+refuses a stale checkpoint. The build and derivation stages —
+`build_dataset()` and `derive_vars()` — remain future work.
 
 ## Installation
 
@@ -39,8 +43,28 @@ automatically. Installing with plain
 [`install.packages()`](https://rdrr.io/r/utils/install.packages.html)
 will fail to resolve it.
 
-`arrow` is an optional dependency, required only for writing oracle
-snapshots.
+`arrow` is an optional dependency required for oracle snapshots and
+analysis set parquet files.
+
+## Declaring an analysis set
+
+Add the patient-identifier column (`id`), selected columns (`vars`),
+exclusions, and expected counts under `analysis_sets:` in `_study.yml`.
+From the study root, load the utilities configuration, then write the
+checkpoint once and read that exact selection in downstream jobs:
+
+``` r
+
+set_config <- hvtiRutilities::study_config()
+write_analysis_set("eda", set_config)
+eda <- read_analysis_set("eda", set_config)
+```
+
+The sidecar records the parent dataset, declaration hash, row counts,
+and per-rule attrition. If the parent or declaration changes, reading
+stops and names the
+[`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+call that refreshes it.
 
 ## Pulling warehouse modules for a study
 

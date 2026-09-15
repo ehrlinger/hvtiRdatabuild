@@ -66,7 +66,7 @@
 <div class="section level2">
 <h2 id="status">Status<a class="anchor" aria-label="anchor" href="#status"></a>
 </h2>
-<p>Slices S0 (Verify) and S1 (Pull). <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code> and <code><a href="reference/compare_built.html">compare_built()</a></code> verify an R-built dataset against its SAS oracle. <code><a href="reference/read_study_config.html">read_study_config()</a></code>, <code><a href="reference/dw_connect.html">dw_connect()</a></code>, <code><a href="reference/dw_modules.html">dw_modules()</a></code>, <code><a href="reference/dw_pull.html">dw_pull()</a></code>, and <code><a href="reference/print.pull_result.html">print.pull_result()</a></code> read a study’s warehouse modules into R. The rest of the pipeline — <code>build_dataset()</code>, <code>derive_vars()</code> — arrives in S2–S3.</p>
+<p>Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4. <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code> and <code><a href="reference/compare_built.html">compare_built()</a></code> verify an R-built dataset against its SAS oracle. <code><a href="reference/read_study_config.html">read_study_config()</a></code>, <code><a href="reference/dw_connect.html">dw_connect()</a></code>, <code><a href="reference/dw_modules.html">dw_modules()</a></code>, <code><a href="reference/dw_pull.html">dw_pull()</a></code>, and <code><a href="reference/print.pull_result.html">print.pull_result()</a></code> read a study’s warehouse modules into R. <code><a href="reference/write_analysis_set.html">write_analysis_set()</a></code> materializes a declared selection from a built dataset, and <code><a href="reference/read_analysis_set.html">read_analysis_set()</a></code> refuses a stale checkpoint. The build and derivation stages — <code>build_dataset()</code> and <code>derive_vars()</code> — remain future work.</p>
 </div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
@@ -75,12 +75,22 @@
 <code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
 <span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"ehrlinger/hvtiRdatabuild"</span><span class="op">)</span></span></code></pre></div>
 <p>This package imports <code>hvtiRutilities</code>, which is <strong>not on CRAN</strong>. The <code>Remotes:</code> field in <code>DESCRIPTION</code> points <code>remotes</code>/<code>pak</code> at <code>ehrlinger/hvtiRutilities</code>, so the command above pulls it in automatically. Installing with plain <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> will fail to resolve it.</p>
-<p><code>arrow</code> is an optional dependency, required only for writing oracle snapshots.</p>
+<p><code>arrow</code> is an optional dependency required for oracle snapshots and analysis set parquet files.</p>
+</div>
+<div class="section level2">
+<h2 id="declaring-an-analysis-set">Declaring an analysis set<a class="anchor" aria-label="anchor" href="#declaring-an-analysis-set"></a>
+</h2>
+<p>Add the patient-identifier column (<code>id</code>), selected columns (<code>vars</code>), exclusions, and expected counts under <code>analysis_sets:</code> in <code>_study.yml</code>. From the study root, load the utilities configuration, then write the checkpoint once and read that exact selection in downstream jobs:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">set_config</span> <span class="op">&lt;-</span> <span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_config.html" class="external-link">study_config</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/write_analysis_set.html">write_analysis_set</a></span><span class="op">(</span><span class="st">"eda"</span>, <span class="va">set_config</span><span class="op">)</span></span>
+<span><span class="va">eda</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/read_analysis_set.html">read_analysis_set</a></span><span class="op">(</span><span class="st">"eda"</span>, <span class="va">set_config</span><span class="op">)</span></span></code></pre></div>
+<p>The sidecar records the parent dataset, declaration hash, row counts, and per-rule attrition. If the parent or declaration changes, reading stops and names the <code><a href="reference/write_analysis_set.html">write_analysis_set()</a></code> call that refreshes it.</p>
 </div>
 <div class="section level2">
 <h2 id="pulling-warehouse-modules-for-a-study">Pulling warehouse modules for a study<a class="anchor" aria-label="anchor" href="#pulling-warehouse-modules-for-a-study"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatabuild" class="external-link">hvtiRdatabuild</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># What modules exist, and what each one requires.</span></span>
@@ -105,7 +115,7 @@
 <div class="section level2">
 <h2 id="verifying-an-r-build-against-sas">Verifying an R build against SAS<a class="anchor" aria-label="anchor" href="#verifying-an-r-build-against-sas"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatabuild" class="external-link">hvtiRdatabuild</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Freeze the SAS-built dataset once.</span></span>
@@ -124,7 +134,7 @@
 <h2 id="local-integration-testing">Local integration testing<a class="anchor" aria-label="anchor" href="#local-integration-testing"></a>
 </h2>
 <p>The committed fixtures are synthetic. To exercise the read path against real SAS output, point <code>HVTI_ORACLE_DIR</code> at a study directory:</p>
-<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
 <p>That directory holds PHI. It must live outside this repository, and nothing in the test suite copies from it. With the variable unset — the default, and what CI sees — these tests skip.</p>
 <p><code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> never emits identifiers unless <code>show_ids = TRUE</code>, because <code>ccfidu</code> is a medical record number combined with a date of surgery. Do not enable it in a session whose output is logged or shared.</p>
 </div>
