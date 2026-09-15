@@ -5,12 +5,15 @@
   duplicate parquet columns from being silently renamed and fractional counts
   from matching after integer truncation.
 
+* Analysis sets resolve their outputs through the study's logical datasets
+  directory, preserving numbered new studies and adopted legacy layouts.
+
 # hvtiRdatabuild 0.2.1
 
 * **New `write_analysis_set()` and `read_analysis_set()`.** An analysis set
   is a declared, checkpointed selection of the built dataset: the columns a
   job reads and the rows it excludes, declared under `analysis_sets:` in
-  `_study.yml`, written once to `datasets/<name>.parquet` with a sidecar
+  `_study.yml`, written once to `datasets/` as `<name>.parquet` with a sidecar
   recording its parent and per-rule attrition, and read by every job that
   needs it. Reading stops, rather than rebuilding, when the built dataset or
   the declaration has changed.

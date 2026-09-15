@@ -26,9 +26,16 @@
   if (!grepl("^[a-z][a-z0-9_]*$", name))
     stop(where, ": a set name is lower-case letters, digits and underscores, ",
          "starting with a letter.", call. = FALSE)
-  if (identical(name, tools::file_path_sans_ext(cfg$built)))
-    stop(where, " has the same name as the built dataset, and its parquet would ",
-         "overwrite the built dataset's cache. Rename the set.", call. = FALSE)
+  additional <- vapply(
+    cfg$additional_datasets %||% list(),
+    function(dataset) dataset$built,
+    character(1)
+  )
+  registered <- tools::file_path_sans_ext(c(cfg$built, additional))
+  if (name %in% registered)
+    stop(where, " has the same name as a registered dataset, and its parquet ",
+         "would overwrite that dataset or its cache. Rename the set.",
+         call. = FALSE)
   unknown <- setdiff(names(raw), .set_keys)
   if (length(unknown))
     stop(where, " has unknown key(s): ", paste(unknown, collapse = ", "),
@@ -173,9 +180,10 @@
 }
 
 .set_paths <- function(name, cfg) {
+  datasets <- hvtiRutilities::study_dir("datasets", cfg$root)
   list(
-    parquet  = file.path(cfg$root, "datasets", paste0(name, ".parquet")),
-    sidecar  = file.path(cfg$root, "datasets", paste0(name, ".set.yml")),
+    parquet  = file.path(datasets, paste0(name, ".parquet")),
+    sidecar  = file.path(datasets, paste0(name, ".set.yml")),
     manifest = file.path(cfg$root, "manifest.yaml")
   )
 }
@@ -198,7 +206,8 @@
   e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
   if (!length(e) || is.null(e[[1L]]$sha256))
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
-         "hvtiRutilities::study_init() or read_built() first.", call. = FALSE)
+         "hvtiRutilities::register_data() or read_built() first.",
+         call. = FALSE)
   p <- hvtiRutilities::built_path(cfg)
   info <- file.info(p)
   list(file = cfg$built, sha256 = e[[1L]]$sha256,
@@ -223,8 +232,9 @@
 #' Cuts the analysis set `name`, declared under `analysis_sets:` in the study's
 #' `_study.yml`, from the built dataset: keeps its `vars`, applies its `exclude`
 #' rules in order (first match wins), checks any `expect` counts, and writes
-#' `datasets/<name>.parquet`, a `datasets/<name>.set.yml` sidecar recording the
-#' parent dataset and the attrition, and a `manifest.yaml` entry.
+#' `<name>.parquet` and a `<name>.set.yml` sidecar in the study's logical
+#' datasets directory, plus a `manifest.yaml` entry. The sidecar records the
+#' parent dataset and the attrition.
 #'
 #' @details
 #' Nothing is written unless every check passes. Each `when` is R code evaluated

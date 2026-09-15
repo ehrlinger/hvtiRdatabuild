@@ -20,8 +20,9 @@ The sidecar contents, invisibly: a list with \code{set}, \code{parent},
 Cuts the analysis set \code{name}, declared under \verb{analysis_sets:} in the study's
 \verb{_study.yml}, from the built dataset: keeps its \code{vars}, applies its \code{exclude}
 rules in order (first match wins), checks any \code{expect} counts, and writes
-\verb{datasets/<name>.parquet}, a \verb{datasets/<name>.set.yml} sidecar recording the
-parent dataset and the attrition, and a \code{manifest.yaml} entry.
+\verb{<name>.parquet} and a \verb{<name>.set.yml} sidecar in the study's logical
+datasets directory, plus a \code{manifest.yaml} entry. The sidecar records the
+parent dataset and the attrition.
 }
 \details{
 Nothing is written unless every check passes. Each \code{when} is R code evaluated

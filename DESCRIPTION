@@ -24,7 +24,7 @@ Imports:
     DBI,
     digest,
     haven,
-    hvtiRutilities,
+    hvtiRutilities (>= 1.1.12),
     tools,
     utils,
     yaml
