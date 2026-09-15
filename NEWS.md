@@ -1,5 +1,9 @@
 # hvtiRdatabuild 0.2.1
 
+* Analysis-set declarations now reject duplicate variables and require every
+  expected row/event count to be one non-negative whole number. This prevents
+  duplicate parquet columns from being silently renamed and fractional counts
+  from matching after integer truncation.
 * **New `write_analysis_set()` and `read_analysis_set()`.** An analysis set
   is a declared, checkpointed selection of the built dataset: the columns a
   job reads and the rows it excludes, declared under `analysis_sets:` in

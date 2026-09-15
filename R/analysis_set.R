@@ -38,6 +38,9 @@
   vars <- unlist(raw$vars, use.names = FALSE)
   if (!is.character(vars) || !length(vars) || anyNA(vars))
     stop(where, ": `vars` must list at least one column.", call. = FALSE)
+  if (anyDuplicated(vars))
+    stop(where, ": duplicate variable `", vars[anyDuplicated(vars)], "` in `vars`.",
+         call. = FALSE)
   rules <- raw$exclude %||% list()
   for (k in seq_along(rules)) {
     r <- rules[[k]]
@@ -68,6 +71,15 @@
   if (length(bad))
     stop(where, ": `expect` has unknown count(s): ", paste(bad, collapse = ", "),
          ". Allowed: ", paste(.expect_keys, collapse = ", "), ".", call. = FALSE)
+  for (k in names(expect)) {
+    value <- expect[[k]]
+    if (!is.numeric(value) || length(value) != 1L)
+      stop(where, ": `expect: ", k, "` must be a single non-negative whole number.",
+           call. = FALSE)
+    if (is.na(value) || !is.finite(value) || value < 0 || value != floor(value))
+      stop(where, ": `expect: ", k, "` must be a non-negative whole number.",
+           call. = FALSE)
+  }
   list(id = raw$id, vars = vars, exclude = rules, expect = expect)
 }
 
@@ -266,7 +278,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
     if (is.null(counts[[k]]))
       stop("analysis set `", name, "`: cannot check `expect: ", k, "` because ",
            "the event column `", ev, "` is not in `vars`.", call. = FALSE)
-    if (!identical(as.integer(counts[[k]]), as.integer(b$expect[[k]])))
+    if (!isTRUE(counts[[k]] == b$expect[[k]]))
       stop("analysis set `", name, "`: expected ", k, " = ", b$expect[[k]], ", got ",
            counts[[k]], ". Nothing was written.", call. = FALSE)
   }
