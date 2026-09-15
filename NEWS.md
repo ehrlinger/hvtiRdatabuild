@@ -1,4 +1,4 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.2.1
 
 * **New `write_analysis_set()` and `read_analysis_set()`.** An analysis set
   is a declared, checkpointed selection of the built dataset: the columns a
