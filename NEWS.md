@@ -1,5 +1,10 @@
 # hvtiRdatabuild (unreleased)
 
+* The SAS migration guide now treats `bd.SAStoR.sas` outputs as general
+  downstream data contracts rather than exports owned by their first consumer.
+  It shows how the final selection becomes a shared analysis set while variable
+  derivation remains in the build layer.
+
 * Analysis-set declarations now reject duplicate variables and require every
   expected row/event count to be one non-negative whole number. This prevents
   duplicate parquet columns from being silently renamed and fractional counts
