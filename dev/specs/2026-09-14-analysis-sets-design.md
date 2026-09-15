@@ -49,7 +49,7 @@ cut after the build, on the analysis side.
 ## 3. Declaration
 
 ```yaml
-# _study.yml, beside the keys study_init() writes
+# _study.yml, beside the keys study_setup() and register_data() write
 analysis_sets:
   eda:
     id: ccfid
@@ -76,8 +76,8 @@ reads the block from `cfg$file` with `yaml::read_yaml()`. **No change to hvtiRut
 
 ⚠️ This is not hvtiRdatabuild's own `study.yaml`, whose `varsets:` key is parsed and
 unused. `study.yaml` exists only for studies built in R through `dw_pull()`. The studies
-this serves have a SAS-built `built` and a `_study.yml` from `study_init()`, and no
-`study.yaml`. `_study.yml` is the one file every study has.
+this serves have a SAS-built `built` and a `_study.yml` from `study_setup()` plus
+`register_data()`, and no `study.yaml`. `_study.yml` is the one file every study has.
 
 ## 4. Exclusion semantics
 
@@ -114,7 +114,8 @@ Two exports.
    `cohort$event` column is among `vars`.
 6. If `expect` is present and any stated count differs, stop. **Nothing is written.**
 7. Write, each atomically (temporary name in the destination, then rename):
-   `datasets/<name>.parquet`, then `datasets/<name>.set.yml`, then the manifest entry
+   `<name>.parquet` in the logical datasets directory, then `<name>.set.yml`, then
+   the manifest entry
    through `hvtiRutilities::update_manifest(file = <parquet>, n_rows =, n_cols =,
    source = "analysis set <name> of <built>")`.
 8. Return the sidecar contents invisibly; the attrition table is in the returned
@@ -122,7 +123,8 @@ Two exports.
 
 ### `read_analysis_set(name, cfg = study_config())`
 
-Reads `datasets/<name>.parquet` after three checks. Any failure **stops**, naming
+Reads `<name>.parquet` from the logical datasets directory after three checks. Any
+failure **stops**, naming
 `write_analysis_set("<name>")` as the fix:
 
 | check | stale when |
@@ -188,8 +190,9 @@ Every one of these stops before anything is written:
 
 ## 9. Testing
 
-Fixtures are temporary studies made with `hvtiRutilities::study_init()` over a CSV
-`built`, so the tests exercise the real data contract with no network and no SAS.
+Fixtures are temporary studies made with `hvtiRutilities::study_setup()` and
+`register_data()` over a CSV `built`, so the tests exercise the real data contract
+with no network and no SAS.
 
 - write then read round-trips the kept columns and rows;
 - rewriting `built` makes `read_analysis_set()` stop with the parent message;

@@ -173,9 +173,10 @@
 }
 
 .set_paths <- function(name, cfg) {
+  datasets <- hvtiRutilities::study_dir("datasets", cfg$root)
   list(
-    parquet  = file.path(cfg$root, "datasets", paste0(name, ".parquet")),
-    sidecar  = file.path(cfg$root, "datasets", paste0(name, ".set.yml")),
+    parquet  = file.path(datasets, paste0(name, ".parquet")),
+    sidecar  = file.path(datasets, paste0(name, ".set.yml")),
     manifest = file.path(cfg$root, "manifest.yaml")
   )
 }
@@ -198,7 +199,8 @@
   e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
   if (!length(e) || is.null(e[[1L]]$sha256))
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
-         "hvtiRutilities::study_init() or read_built() first.", call. = FALSE)
+         "hvtiRutilities::register_data() or read_built() first.",
+         call. = FALSE)
   p <- hvtiRutilities::built_path(cfg)
   info <- file.info(p)
   list(file = cfg$built, sha256 = e[[1L]]$sha256,
@@ -223,8 +225,9 @@
 #' Cuts the analysis set `name`, declared under `analysis_sets:` in the study's
 #' `_study.yml`, from the built dataset: keeps its `vars`, applies its `exclude`
 #' rules in order (first match wins), checks any `expect` counts, and writes
-#' `datasets/<name>.parquet`, a `datasets/<name>.set.yml` sidecar recording the
-#' parent dataset and the attrition, and a `manifest.yaml` entry.
+#' `<name>.parquet` and a `<name>.set.yml` sidecar in the study's logical
+#' datasets directory, plus a `manifest.yaml` entry. The sidecar records the
+#' parent dataset and the attrition.
 #'
 #' @details
 #' Nothing is written unless every check passes. Each `when` is R code evaluated

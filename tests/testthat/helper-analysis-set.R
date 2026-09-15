@@ -1,6 +1,11 @@
 local_study <- function(sets = list(), env = parent.frame()) {
   root <- withr::local_tempdir(.local_envir = env)
-  dir.create(file.path(root, "datasets"))
+  suppressMessages(invisible(hvtiRutilities::study_setup(
+    root,
+    study = "Test",
+    study_tracker_id = 1L,
+    adopt = TRUE
+  )))
   n <- 20L
   d <- data.frame(
     ccfid   = seq_len(n),
@@ -10,9 +15,16 @@ local_study <- function(sets = list(), env = parent.frame()) {
     iv_dead = seq_len(n) / 2,
     junk    = 1
   )
-  utils::write.csv(d, file.path(root, "datasets", "built.csv"), row.names = FALSE)
-  suppressMessages(invisible(hvtiRutilities::study_init(
-    root, study = "Test", built = "built.csv", event = "dead", time = "iv_dead"
+  utils::write.csv(
+    d,
+    file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
+    row.names = FALSE
+  )
+  suppressMessages(invisible(hvtiRutilities::register_data(
+    root,
+    built = "built.csv",
+    event = "dead",
+    time = "iv_dead"
   )))
   if (length(sets)) {
     yml <- file.path(root, "_study.yml")

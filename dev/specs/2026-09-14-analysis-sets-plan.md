@@ -21,7 +21,8 @@ the spec's "no global environment" rule and still uses the tracker.
 - Spec: `dev/specs/2026-09-14-analysis-sets-design.md`. Select-only; no derived variables.
 - Declared under `analysis_sets:` in `_study.yml`; keys `id`, `vars` (required), `exclude`, `expect` (optional). Any other key is an error.
 - Exclusions: `str2lang()`, evaluated with the data as environment and `baseenv()` as parent. `NA` means not excluded. First match wins.
-- Files: `datasets/<name>.parquet`, `datasets/<name>.set.yml`, and a `manifest.yaml` entry via `hvtiRutilities::update_manifest()`.
+- Files: `<name>.parquet` and `<name>.set.yml` in the logical datasets directory,
+  plus a `manifest.yaml` entry via `hvtiRutilities::update_manifest()`.
 - No identifier value is ever written to the sidecar or the manifest.
 - No change to hvtiRutilities; no `:::` calls into it.
 - Imports unchanged. `hvtiPlotR` added to Suggests (and `Remotes: ehrlinger/hvtiPlotR`); `arrow` already there.
@@ -58,7 +59,9 @@ sidecar. The manifest's `sha256` for `built` is refreshed only when something ca
 # tests/testthat/helper-analysis-set.R
 local_study <- function(sets = list(), env = parent.frame()) {
   root <- withr::local_tempdir(.local_envir = env)
-  dir.create(file.path(root, "datasets"))
+  suppressMessages(invisible(hvtiRutilities::study_setup(
+    root, study = "Test", study_tracker_id = 1L, adopt = TRUE
+  )))
   n <- 20L
   d <- data.frame(
     ccfid   = seq_len(n),
@@ -68,9 +71,13 @@ local_study <- function(sets = list(), env = parent.frame()) {
     iv_dead = seq_len(n) / 2,
     junk    = 1
   )
-  utils::write.csv(d, file.path(root, "datasets", "built.csv"), row.names = FALSE)
-  suppressMessages(invisible(hvtiRutilities::study_init(
-    root, study = "Test", built = "built.csv", event = "dead", time = "iv_dead"
+  utils::write.csv(
+    d,
+    file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
+    row.names = FALSE
+  )
+  suppressMessages(invisible(hvtiRutilities::register_data(
+    root, built = "built.csv", event = "dead", time = "iv_dead"
   )))
   if (length(sets)) {
     yml <- file.path(root, "_study.yml")
@@ -435,7 +442,7 @@ test_that("missing columns and a non-unique id are errors", {
   e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
   if (!length(e) || is.null(e[[1L]]$sha256))
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
-         "hvtiRutilities::study_init() or read_built() first.", call. = FALSE)
+         "hvtiRutilities::register_data() or read_built() first.", call. = FALSE)
   p <- hvtiRutilities::built_path(cfg)
   info <- file.info(p)
   list(file = cfg$built, sha256 = e[[1L]]$sha256,
@@ -449,8 +456,9 @@ test_that("missing columns and a non-unique id are errors", {
 #' Cuts the analysis set `name`, declared under `analysis_sets:` in the study's
 #' `_study.yml`, from the built dataset: keeps its `vars`, applies its `exclude`
 #' rules in order (first match wins), checks any `expect` counts, and writes
-#' `datasets/<name>.parquet`, a `datasets/<name>.set.yml` sidecar recording the
-#' parent dataset and the attrition, and a `manifest.yaml` entry.
+#' `<name>.parquet` and a `<name>.set.yml` sidecar in the study's logical
+#' datasets directory, plus a `manifest.yaml` entry. The sidecar records the
+#' parent dataset and the attrition.
 #'
 #' @details
 #' Nothing is written unless every check passes. Each `when` is R code evaluated
@@ -654,7 +662,8 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 * **New `write_analysis_set()` and `read_analysis_set()`.** An analysis set
   is a declared, checkpointed selection of the built dataset: the columns a
   job reads and the rows it excludes, declared under `analysis_sets:` in
-  `_study.yml`, written once to `datasets/<name>.parquet` with a sidecar
+  `_study.yml`, written once to the logical datasets directory as
+  `<name>.parquet` with a sidecar
   recording its parent and per-rule attrition, and read by every job that
   needs it. Reading stops, rather than rebuilding, when the built dataset or
   the declaration has changed.
