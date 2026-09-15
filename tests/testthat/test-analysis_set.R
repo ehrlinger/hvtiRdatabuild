@@ -163,8 +163,8 @@ test_that("write produces parquet, sidecar and manifest entry", {
   side <- write_analysis_set("eda", cfg)
   p <- .set_paths("eda", cfg)
   expect_equal(
-    dirname(p$parquet),
-    hvtiRutilities::study_dir("datasets", cfg$root)
+    normalizePath(dirname(p$parquet), winslash = "/"),
+    normalizePath(file.path(cfg$root, "00_datasets"), winslash = "/")
   )
   expect_true(file.exists(p$parquet))
   expect_true(file.exists(p$sidecar))
