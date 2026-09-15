@@ -152,7 +152,35 @@
 <td>parquet, or just return the object</td>
 </tr>
 </tbody>
-</table></section><section class="level2"><h2 id="the-traps">The traps<a class="anchor" aria-label="anchor" href="#the-traps"></a>
+</table></section><section class="level2"><h2 id="port-the-downstream-dataset-not-its-first-consumer">Port the downstream dataset, not its first consumer<a class="anchor" aria-label="anchor" href="#port-the-downstream-dataset-not-its-first-consumer"></a>
+</h2>
+<p>A <code>bd.SAStoR.sas</code> job, often copied from <code>tp.bd.SAStoR.sas</code>, can look like a file-format adapter: it reads <code>built</code>, keeps a shorter variable list, and writes <code>builtr</code> for R. The useful boundary is not SAS versus R, however. The output is a downstream data contract that may feed descriptive summaries, models, tables, and figures long after the first job that happened to read it.</p>
+<p>Port that pattern as an analysis set. Declare the columns and any row exclusions once under <code>analysis_sets:</code> in the setup manifest, <code>_study.yml</code>, then let every downstream job that needs that contract read the same checkpoint. This is not the warehouse-build <code>study.yaml</code> read by <code><a href="../reference/read_study_config.html">read_study_config()</a></code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">analysis_sets</span><span class="kw">:</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="at">  </span><span class="fu">primary_analysis</span><span class="kw">:</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">id</span><span class="kw">:</span><span class="at"> patient_id</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">vars</span><span class="kw">:</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> patient_id</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> surgery_year</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> biomarker</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> event</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> follow_up</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">expect</span><span class="kw">:</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">1200</span></span></code></pre></div>
+<p>The names and counts above are synthetic. Name a set for the dataset contract, such as <code>primary_analysis</code>, rather than for its first consumer, such as a particular plot. Add another set only when the study has a genuinely different population or variable contract. If the SAS step keeps every row, omit <code>exclude</code>; the <code>vars</code> list alone expresses its projection. Add <code>n_events</code> and <code>n_censored</code> expectations only when <code>vars</code> contains the event column registered in <code>_study.yml</code>; <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> calculates both from that column.</p>
+<p>Write the checkpoint explicitly after the built dataset is ready:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_config.html" class="external-link">study_config</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/write_analysis_set.html">write_analysis_set</a></span><span class="op">(</span><span class="st">"primary_analysis"</span>, <span class="va">cfg</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p>Downstream jobs read it; they do not cut their own copies or silently rebuild a stale one:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_analysis_set.html">read_analysis_set</a></span><span class="op">(</span><span class="st">"primary_analysis"</span>, <span class="va">cfg</span><span class="op">)</span></span></code></pre></div>
+</div>
+<p>Keep derivation on the build side of this boundary. If the SAS job calls a <code>vars</code> macro before its final <code>keep</code>, port those new or transformed variables to the build or derived-variable layer. An analysis set selects rows and columns from <code>built</code>; it does not create variables. This separation leaves one reviewable derivation path and one reviewable downstream contract, without a study-specific package function for either variable list.</p>
+</section><section class="level2"><h2 id="the-traps">The traps<a class="anchor" aria-label="anchor" href="#the-traps"></a>
 </h2>
 <p>Each of these produces a wrong number rather than an error. They are the reason <code><a href="../reference/compare_built.html">compare_built()</a></code> exists.</p>
 <section class="level3"><h3 id="missing-sorts-low">Missing sorts low<a class="anchor" aria-label="anchor" href="#missing-sorts-low"></a>
@@ -161,7 +189,7 @@
 <pre><code>if bmi &lt; 18.5 then underweight = 1;</code></pre>
 <p>R does not:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">bmi</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">31.2</span>, <span class="cn">NA</span>, <span class="fl">17.0</span><span class="op">)</span></span>
 <span><span class="va">bmi</span> <span class="op">&lt;</span> <span class="fl">18.5</span></span>
 <span><span class="co">#&gt; [1] FALSE    NA  TRUE</span></span></code></pre></div>
@@ -171,7 +199,7 @@
 </h3>
 <p>SAS pads character values to their declared length, so <code>'Smith'</code> and <code>'Smith   '</code> compare equal. In R they do not:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="st">"Smith"</span> <span class="op">==</span> <span class="st">"Smith   "</span></span>
 <span><span class="co">#&gt; [1] FALSE</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws</a></span><span class="op">(</span><span class="st">"Smith   "</span><span class="op">)</span> <span class="op">==</span> <span class="st">"Smith"</span></span>
@@ -182,7 +210,7 @@
 </h3>
 <p>R distinguishes <code>NA</code> from <code>""</code>. SAS does not — a missing character <strong>is</strong> the empty string. Read a SAS dataset and every missing character comes back as <code>""</code>:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"oracle_small.sas7bdat"</span>,</span>
 <span>                 package <span class="op">=</span> <span class="st">"hvtiRdatabuild"</span><span class="op">)</span></span>
 <span><span class="va">surgeon</span> <span class="op">&lt;-</span> <span class="fu">haven</span><span class="fu">::</span><span class="fu"><a href="https://haven.tidyverse.org/reference/read_sas.html" class="external-link">read_sas</a></span><span class="op">(</span><span class="va">f</span><span class="op">)</span><span class="op">$</span><span class="va">surgeon</span></span>
@@ -202,7 +230,7 @@
 </blockquote>
 <p>R makes the same mistake loud:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">a</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"A"</span><span class="op">)</span>, x <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">)</span></span>
 <span><span class="va">b</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A"</span>, <span class="st">"A"</span><span class="op">)</span>, y <span class="op">=</span> <span class="fl">3</span><span class="op">:</span><span class="fl">4</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate-joins.html" class="external-link">left_join</a></span><span class="op">(</span><span class="va">a</span>, <span class="va">b</span>, by <span class="op">=</span> <span class="st">"id"</span><span class="op">)</span><span class="op">)</span></span>
@@ -219,7 +247,7 @@
 </h3>
 <p>SAS counts days from 1960-01-01; R from 1970-01-01. The gap is 3,653 days. <code>haven</code> converts correctly, so a value read through <code><a href="../reference/snapshot_oracle.html">snapshot_oracle()</a></code> is already right. A hand-rolled conversion is where this goes wrong.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fl">0</span>, origin <span class="op">=</span> <span class="st">"1970-01-01"</span><span class="op">)</span>   <span class="co"># R's zero</span></span>
 <span><span class="co">#&gt; [1] "1970-01-01"</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fl">0</span>, origin <span class="op">=</span> <span class="st">"1960-01-01"</span><span class="op">)</span>   <span class="co"># what a raw SAS number means</span></span>
@@ -236,7 +264,7 @@
 </h2>
 <p>Build the variable in R, then compare against the oracle:</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode cell-code" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">oracle</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>ccfidu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A1"</span>, <span class="st">"A2"</span>, <span class="st">"A3"</span><span class="op">)</span>, age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">65.5</span>, <span class="fl">70.2</span>, <span class="fl">58.0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">mine</span>   <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>ccfidu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A1"</span>, <span class="st">"A2"</span>, <span class="st">"A3"</span><span class="op">)</span>, age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">65.5</span>, <span class="fl">70.2</span>, <span class="fl">58.5</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>

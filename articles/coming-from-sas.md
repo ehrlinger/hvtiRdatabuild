@@ -42,6 +42,70 @@ doing: what used to be invisible becomes reviewable.
 | `first.id` / `last.id` | `group_by()` + `slice_head()` / `slice_tail()` |
 | `libname out xport` then `read.xport()` | parquet, or just return the object |
 
+## Port the downstream dataset, not its first consumer
+
+A `bd.SAStoR.sas` job, often copied from `tp.bd.SAStoR.sas`, can look
+like a file-format adapter: it reads `built`, keeps a shorter variable
+list, and writes `builtr` for R. The useful boundary is not SAS versus
+R, however. The output is a downstream data contract that may feed
+descriptive summaries, models, tables, and figures long after the first
+job that happened to read it.
+
+Port that pattern as an analysis set. Declare the columns and any row
+exclusions once under `analysis_sets:` in the setup manifest,
+`_study.yml`, then let every downstream job that needs that contract
+read the same checkpoint. This is not the warehouse-build `study.yaml`
+read by
+[`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md):
+
+``` yaml
+analysis_sets:
+  primary_analysis:
+    id: patient_id
+    vars:
+      - patient_id
+      - surgery_year
+      - biomarker
+      - event
+      - follow_up
+    expect:
+      n: 1200
+```
+
+The names and counts above are synthetic. Name a set for the dataset
+contract, such as `primary_analysis`, rather than for its first
+consumer, such as a particular plot. Add another set only when the study
+has a genuinely different population or variable contract. If the SAS
+step keeps every row, omit `exclude`; the `vars` list alone expresses
+its projection. Add `n_events` and `n_censored` expectations only when
+`vars` contains the event column registered in `_study.yml`;
+[`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+calculates both from that column.
+
+Write the checkpoint explicitly after the built dataset is ready:
+
+``` r
+
+cfg <- hvtiRutilities::study_config()
+write_analysis_set("primary_analysis", cfg)
+```
+
+Downstream jobs read it; they do not cut their own copies or silently
+rebuild a stale one:
+
+``` r
+
+d <- read_analysis_set("primary_analysis", cfg)
+```
+
+Keep derivation on the build side of this boundary. If the SAS job calls
+a `vars` macro before its final `keep`, port those new or transformed
+variables to the build or derived-variable layer. An analysis set
+selects rows and columns from `built`; it does not create variables.
+This separation leaves one reviewable derivation path and one reviewable
+downstream contract, without a study-specific package function for
+either variable list.
+
 ## The traps
 
 Each of these produces a wrong number rather than an error. They are the
