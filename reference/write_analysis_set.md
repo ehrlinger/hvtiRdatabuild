@@ -3,9 +3,9 @@
 Cuts the analysis set `name`, declared under `analysis_sets:` in the
 study's `_study.yml`, from the built dataset: keeps its `vars`, applies
 its `exclude` rules in order (first match wins), checks any `expect`
-counts, and writes `datasets/<name>.parquet`, a
-`datasets/<name>.set.yml` sidecar recording the parent dataset and the
-attrition, and a `manifest.yaml` entry.
+counts, and writes `<name>.parquet` and a `<name>.set.yml` sidecar in
+the study's logical datasets directory, plus a `manifest.yaml` entry.
+The sidecar records the parent dataset and the attrition.
 
 ## Usage
 
