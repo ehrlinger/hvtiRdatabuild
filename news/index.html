@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,11 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.1" id="hvtirdatabuild-021">hvtiRdatabuild 0.2.1<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-021"></a></h2>
+<ul><li>
+<strong>New <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> and <code><a href="../reference/read_analysis_set.html">read_analysis_set()</a></code>.</strong> An analysis set is a declared, checkpointed selection of the built dataset: the columns a job reads and the rows it excludes, declared under <code>analysis_sets:</code> in <code>_study.yml</code>, written once to <code>datasets/&lt;name&gt;.parquet</code> with a sidecar recording its parent and per-rule attrition, and read by every job that needs it. Reading stops, rather than rebuilding, when the built dataset or the declaration has changed.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.0" id="hvtirdatabuild-020">hvtiRdatabuild 0.2.0<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-020"></a></h2>
 <div class="section level3">
