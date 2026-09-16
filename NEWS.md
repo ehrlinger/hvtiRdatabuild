@@ -1,4 +1,9 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.2.2
+
+* Documentation no longer points `dw_pull()` users at a
+  `building-a-study-dataset` vignette that does not exist, and the SAS migration
+  guide no longer lists the shipped `dw_connect()` and `dw_pull()` as future
+  work. Prose across the README, vignette and reference pages was tightened.
 
 * The SAS migration guide now treats `bd.SAStoR.sas` outputs as general
   downstream data contracts rather than exports owned by their first consumer.

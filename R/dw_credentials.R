@@ -3,7 +3,7 @@
 #' Walks the credential ladder and stops at the first resolvable source. The
 #' order is deliberate and is fixed by the design spec:
 #'
-#' 1. Kerberos integrated authentication — no stored secret at all.
+#' 1. Kerberos integrated authentication, with no stored secret at all.
 #' 2. A named ODBC DSN, where the *driver* holds the credentials.
 #' 3. `HVI_DW_UID` / `HVI_DW_PWD` from `~/.Renviron`.
 #' 4. `keyring`, if configured. Documented, not default: it assumes a Secret
@@ -67,7 +67,7 @@
 #'
 #' Windows has no POSIX file mode: `Sys.chmod()` there only toggles the
 #' read-only attribute, so a file "chmod'd" to 600 still reports as
-#' world-readable. Rather than pass a credential file that cannot actually be
+#' world-readable. Rather than pass a credential file that cannot be
 #' confirmed protected, this refuses outright on a platform without POSIX
 #' modes.
 #'

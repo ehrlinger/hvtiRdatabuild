@@ -17,7 +17,7 @@
 \description{
 \code{str()} dispatches on the object rather than routing through
 \code{\link[=print.built_comparison]{print.built_comparison()}}, so the default method would print the \code{rows}
-attribute verbatim — including the identifier vectors. In this group's data
+attribute verbatim, including the identifier vectors. In this group's data
 an identifier is a medical record number concatenated with a date of
 surgery.
 }
