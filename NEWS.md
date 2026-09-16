@@ -1,4 +1,4 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.2.2
 
 * Documentation no longer points `dw_pull()` users at a
   `building-a-study-dataset` vignette that does not exist, and the SAS migration
