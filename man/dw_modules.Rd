@@ -15,7 +15,7 @@ Module definitions ship as data under \verb{inst/extdata/modules/}, one YAML
 file per module, rather than as R code. They change independently of the
 code that executes them, they carry a description of the SAS block each one
 ports, and holding them outside R source is what keeps site-specific
-identifiers out of this repository — the SQL ships with placeholders and
+identifiers out of this repository. The SQL ships with placeholders and
 the real warehouse, schema, and cohort names arrive from \code{study.yaml} at
 run time.
 }

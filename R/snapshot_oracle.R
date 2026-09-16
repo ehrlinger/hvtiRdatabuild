@@ -9,7 +9,7 @@
 #' changes mid-migration, every previously passing comparison silently becomes
 #' meaningless. A checksummed snapshot is a citable fixed point.
 #'
-#' Note that this does not remove \pkg{haven} from the chain of custody — it
+#' Note that this does not remove \pkg{haven} from the chain of custody; it
 #' confines it to a single audited step. A misread is faithfully preserved in
 #' the parquet file. Supply `expect` to validate the conversion against
 #' SAS-side `PROC CONTENTS` output.

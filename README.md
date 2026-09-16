@@ -21,8 +21,8 @@ verify an R-built dataset against its SAS oracle. `read_study_config()`,
 `dw_connect()`, `dw_modules()`, `dw_pull()`, and `print.pull_result()` read a
 study's warehouse modules into R. `write_analysis_set()` materializes a
 declared selection from a built dataset, and `read_analysis_set()` refuses a
-stale checkpoint. The build and derivation stages — `build_dataset()` and
-`derive_vars()` — remain future work.
+stale checkpoint. The build and derivation stages (`build_dataset()` and
+`derive_vars()`) remain future work.
 
 ## Installation
 
@@ -81,9 +81,9 @@ result
 
 `pulled_at` is wall-clock time at pull, so it will differ on your machine.
 `print.pull_result()` (dispatched automatically for `result`) never prints
-row-level data, only the manifest shape — no identifiers to redact.
+row-level data, only the manifest shape, so there are no identifiers to redact.
 
-`dw_pull()` is **read-only**. It never writes to the warehouse — the cohort
+`dw_pull()` is **read-only** and never writes to the warehouse. The cohort
 write-back the SAS templates perform (`libsql`) is deliberately not ported in
 this slice. The re-pull variants (`snapshotpull`, `ccfpull`), which take an
 existing built dataset and remap keys because `masterid` stopped being stable
@@ -112,8 +112,8 @@ every variable that is not `identical`.
 the five warehouse modules, only `bdbase` and `bdstat` are one row per patient
 and so are measurable against the SAS oracle today. `echo`, `fup`, and
 `bdevents` are one row per *event* (echocardiogram, follow-up visit,
-reoperation) — a given `patid` legitimately repeats — so a direct
-per-identifier comparison errors on them by design, not by oversight.
+reoperation), where a given `patid` legitimately repeats, so a direct
+per-identifier comparison errors on them by design.
 Verifying those three needs a composite-key comparison, deferred to a later
 slice.
 
@@ -127,8 +127,8 @@ HVTI_ORACLE_DIR=/studies/st1234/datasets Rscript -e 'devtools::test()'
 ```
 
 That directory holds PHI. It must live outside this repository, and nothing in
-the test suite copies from it. With the variable unset — the default, and what
-CI sees — these tests skip.
+the test suite copies from it. With the variable unset (the default, and what
+CI sees), these tests skip.
 
 `print()` never emits identifiers unless `show_ids = TRUE`, because `ccfidu` is
 a medical record number combined with a date of surgery. Do not enable it in a
@@ -136,7 +136,7 @@ session whose output is logged or shared.
 
 ## Documentation
 
-- `vignette("coming-from-sas")` — migration guide for SAS users. Start here.
+- `vignette("coming-from-sas")`: the migration guide for SAS users. Start here.
 
 ## Design
 

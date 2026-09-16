@@ -60,8 +60,8 @@
 #' * **`""` is folded to `NA`.** SAS has no character missing value distinct
 #'   from the empty string. A missing character in a SAS dataset reads back as
 #'   `""`, while the R pipeline produces `NA`. Treating them as different would
-#'   report `differs` for every character column containing any missing value —
-#'   false positives in bulk, on every study.
+#'   report `differs` for every character column containing any missing value,
+#'   a false positive in bulk on every study.
 #'
 #' The information loss is real but unavoidable: the oracle cannot distinguish
 #' `""` from missing, so a difference between them is never evidence of

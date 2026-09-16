@@ -68,7 +68,7 @@ print.built_comparison <- function(x, ...,
 #'
 #' `str()` dispatches on the object rather than routing through
 #' [print.built_comparison()], so the default method would print the `rows`
-#' attribute verbatim — including the identifier vectors. In this group's data
+#' attribute verbatim, including the identifier vectors. In this group's data
 #' an identifier is a medical record number concatenated with a date of
 #' surgery.
 #'

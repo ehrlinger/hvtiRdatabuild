@@ -16,3 +16,6 @@
 !inst/extdata/oracle_small.sas7bdat
 oracle/
 docs
+
+# Findings reports can quote PHI-adjacent content; never commit them.
+reports/

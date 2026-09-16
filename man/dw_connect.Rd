@@ -49,13 +49,13 @@ encryption or trusts the server certificate. The legacy SAS connection
 carried \code{TrustServerCertificate=Yes}, which is why the pull works today.
 Whether trusting the certificate is the right long-term posture, versus
 installing the institutional CA chain, is a question for whoever
-administers the DSN — but changing it silently would break every pull.
+administers the DSN, but changing it silently would break every pull.
 
 Set the \code{HVI_DW_KERBEROS} environment variable to enable the top rung of
 the credential ladder, Kerberos integrated authentication: no stored
 secret is used, and the connection relies on the caller's existing ticket
 instead. It is read with \code{\link[=as.logical]{as.logical()}}, which recognises \code{"true"},
-\code{"True"}, \code{"T"}, and \code{"TRUE"} (and their \code{FALSE} counterparts) — set it to
+\code{"True"}, \code{"T"}, and \code{"TRUE"} (and their \code{FALSE} counterparts). Set it to
 one of those, not \code{"yes"} or \code{"1"}, which \code{as.logical()} does not
 recognise and silently reads as \code{NA}.
 

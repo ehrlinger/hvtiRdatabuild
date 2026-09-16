@@ -6,7 +6,7 @@
 #' diffable, committed file.
 #'
 #' Validation is strict by design. An unknown key is an error rather than a
-#' warning, because a typo'd module name must not silently disable a module —
+#' warning, because a typo'd module name must not silently disable a module;
 #' that failure mode produces a quietly incomplete dataset with no signal. For
 #' the same reason, `modules` must name at least one module: an empty or bare
 #' `modules` key would otherwise pull zero data with no error, the same
