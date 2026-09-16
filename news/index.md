@@ -1,5 +1,31 @@
 # Changelog
 
+## hvtiRdatabuild 0.2.2
+
+- Documentation no longer points
+  [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md)
+  users at a `building-a-study-dataset` vignette that does not exist,
+  and the SAS migration guide no longer lists the shipped
+  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md)
+  and
+  [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md)
+  as future work. Prose across the README, vignette and reference pages
+  was tightened.
+
+- The SAS migration guide now treats `bd.SAStoR.sas` outputs as general
+  downstream data contracts rather than exports owned by their first
+  consumer. It shows how the final selection becomes a shared analysis
+  set while variable derivation remains in the build layer.
+
+- Analysis-set declarations now reject duplicate variables and require
+  every expected row/event count to be one non-negative whole number.
+  This prevents duplicate parquet columns from being silently renamed
+  and fractional counts from matching after integer truncation.
+
+- Analysis sets resolve their outputs through the study’s logical
+  datasets directory, preserving numbered new studies and adopted legacy
+  layouts.
+
 ## hvtiRdatabuild 0.2.1
 
 - **New

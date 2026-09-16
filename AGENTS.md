@@ -1,14 +1,17 @@
 # hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and
-verifies them against the legacy SAS datasets they replace. Six exports:
+verifies them against the legacy SAS datasets they replace. Eight
+exports:
 [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
 [`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
 [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md),
 [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
-[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
+[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md),
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md),
+[`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
 and
-[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md).
+[`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md).
 
 **This is the package that touches PHI and warehouse credentials.** Most
 of its rules are about not leaking either, and they are not negotiable

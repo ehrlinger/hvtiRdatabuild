@@ -3,7 +3,7 @@
 [`str()`](https://rdrr.io/r/utils/str.html) dispatches on the object
 rather than routing through
 [`print.built_comparison()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.built_comparison.md),
-so the default method would print the `rows` attribute verbatim —
+so the default method would print the `rows` attribute verbatim,
 including the identifier vectors. In this group's data an identifier is
 a medical record number concatenated with a date of surgery.
 

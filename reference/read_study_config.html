@@ -13,7 +13,7 @@ diffable, committed file."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -76,7 +76,7 @@ named logical vector).</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Validation is strict by design. An unknown key is an error rather than a
-warning, because a typo'd module name must not silently disable a module —
+warning, because a typo'd module name must not silently disable a module;
 that failure mode produces a quietly incomplete dataset with no signal. For
 the same reason, <code>modules</code> must name at least one module: an empty or bare
 <code>modules</code> key would otherwise pull zero data with no error, the same

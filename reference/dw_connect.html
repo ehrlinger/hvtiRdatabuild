@@ -13,7 +13,7 @@ string is never echoed."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -114,12 +114,12 @@ encryption or trusts the server certificate. The legacy SAS connection
 carried <code>TrustServerCertificate=Yes</code>, which is why the pull works today.
 Whether trusting the certificate is the right long-term posture, versus
 installing the institutional CA chain, is a question for whoever
-administers the DSN — but changing it silently would break every pull.</p>
+administers the DSN, but changing it silently would break every pull.</p>
 <p>Set the <code>HVI_DW_KERBEROS</code> environment variable to enable the top rung of
 the credential ladder, Kerberos integrated authentication: no stored
 secret is used, and the connection relies on the caller's existing ticket
 instead. It is read with <code><a href="https://rdrr.io/r/base/logical.html" class="external-link">as.logical()</a></code>, which recognises <code>"true"</code>,
-<code>"True"</code>, <code>"T"</code>, and <code>"TRUE"</code> (and their <code>FALSE</code> counterparts) — set it to
+<code>"True"</code>, <code>"T"</code>, and <code>"TRUE"</code> (and their <code>FALSE</code> counterparts). Set it to
 one of those, not <code>"yes"</code> or <code>"1"</code>, which <code><a href="https://rdrr.io/r/base/logical.html" class="external-link">as.logical()</a></code> does not
 recognise and silently reads as <code>NA</code>.</p>
 <p>File-based credentials (a DSN or <code>~/.Renviron</code>) are unavailable on

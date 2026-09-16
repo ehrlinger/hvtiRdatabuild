@@ -51,7 +51,7 @@ incomplete dataset, which is the failure this package exists to prevent.
 
 ``` r
 # \donttest{
-# Requires a warehouse connection; see vignette("building-a-study-dataset")
+# Requires a warehouse connection; see ?dw_connect
 # for a runnable version against a mocked connection.
 # }
 ```

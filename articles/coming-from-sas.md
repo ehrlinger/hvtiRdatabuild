@@ -19,20 +19,20 @@ of the script.
 
 R passes values through functions, and the study’s `study.yaml` is the
 record. Enabling a step is a change to a committed configuration file,
-not an uncommented block. This is the whole reason the port is worth
-doing: what used to be invisible becomes reviewable.
+not an uncommented block. The port is worth doing because what used to
+be invisible becomes reviewable.
 
 ## Idiom translation
 
 ``` r
 
-# Functions marked (S1)-(S3) arrive in later slices.
+# Functions marked (S3) arrive in a later slice.
 ```
 
 | SAS | R |
 |----|----|
-| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) (S1) |
-| `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` (S1) |
+| `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) |
+| `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
 | `%macro skip; ... %mend skip;` | `modules:` / `derive:` toggles in `study.yaml` |
 | `%vars(in=built, out=built, transf=1)` | `derive_vars(built, config)` (S3) |
@@ -75,9 +75,9 @@ analysis_sets:
 The names and counts above are synthetic. Name a set for the dataset
 contract, such as `primary_analysis`, rather than for its first
 consumer, such as a particular plot. Add another set only when the study
-has a genuinely different population or variable contract. If the SAS
-step keeps every row, omit `exclude`; the `vars` list alone expresses
-its projection. Add `n_events` and `n_censored` expectations only when
+has a different population or variable contract. If the SAS step keeps
+every row, omit `exclude`; the `vars` list alone expresses its
+projection. Add `n_events` and `n_censored` expectations only when
 `vars` contains the event column registered in `_study.yml`;
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
 calculates both from that column.
@@ -153,9 +153,9 @@ trims before comparing, for exactly this reason.
 
 ### SAS has no missing character value
 
-R distinguishes `NA` from `""`. SAS does not — a missing character
-**is** the empty string. Read a SAS dataset and every missing character
-comes back as `""`:
+R distinguishes `NA` from `""`. SAS does not: a missing character **is**
+the empty string. Read a SAS dataset and every missing character comes
+back as `""`:
 
 ``` r
 
@@ -181,8 +181,8 @@ is missing. Test for `""`, or convert on read.
 ### `MERGE` is not a join
 
 A SAS data-step `MERGE` on a non-unique BY key does not error. It
-produces undefined results. This is not hypothetical — from the revision
-history of `tp.bd.data.master.sas`:
+produces undefined results. This is not hypothetical. The revision
+history of `tp.bd.data.master.sas` records it:
 
 > 07/03/23: Changed the join logic for the FUP dataset to correct
 > many-to-1 join problem when patient has multiple surgeries in the
@@ -203,12 +203,12 @@ nrow(dplyr::left_join(a, b, by = "id"))
 #> [1] 4
 ```
 
-Four rows from two — and `dplyr` says so, out loud, which SAS never did.
+Four rows from two, and `dplyr` says so out loud, which SAS never did.
 
 You can silence that warning with `relationship = "many-to-many"`, and
 there are joins where the fan-out is genuinely intended. But reach for
 it only once you have confirmed the duplication is what you want. Do not
-pass it reflexively to quiet the output — that turns off the one check
+pass it reflexively to quiet the output; that turns off the one check
 SAS never gave you.
 
 ### Dates use different origins
@@ -241,18 +241,18 @@ A SAS numeric written with `length 4` loses precision on disk. A value
 read back from an old dataset may not equal a freshly computed R value,
 and **the SAS side is the lossy one**. `tolerance` in
 [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
-is what catches this — but it is an **absolute** threshold, not a
+is what catches this, but it is an **absolute** threshold, not a
 relative one. A single absolute threshold cannot serve columns of mixed
 magnitude: a value large enough to be at risk of `length 4` truncation
 (into the millions, for identifiers or accumulated counts) can differ by
 more than a small absolute `tolerance` while the difference is still
 storage precision, not a real disagreement. `1234567` vs `1234567.06`
-reports `differs`, not `within_tolerance`, with `max_abs_diff` of `0.06`
-— but `max_rel_diff` is `4.9e-08`. For a large-magnitude variable, that
-tiny relative difference alongside a `differs` verdict is the signal to
-suspect storage precision, not the `within_tolerance` verdict itself.
-Read `max_rel_diff`, not the verdict alone, when judging whether a
-difference is real.
+reports `differs`, not `within_tolerance`, with `max_abs_diff` of
+`0.06`, but `max_rel_diff` is `4.9e-08`. For a large-magnitude variable,
+that tiny relative difference alongside a `differs` verdict is the
+signal to suspect storage precision, not the `within_tolerance` verdict
+itself. Read `max_rel_diff`, not the verdict alone, when judging whether
+a difference is real.
 
 ## Verifying your own port
 

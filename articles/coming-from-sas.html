@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -78,12 +78,12 @@
 </section><section class="level2"><h2 id="the-model-shift">The model shift<a class="anchor" aria-label="anchor" href="#the-model-shift"></a>
 </h2>
 <p>A SAS program mutates a dataset through a sequence of steps, and the program itself is the record of what happened. If an analyst commented out a block with <code>%macro skip</code>, that decision lives only in their copy of the script.</p>
-<p>R passes values through functions, and the study’s <code>study.yaml</code> is the record. Enabling a step is a change to a committed configuration file, not an uncommented block. This is the whole reason the port is worth doing: what used to be invisible becomes reviewable.</p>
+<p>R passes values through functions, and the study’s <code>study.yaml</code> is the record. Enabling a step is a change to a committed configuration file, not an uncommented block. The port is worth doing because what used to be invisible becomes reviewable.</p>
 </section><section class="level2"><h2 id="idiom-translation">Idiom translation<a class="anchor" aria-label="anchor" href="#idiom-translation"></a>
 </h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Functions marked (S1)-(S3) arrive in later slices.</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="co"># Functions marked (S3) arrive in a later slice.</span></span></code></pre></div>
 </div>
 <table class="table caption-top">
 <colgroup>
@@ -99,13 +99,11 @@
 <td>
 <code>%include "&lt;dbcreds&gt;.sas"</code> + <code>CONNECT TO ODBC</code>
 </td>
-<td>
-<code><a href="../reference/dw_connect.html">dw_connect()</a></code> (S1)</td>
+<td><code><a href="../reference/dw_connect.html">dw_connect()</a></code></td>
 </tr>
 <tr class="even">
 <td><code>PROC SQL; SELECT ... FROM connection to ODBC</code></td>
-<td>
-<code>dw_pull(config, conn)</code> (S1)</td>
+<td><code>dw_pull(config, conn)</code></td>
 </tr>
 <tr class="odd">
 <td><code>libname library "&amp;STUDY/datasets"</code></td>
@@ -167,7 +165,7 @@
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="kw">-</span><span class="at"> follow_up</span></span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">expect</span><span class="kw">:</span></span>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">1200</span></span></code></pre></div>
-<p>The names and counts above are synthetic. Name a set for the dataset contract, such as <code>primary_analysis</code>, rather than for its first consumer, such as a particular plot. Add another set only when the study has a genuinely different population or variable contract. If the SAS step keeps every row, omit <code>exclude</code>; the <code>vars</code> list alone expresses its projection. Add <code>n_events</code> and <code>n_censored</code> expectations only when <code>vars</code> contains the event column registered in <code>_study.yml</code>; <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> calculates both from that column.</p>
+<p>The names and counts above are synthetic. Name a set for the dataset contract, such as <code>primary_analysis</code>, rather than for its first consumer, such as a particular plot. Add another set only when the study has a different population or variable contract. If the SAS step keeps every row, omit <code>exclude</code>; the <code>vars</code> list alone expresses its projection. Add <code>n_events</code> and <code>n_censored</code> expectations only when <code>vars</code> contains the event column registered in <code>_study.yml</code>; <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> calculates both from that column.</p>
 <p>Write the checkpoint explicitly after the built dataset is ready:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
@@ -208,7 +206,7 @@
 <p>This bites hardest on merges keyed by a character id. <code><a href="../reference/compare_built.html">compare_built()</a></code> trims before comparing, for exactly this reason.</p>
 </section><section class="level3"><h3 id="sas-has-no-missing-character-value">SAS has no missing character value<a class="anchor" aria-label="anchor" href="#sas-has-no-missing-character-value"></a>
 </h3>
-<p>R distinguishes <code>NA</code> from <code>""</code>. SAS does not — a missing character <strong>is</strong> the empty string. Read a SAS dataset and every missing character comes back as <code>""</code>:</p>
+<p>R distinguishes <code>NA</code> from <code>""</code>. SAS does not: a missing character <strong>is</strong> the empty string. Read a SAS dataset and every missing character comes back as <code>""</code>:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"oracle_small.sas7bdat"</span>,</span>
@@ -224,7 +222,7 @@
 </section><section class="level3"><h3 id="merge-is-not-a-join">
 <code>MERGE</code> is not a join<a class="anchor" aria-label="anchor" href="#merge-is-not-a-join"></a>
 </h3>
-<p>A SAS data-step <code>MERGE</code> on a non-unique BY key does not error. It produces undefined results. This is not hypothetical — from the revision history of <code>tp.bd.data.master.sas</code>:</p>
+<p>A SAS data-step <code>MERGE</code> on a non-unique BY key does not error. It produces undefined results. This is not hypothetical. The revision history of <code>tp.bd.data.master.sas</code> records it:</p>
 <blockquote>
 <p>07/03/23: Changed the join logic for the FUP dataset to correct many-to-1 join problem when patient has multiple surgeries in the dataset</p>
 </blockquote>
@@ -241,8 +239,8 @@
 <span><span class="co">#&gt;   "many-to-many"` to silence this warning.</span></span>
 <span><span class="co">#&gt; [1] 4</span></span></code></pre></div>
 </div>
-<p>Four rows from two — and <code>dplyr</code> says so, out loud, which SAS never did.</p>
-<p>You can silence that warning with <code>relationship = "many-to-many"</code>, and there are joins where the fan-out is genuinely intended. But reach for it only once you have confirmed the duplication is what you want. Do not pass it reflexively to quiet the output — that turns off the one check SAS never gave you.</p>
+<p>Four rows from two, and <code>dplyr</code> says so out loud, which SAS never did.</p>
+<p>You can silence that warning with <code>relationship = "many-to-many"</code>, and there are joins where the fan-out is genuinely intended. But reach for it only once you have confirmed the duplication is what you want. Do not pass it reflexively to quiet the output; that turns off the one check SAS never gave you.</p>
 </section><section class="level3"><h3 id="dates-use-different-origins">Dates use different origins<a class="anchor" aria-label="anchor" href="#dates-use-different-origins"></a>
 </h3>
 <p>SAS counts days from 1960-01-01; R from 1970-01-01. The gap is 3,653 days. <code>haven</code> converts correctly, so a value read through <code><a href="../reference/snapshot_oracle.html">snapshot_oracle()</a></code> is already right. A hand-rolled conversion is where this goes wrong.</p>
@@ -259,7 +257,7 @@
 </section><section class="level3"><h3 id="length-4-silently-truncates">
 <code>length 4</code> silently truncates<a class="anchor" aria-label="anchor" href="#length-4-silently-truncates"></a>
 </h3>
-<p>A SAS numeric written with <code>length 4</code> loses precision on disk. A value read back from an old dataset may not equal a freshly computed R value, and <strong>the SAS side is the lossy one</strong>. <code>tolerance</code> in <code><a href="../reference/compare_built.html">compare_built()</a></code> is what catches this — but it is an <strong>absolute</strong> threshold, not a relative one. A single absolute threshold cannot serve columns of mixed magnitude: a value large enough to be at risk of <code>length 4</code> truncation (into the millions, for identifiers or accumulated counts) can differ by more than a small absolute <code>tolerance</code> while the difference is still storage precision, not a real disagreement. <code>1234567</code> vs <code>1234567.06</code> reports <code>differs</code>, not <code>within_tolerance</code>, with <code>max_abs_diff</code> of <code>0.06</code> — but <code>max_rel_diff</code> is <code>4.9e-08</code>. For a large-magnitude variable, that tiny relative difference alongside a <code>differs</code> verdict is the signal to suspect storage precision, not the <code>within_tolerance</code> verdict itself. Read <code>max_rel_diff</code>, not the verdict alone, when judging whether a difference is real.</p>
+<p>A SAS numeric written with <code>length 4</code> loses precision on disk. A value read back from an old dataset may not equal a freshly computed R value, and <strong>the SAS side is the lossy one</strong>. <code>tolerance</code> in <code><a href="../reference/compare_built.html">compare_built()</a></code> is what catches this, but it is an <strong>absolute</strong> threshold, not a relative one. A single absolute threshold cannot serve columns of mixed magnitude: a value large enough to be at risk of <code>length 4</code> truncation (into the millions, for identifiers or accumulated counts) can differ by more than a small absolute <code>tolerance</code> while the difference is still storage precision, not a real disagreement. <code>1234567</code> vs <code>1234567.06</code> reports <code>differs</code>, not <code>within_tolerance</code>, with <code>max_abs_diff</code> of <code>0.06</code>, but <code>max_rel_diff</code> is <code>4.9e-08</code>. For a large-magnitude variable, that tiny relative difference alongside a <code>differs</code> verdict is the signal to suspect storage precision, not the <code>within_tolerance</code> verdict itself. Read <code>max_rel_diff</code>, not the verdict alone, when judging whether a difference is real.</p>
 </section></section><section class="level2"><h2 id="verifying-your-own-port">Verifying your own port<a class="anchor" aria-label="anchor" href="#verifying-your-own-port"></a>
 </h2>
 <p>Build the variable in R, then compare against the oracle:</p>

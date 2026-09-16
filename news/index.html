@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,13 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.2" id="hvtirdatabuild-022">hvtiRdatabuild 0.2.2<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-022"></a></h2>
+<ul><li><p>Documentation no longer points <code><a href="../reference/dw_pull.html">dw_pull()</a></code> users at a <code>building-a-study-dataset</code> vignette that does not exist, and the SAS migration guide no longer lists the shipped <code><a href="../reference/dw_connect.html">dw_connect()</a></code> and <code><a href="../reference/dw_pull.html">dw_pull()</a></code> as future work. Prose across the README, vignette and reference pages was tightened.</p></li>
+<li><p>The SAS migration guide now treats <code>bd.SAStoR.sas</code> outputs as general downstream data contracts rather than exports owned by their first consumer. It shows how the final selection becomes a shared analysis set while variable derivation remains in the build layer.</p></li>
+<li><p>Analysis-set declarations now reject duplicate variables and require every expected row/event count to be one non-negative whole number. This prevents duplicate parquet columns from being silently renamed and fractional counts from matching after integer truncation.</p></li>
+<li><p>Analysis sets resolve their outputs through the study’s logical datasets directory, preserving numbered new studies and adopted legacy layouts.</p></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.1" id="hvtirdatabuild-021">hvtiRdatabuild 0.2.1<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-021"></a></h2>
 <ul><li>

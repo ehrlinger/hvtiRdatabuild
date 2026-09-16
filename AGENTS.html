@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -41,7 +41,7 @@
 
 <div id="hvtirdatabuild" class="section level1">
 
-<p>Builds analysis-ready clinical datasets from the HVTI data warehouse and verifies them against the legacy SAS datasets they replace. Six exports: <code><a href="reference/dw_connect.html">dw_connect()</a></code>, <code><a href="reference/dw_modules.html">dw_modules()</a></code>, <code><a href="reference/dw_pull.html">dw_pull()</a></code>, <code><a href="reference/read_study_config.html">read_study_config()</a></code>, <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code> and <code><a href="reference/compare_built.html">compare_built()</a></code>.</p>
+<p>Builds analysis-ready clinical datasets from the HVTI data warehouse and verifies them against the legacy SAS datasets they replace. Eight exports: <code><a href="reference/dw_connect.html">dw_connect()</a></code>, <code><a href="reference/dw_modules.html">dw_modules()</a></code>, <code><a href="reference/dw_pull.html">dw_pull()</a></code>, <code><a href="reference/read_study_config.html">read_study_config()</a></code>, <code><a href="reference/snapshot_oracle.html">snapshot_oracle()</a></code>, <code><a href="reference/compare_built.html">compare_built()</a></code>, <code><a href="reference/write_analysis_set.html">write_analysis_set()</a></code> and <code><a href="reference/read_analysis_set.html">read_analysis_set()</a></code>.</p>
 <p><strong>This is the package that touches PHI and warehouse credentials.</strong> Most of its rules are about not leaking either, and they are not negotiable for convenience.</p>
 <p>This file is the operational contract and applies in full. It is tool neutral, so Codex and any other agent read the same rules. Claude Code affordances live in <code>CLAUDE.md</code>, which imports this file.</p>
 <div class="section level2">

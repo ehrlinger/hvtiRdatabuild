@@ -25,8 +25,8 @@ read a study’s warehouse modules into R.
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
 materializes a declared selection from a built dataset, and
 [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
-refuses a stale checkpoint. The build and derivation stages —
-`build_dataset()` and `derive_vars()` — remain future work.
+refuses a stale checkpoint. The build and derivation stages
+(`build_dataset()` and `derive_vars()`) remain future work.
 
 ## Installation
 
@@ -94,10 +94,10 @@ result
 machine.
 [`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
 (dispatched automatically for `result`) never prints row-level data,
-only the manifest shape — no identifiers to redact.
+only the manifest shape, so there are no identifiers to redact.
 
 [`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md)
-is **read-only**. It never writes to the warehouse — the cohort
+is **read-only** and never writes to the warehouse. The cohort
 write-back the SAS templates perform (`libsql`) is deliberately not
 ported in this slice. The re-pull variants (`snapshotpull`, `ccfpull`),
 which take an existing built dataset and remap keys because `masterid`
@@ -129,10 +129,9 @@ requires exactly one row per identifier on both sides. Of the five
 warehouse modules, only `bdbase` and `bdstat` are one row per patient
 and so are measurable against the SAS oracle today. `echo`, `fup`, and
 `bdevents` are one row per *event* (echocardiogram, follow-up visit,
-reoperation) — a given `patid` legitimately repeats — so a direct
-per-identifier comparison errors on them by design, not by oversight.
-Verifying those three needs a composite-key comparison, deferred to a
-later slice.
+reoperation), where a given `patid` legitimately repeats, so a direct
+per-identifier comparison errors on them by design. Verifying those
+three needs a composite-key comparison, deferred to a later slice.
 
 ## Local integration testing
 
@@ -144,8 +143,8 @@ HVTI_ORACLE_DIR=/studies/st1234/datasets Rscript -e 'devtools::test()'
 ```
 
 That directory holds PHI. It must live outside this repository, and
-nothing in the test suite copies from it. With the variable unset — the
-default, and what CI sees — these tests skip.
+nothing in the test suite copies from it. With the variable unset (the
+default, and what CI sees), these tests skip.
 
 [`print()`](https://rdrr.io/r/base/print.html) never emits identifiers
 unless `show_ids = TRUE`, because `ccfidu` is a medical record number
@@ -154,8 +153,8 @@ output is logged or shared.
 
 ## Documentation
 
-- [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md)
-  — migration guide for SAS users. Start here.
+- [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md):
+  the migration guide for SAS users. Start here.
 
 ## Design
 
