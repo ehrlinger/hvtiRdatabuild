@@ -1,5 +1,24 @@
 # Changelog
 
+## hvtiRdatabuild 0.2.3
+
+- **New
+  [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md).**
+  A programmer can publish a mutable clinical-data draft as an immutable
+  dated release. Publication preserves the draft bytes, verifies that
+  the staged copy is readable, records its checksum and shape in
+  `dataset-catalog.yml`, and serializes concurrent publishers with a
+  catalog lock. Same-day corrections receive revision filenames;
+  retrying identical bytes is idempotent, including recovery of a file
+  moved before a failed catalog write.
+
+- **New
+  [`withdraw_dataset_release()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/withdraw_dataset_release.md).**
+  Withdrawal records a reason and an optional replacement in the catalog
+  without changing or deleting the published file. The package now
+  requires hvtiRutilities 1.3.1, whose study workflow discovers,
+  reviews, and explicitly adopts these releases.
+
 ## hvtiRdatabuild 0.2.2
 
 - Documentation no longer points
