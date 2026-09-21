@@ -525,3 +525,82 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
   })
   invisible(release)
 }
+
+#' Withdraw a published dataset release
+#'
+#' @param dataset_id Stable logical dataset identifier.
+#' @param release_id Exact release identifier to withdraw.
+#' @param datasets_dir Directory that owns published files and the catalog.
+#' @param reason Non-empty reason for withdrawal.
+#' @param replacement_release_id Optional replacement from the same dataset.
+#'
+#' @return Invisibly, the updated release record.
+#'
+#' @export
+withdraw_dataset_release <- function(dataset_id, release_id, datasets_dir,
+                                     reason, replacement_release_id = NULL) {
+  if (!is.character(dataset_id) || length(dataset_id) != 1L ||
+      is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
+    stop("`dataset_id` is invalid.", call. = FALSE)
+  }
+  if (!is.character(release_id) || length(release_id) != 1L ||
+      is.na(release_id) || !grepl("^[a-z0-9][a-z0-9_-]*$", release_id) ||
+      identical(release_id, "latest")) {
+    stop("`release_id` is invalid.", call. = FALSE)
+  }
+  if (!is.character(datasets_dir) || length(datasets_dir) != 1L ||
+      is.na(datasets_dir) || !dir.exists(datasets_dir)) {
+    stop("`datasets_dir` must be one existing directory.", call. = FALSE)
+  }
+  if (!is.character(reason) || length(reason) != 1L || is.na(reason) || !nzchar(reason)) {
+    stop("`reason` must be one non-empty string.", call. = FALSE)
+  }
+  if (!is.null(replacement_release_id) &&
+      (!is.character(replacement_release_id) ||
+       length(replacement_release_id) != 1L ||
+       is.na(replacement_release_id) ||
+       !grepl("^[a-z0-9][a-z0-9_-]*$", replacement_release_id) ||
+       identical(replacement_release_id, "latest"))) {
+    stop("`replacement_release_id` is invalid.", call. = FALSE)
+  }
+  if (identical(replacement_release_id, release_id)) {
+    stop("A withdrawn release cannot replace itself.", call. = FALSE)
+  }
+
+  catalog_path <- .publication_catalog_path(datasets_dir)
+  release <- .with_catalog_lock(catalog_path, {
+    catalog <- .publication_read_catalog(catalog_path)
+    dataset <- catalog$datasets[[dataset_id]]
+    if (is.null(dataset)) {
+      stop("Unknown `dataset_id`: ", dataset_id, ".", call. = FALSE)
+    }
+    ids <- vapply(dataset$releases, function(item) item$release_id, character(1))
+    index <- match(release_id, ids)
+    if (is.na(index)) {
+      stop(
+        "Unknown `release_id` for ", dataset_id, ": ", release_id, ".",
+        call. = FALSE
+      )
+    }
+    if (!is.null(replacement_release_id) && !replacement_release_id %in% ids) {
+      stop(
+        "Unknown `replacement_release_id` for ", dataset_id, ": ",
+        replacement_release_id, ".",
+        call. = FALSE
+      )
+    }
+    candidate <- dataset$releases[[index]]
+    if (identical(candidate$status, "withdrawn")) {
+      stop("Release is already withdrawn: ", release_id, ".", call. = FALSE)
+    }
+    candidate$status <- "withdrawn"
+    candidate$withdrawal_reason <- reason
+    if (!is.null(replacement_release_id)) {
+      candidate$replacement_release_id <- replacement_release_id
+    }
+    catalog$datasets[[dataset_id]]$releases[[index]] <- candidate
+    .publication_write_catalog(catalog, catalog_path)
+    candidate
+  })
+  invisible(release)
+}

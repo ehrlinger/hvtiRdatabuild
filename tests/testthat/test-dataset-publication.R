@@ -426,3 +426,123 @@ test_that("concurrent publications serialize catalog identity", {
     )
   }
 })
+
+test_that("withdrawal changes only catalog metadata", {
+  dir <- local_publication_dir()
+  draft <- write_synthetic_draft(dir)
+  published <- publish_dataset(draft, "cohort", dir, "2026-09-21")
+  release_path <- file.path(dir, published$file)
+  bytes_before <- readBin(release_path, "raw", n = file.info(release_path)$size)
+  sha_before <- digest::digest(release_path, algo = "sha256", file = TRUE)
+  mtime_before <- file.info(release_path)$mtime
+
+  expect_invisible(
+    withdraw_dataset_release(
+      "cohort",
+      published$release_id,
+      dir,
+      reason = "Synthetic source correction"
+    )
+  )
+
+  expect_true(file.exists(release_path))
+  expect_identical(
+    readBin(release_path, "raw", n = file.info(release_path)$size),
+    bytes_before
+  )
+  expect_identical(digest::digest(release_path, algo = "sha256", file = TRUE), sha_before)
+  expect_identical(file.info(release_path)$mtime, mtime_before)
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+  withdrawn <- catalog$datasets$cohort$releases[[1L]]
+  expect_identical(withdrawn$status, "withdrawn")
+  expect_identical(withdrawn$withdrawal_reason, "Synthetic source correction")
+})
+
+test_that("withdrawal validates identity, reason and replacement", {
+  dir <- local_publication_dir()
+  first_draft <- write_synthetic_draft(dir, "first.csv", n = 3L)
+  second_draft <- write_synthetic_draft(dir, "second.csv", n = 4L)
+  other_draft <- write_synthetic_draft(dir, "other.csv", n = 5L)
+  first <- publish_dataset(first_draft, "cohort", dir, "2026-09-21")
+  second <- publish_dataset(second_draft, "cohort", dir, "2026-09-22")
+  other <- publish_dataset(other_draft, "imaging", dir, "2026-09-21")
+
+  expect_error(
+    withdraw_dataset_release("cohort", first$release_id, dir, ""),
+    "reason"
+  )
+  expect_error(
+    withdraw_dataset_release("missing", first$release_id, dir, "Synthetic correction"),
+    "dataset_id"
+  )
+  expect_error(
+    withdraw_dataset_release("cohort", "missing-release", dir, "Synthetic correction"),
+    "release_id"
+  )
+  expect_error(
+    withdraw_dataset_release(
+      "cohort", first$release_id, dir, "Synthetic correction",
+      replacement_release_id = "missing-release"
+    ),
+    "replacement_release_id"
+  )
+  expect_error(
+    withdraw_dataset_release(
+      "cohort", first$release_id, dir, "Synthetic correction",
+      replacement_release_id = other$release_id
+    ),
+    "replacement_release_id"
+  )
+  expect_error(
+    withdraw_dataset_release(
+      "cohort", first$release_id, dir, "Synthetic correction",
+      replacement_release_id = first$release_id
+    ),
+    "itself"
+  )
+
+  withdrawn <- withdraw_dataset_release(
+    "cohort",
+    first$release_id,
+    dir,
+    "Synthetic correction",
+    replacement_release_id = second$release_id
+  )
+  expect_identical(withdrawn$replacement_release_id, second$release_id)
+  expect_error(
+    withdraw_dataset_release("cohort", first$release_id, dir, "Again"),
+    "already withdrawn"
+  )
+})
+
+test_that("withdrawal and publication serialize without losing either change", {
+  testthat::skip_on_os("windows")
+  dir <- local_publication_dir()
+  first_draft <- write_synthetic_draft(dir, "first.csv", n = 3L)
+  second_draft <- write_synthetic_draft(dir, "second.csv", n = 4L)
+  first <- publish_dataset(first_draft, "cohort", dir, "2026-09-21")
+
+  results <- parallel::mclapply(
+    c("withdraw", "publish"),
+    function(operation) {
+      tryCatch(
+        if (identical(operation, "withdraw")) {
+          withdraw_dataset_release(
+            "cohort", first$release_id, dir, "Synthetic correction"
+          )
+        } else {
+          publish_dataset(second_draft, "cohort", dir, "2026-09-22")
+        },
+        error = function(error) error
+      )
+    },
+    mc.cores = 2L
+  )
+
+  expect_false(any(vapply(results, inherits, logical(1), "error")))
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+  releases <- catalog$datasets$cohort$releases
+  expect_length(releases, 2L)
+  expect_identical(releases[[1L]]$status, "withdrawn")
+  expect_identical(releases[[2L]]$status, "published")
+})
