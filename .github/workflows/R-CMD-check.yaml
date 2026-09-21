@@ -55,14 +55,25 @@ jobs:
           use-public-rspm: true
           rtools-version: '44'
 
+      - name: Install unixODBC headers
+        if: runner.os == 'macOS'
+        run: brew reinstall unixodbc
+
+      - name: Install XQuartz runtime
+        if: runner.os == 'macOS'
+        run: brew install --cask xquartz
+
       # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
+      # The macOS odbc binary can be served as an unreadable archive, so build
+      # that one dependency from source without changing other jobs.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: |
             any::rcmdcheck
             github::ehrlinger/hvtiRutilities
+            ${{ runner.os == 'macOS' && 'odbc=?source' || '' }}
           needs: check
 
       # Install the package into the user library so that Quarto's subprocess

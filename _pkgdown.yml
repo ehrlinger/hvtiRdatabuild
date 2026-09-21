@@ -42,6 +42,14 @@ reference:
   - write_analysis_set
   - read_analysis_set
 
+- title: "Dataset publication"
+  desc: >
+    Turn a mutable draft into an immutable dated release, or withdraw a release
+    without changing its bytes.
+  contents:
+  - publish_dataset
+  - withdraw_dataset_release
+
 articles:
 - title: "Getting Started"
   contents:
