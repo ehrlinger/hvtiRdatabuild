@@ -246,3 +246,124 @@
   catalog$datasets <- datasets
   catalog
 }
+
+.publication_validate_request <- function(draft, dataset_id, datasets_dir,
+                                          extract_date, source = NULL,
+                                          file_stem = dataset_id) {
+  if (!is.character(draft) || length(draft) != 1L || is.na(draft) || !nzchar(draft)) {
+    stop("`draft` must be one non-empty file path.", call. = FALSE)
+  }
+  if (!file.exists(draft)) {
+    stop("Draft dataset does not exist: ", draft, call. = FALSE)
+  }
+  if (!is.character(dataset_id) || length(dataset_id) != 1L ||
+      is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
+    stop(
+      "`dataset_id` must use lower-case letters, digits and underscores, ",
+      "starting with a letter.",
+      call. = FALSE
+    )
+  }
+  if (!is.character(datasets_dir) || length(datasets_dir) != 1L ||
+      is.na(datasets_dir) || !dir.exists(datasets_dir)) {
+    stop("`datasets_dir` must be one existing directory.", call. = FALSE)
+  }
+  if (!is.character(file_stem) || length(file_stem) != 1L ||
+      is.na(file_stem) || !grepl("^[a-z][a-z0-9_-]*$", file_stem)) {
+    stop(
+      "`file_stem` must be a safe basename using lower-case letters, digits, ",
+      "underscores or hyphens, starting with a letter.",
+      call. = FALSE
+    )
+  }
+  if (!is.null(source) && (!is.character(source) || length(source) != 1L ||
+      is.na(source) || !nzchar(source))) {
+    stop("`source` must be NULL or one non-empty string.", call. = FALSE)
+  }
+
+  date <- if (inherits(extract_date, "Date") && length(extract_date) == 1L &&
+      !is.na(extract_date)) {
+    format(extract_date, "%Y-%m-%d")
+  } else if (is.character(extract_date) && length(extract_date) == 1L &&
+      !is.na(extract_date)) {
+    extract_date
+  } else {
+    NA_character_
+  }
+  if (is.na(date) || !.publication_valid_date(date)) {
+    stop("`extract_date` must be one valid ISO date.", call. = FALSE)
+  }
+
+  extension <- tolower(tools::file_ext(draft))
+  supported <- c("sas7bdat", "csv", "xlsx", "xls", "rds")
+  if (!extension %in% supported) {
+    stop(
+      "Unsupported draft extension '.", extension, "'. Supported: ",
+      paste0(".", supported, collapse = ", "), ".",
+      call. = FALSE
+    )
+  }
+
+  list(
+    draft = draft,
+    dataset_id = dataset_id,
+    datasets_dir = datasets_dir,
+    extract_date = date,
+    source = source,
+    file_stem = file_stem,
+    extension = extension
+  )
+}
+
+.publication_stage_draft <- function(request) {
+  hvtiRutilities::read_clinical_data(request$draft, convert_types = FALSE)
+  staged_path <- tempfile(
+    pattern = ".publish-",
+    tmpdir = request$datasets_dir,
+    fileext = paste0(".", request$extension)
+  )
+  if (!file.copy(request$draft, staged_path, overwrite = FALSE)) {
+    stop("Could not stage draft dataset in ", request$datasets_dir, ".", call. = FALSE)
+  }
+  staged <- tryCatch(
+    hvtiRutilities::read_clinical_data(staged_path, convert_types = FALSE),
+    error = function(error) {
+      unlink(staged_path)
+      stop(conditionMessage(error), call. = FALSE)
+    }
+  )
+  list(
+    path = staged_path,
+    extension = request$extension,
+    sha256 = digest::digest(staged_path, algo = "sha256", file = TRUE),
+    n_rows = as.integer(nrow(staged)),
+    n_cols = as.integer(ncol(staged))
+  )
+}
+
+.publication_identity <- function(catalog, request) {
+  dataset <- catalog$datasets[[request$dataset_id]]
+  releases <- if (is.null(dataset)) list() else dataset$releases
+  sequence <- if (length(releases)) {
+    max(vapply(releases, function(release) release$sequence, integer(1))) + 1L
+  } else {
+    1L
+  }
+  dates <- if (length(releases)) {
+    vapply(releases, function(release) release$extract_date, character(1))
+  } else {
+    character()
+  }
+  revision <- sum(dates == request$extract_date) + 1L
+  compact_date <- gsub("-", "", request$extract_date, fixed = TRUE)
+  suffix <- if (revision == 1L) "" else paste0("_r", revision)
+
+  list(
+    release_id = paste0(request$dataset_id, "-", compact_date, "-r", revision),
+    sequence = as.integer(sequence),
+    revision = as.integer(revision),
+    file = paste0(
+      request$file_stem, "_", compact_date, suffix, ".", request$extension
+    )
+  )
+}
