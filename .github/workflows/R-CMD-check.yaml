@@ -63,6 +63,9 @@ jobs:
           extra-packages: |
             any::rcmdcheck
             github::ehrlinger/hvtiRutilities
+            # The macOS odbc binary can be served as an unreadable archive.
+            # Build that one dependency from source without changing other jobs.
+            ${{ runner.os == 'macOS' && 'odbc=?source' || '' }}
           needs: check
 
       # Install the package into the user library so that Quarto's subprocess
