@@ -395,6 +395,22 @@
   paste0(format(time, "%Y-%m-%dT%H:%M:%S", tz = "UTC"), "Z")
 }
 
+.publication_check_file <- function(path, datasets_dir) {
+  link <- Sys.readlink(path)
+  if (!is.na(link) && nzchar(link)) {
+    stop("Refusing release path that is a symbolic link: ", path, call. = FALSE)
+  }
+  if (!utils::file_test("-f", path)) {
+    stop("Refusing release path that is not a regular file: ", path, call. = FALSE)
+  }
+  resolved <- normalizePath(path, winslash = "/", mustWork = TRUE)
+  resolved_dir <- normalizePath(datasets_dir, winslash = "/", mustWork = TRUE)
+  if (!identical(dirname(resolved), resolved_dir)) {
+    stop("Refusing release path outside datasets directory: ", path, call. = FALSE)
+  }
+  invisible(path)
+}
+
 .publication_existing_release <- function(catalog, request, staged) {
   dataset <- catalog$datasets[[request$dataset_id]]
   if (is.null(dataset)) {
@@ -402,22 +418,18 @@
   }
   matches <- vapply(dataset$releases, function(release) {
     identical(release$extract_date, request$extract_date) &&
-      identical(release$sha256, staged$sha256) &&
-      identical(release$status, "published")
+      identical(release$sha256, staged$sha256)
   }, logical(1))
   if (!any(matches)) {
     return(NULL)
   }
   release <- dataset$releases[[utils::tail(which(matches), 1L)]]
   path <- file.path(request$datasets_dir, release$file)
-  actual <- if (file.exists(path)) {
-    digest::digest(path, algo = "sha256", file = TRUE)
-  } else {
-    NA_character_
-  }
-  if (is.na(actual)) {
+  if (!file.exists(path)) {
     stop("Published release is missing: ", path, call. = FALSE)
   }
+  .publication_check_file(path, request$datasets_dir)
+  actual <- digest::digest(path, algo = "sha256", file = TRUE)
   if (!identical(actual, release$sha256)) {
     stop(
       "Published release changed in place: ", path,
@@ -480,6 +492,8 @@
 #' and so on. The catalog lock protects that sequence when two processes publish
 #' at once. Publishing the same bytes again for the same dataset and date is
 #' idempotent: it returns the existing release rather than creating a revision.
+#' If that release was withdrawn, it remains withdrawn; publication does not
+#' reactivate the bytes under a new release identity.
 #'
 #' The release file moves into place before the catalog is replaced. If the
 #' catalog write fails, the file remains as an unregistered orphan. No study can
@@ -545,6 +559,7 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
       identity <- .publication_identity(catalog, request)
       final_path <- file.path(request$datasets_dir, identity$file)
       if (file.exists(final_path)) {
+        .publication_check_file(final_path, request$datasets_dir)
         actual <- digest::digest(final_path, algo = "sha256", file = TRUE)
         if (!identical(actual, staged$sha256)) {
           stop(
