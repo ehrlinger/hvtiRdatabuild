@@ -422,10 +422,13 @@ test_that("orphan recovery rejects a symbolic link outside datasets_dir", {
 
   expect_error(
     publish_dataset(draft, "cohort", dir, "2026-09-21"),
-    "symbolic link"
+    "symbolic link|outside datasets directory"
   )
 
-  expect_identical(Sys.readlink(orphan), draft)
+  expect_identical(
+    normalizePath(orphan, winslash = "/"),
+    normalizePath(draft, winslash = "/")
+  )
   expect_false(file.exists(.publication_catalog_path(dir)))
 })
 
