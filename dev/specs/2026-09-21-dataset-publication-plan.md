@@ -351,4 +351,3 @@ Before implementation, confirm these two implementation choices:
    publication safety.
 2. `withdraw_dataset_release()` is the desired public name for the catalog-only
    withdrawal operation.
-
