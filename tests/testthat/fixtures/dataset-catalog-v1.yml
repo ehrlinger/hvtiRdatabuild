@@ -1,0 +1,24 @@
+format_version: 1
+datasets:
+  surgery_cohort:
+    releases:
+      - release_id: surgery_cohort-20260920-r1
+        sequence: 1
+        file: cohort_20260920.csv
+        extract_date: '2026-09-20'
+        revision: 1
+        published_at: '2026-09-20T16:00:00-04:00'
+        sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        n_rows: 3
+        n_cols: 3
+        status: published
+      - release_id: surgery_cohort-20260921-r1
+        sequence: 2
+        file: cohort_20260921.csv
+        extract_date: '2026-09-21'
+        revision: 1
+        published_at: '2026-09-21T16:00:00-04:00'
+        sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+        n_rows: 4
+        n_cols: 3
+        status: published
