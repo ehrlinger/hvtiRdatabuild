@@ -216,6 +216,16 @@ dataset.
 - [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
   : Read an analysis set
 
+## Dataset publication
+
+Turn a mutable draft into an immutable dated release, or withdraw a
+release without changing its bytes.
+
+- [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md)
+  : Publish an immutable dataset release
+- [`withdraw_dataset_release()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/withdraw_dataset_release.md)
+  : Withdraw a published dataset release
+
 # Articles
 
 ### Getting Started
