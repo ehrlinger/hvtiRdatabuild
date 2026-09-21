@@ -459,14 +459,64 @@
 
 #' Publish an immutable dataset release
 #'
-#' @param draft Path to a mutable draft dataset.
-#' @param dataset_id Stable logical dataset identifier.
-#' @param datasets_dir Directory that owns published files and the catalog.
-#' @param extract_date Extract date as a `Date` or ISO date string.
-#' @param source Optional publisher provenance.
-#' @param file_stem Basename stem for dated release files.
+#' A draft is the file a programmer is still allowed to rebuild. Publication
+#' copies those bytes to a dated release file and adds the release to
+#' `dataset-catalog.yml`. Consuming studies can then discover the release, but
+#' they keep reading the release they already pinned until someone explicitly
+#' adopts the new one with [hvtiRutilities::adopt_data_update()].
 #'
-#' @return Invisibly, the published release record.
+#' `publish_dataset()` reads the draft, stages a byte-for-byte copy in
+#' `datasets_dir`, and reads the staged copy again before recording its SHA-256,
+#' row count, and column count. It supports the clinical-data formats read by
+#' [hvtiRutilities::read_clinical_data()]: `.sas7bdat`, `.csv`, `.xlsx`,
+#' `.xls`, and `.rds`. This verifies that the release is readable and records
+#' its shape. It does not decide whether the cohort or its values are clinically
+#' correct.
+#'
+#' The first release on a date is named `<file_stem>_YYYYMMDD.<ext>`. A
+#' different release published for the same extract date adds `_r2`, `_r3`,
+#' and so on. The catalog lock protects that sequence when two processes publish
+#' at once. Publishing the same bytes again for the same dataset and date is
+#' idempotent: it returns the existing release rather than creating a revision.
+#'
+#' The release file moves into place before the catalog is replaced. If the
+#' catalog write fails, the file remains as an unregistered orphan. No study can
+#' discover it. Retry the same call and publication registers the matching
+#' orphan without rewriting its bytes. Different bytes at an expected release
+#' filename are an integrity error and are never overwritten.
+#'
+#' @param draft Character. Path to a mutable draft dataset.
+#' @param dataset_id Character. Stable logical dataset identifier, using
+#'   lower-case letters, digits, and underscores.
+#' @param datasets_dir Character. Existing directory that owns the published
+#'   files and `dataset-catalog.yml`.
+#' @param extract_date A `Date` or `YYYY-MM-DD` string. Defaults to today.
+#' @param source Optional character string recording publisher provenance.
+#' @param file_stem Character. Safe basename stem for dated release files.
+#'   Defaults to `dataset_id`.
+#'
+#' @return Invisibly, a named list containing `release_id`, `sequence`, `file`,
+#'   `extract_date`, `revision`, `published_at`, `sha256`, `n_rows`, `n_cols`,
+#'   `status`, and `source` when supplied.
+#'
+#' @examples
+#' published <- tempfile("published-")
+#' dir.create(published)
+#' draft <- tempfile(fileext = ".csv")
+#' write.csv(
+#'   data.frame(synthetic_id = c("SYN001", "SYN002"), value = c(1, 2)),
+#'   draft,
+#'   row.names = FALSE
+#' )
+#' release <- publish_dataset(
+#'   draft,
+#'   dataset_id = "example_cohort",
+#'   datasets_dir = published,
+#'   extract_date = "2026-09-21",
+#'   source = "Synthetic documentation example"
+#' )
+#' release$release_id
+#' unlink(c(draft, published), recursive = TRUE)
 #'
 #' @export
 publish_dataset <- function(draft, dataset_id, datasets_dir,
@@ -528,13 +578,49 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
 
 #' Withdraw a published dataset release
 #'
-#' @param dataset_id Stable logical dataset identifier.
-#' @param release_id Exact release identifier to withdraw.
-#' @param datasets_dir Directory that owns published files and the catalog.
-#' @param reason Non-empty reason for withdrawal.
-#' @param replacement_release_id Optional replacement from the same dataset.
+#' Withdrawal changes the release's catalog status and records why it should no
+#' longer be adopted. It never changes or deletes the release file. A study
+#' already pinned to that release can therefore reproduce historical work with
+#' the explicit `allow_withdrawn = TRUE` override in
+#' [hvtiRutilities::read_built()], while normal reads stop and report the
+#' withdrawal.
 #'
-#' @return Invisibly, the updated release record.
+#' A replacement is optional, but it must name another release under the same
+#' logical dataset. Catalog locking serializes withdrawal with publication, so
+#' neither operation can discard the other's catalog change.
+#'
+#' @param dataset_id Character. Stable logical dataset identifier.
+#' @param release_id Character. Exact release identifier to withdraw.
+#' @param datasets_dir Character. Existing directory that owns the published
+#'   files and `dataset-catalog.yml`.
+#' @param reason Character. Non-empty reason for withdrawal.
+#' @param replacement_release_id Optional character release identifier from the
+#'   same logical dataset.
+#'
+#' @return Invisibly, the release record with `status = "withdrawn"`,
+#'   `withdrawal_reason`, and `replacement_release_id` when supplied.
+#'
+#' @examples
+#' published <- tempfile("published-")
+#' dir.create(published)
+#' draft <- tempfile(fileext = ".csv")
+#' write.csv(data.frame(synthetic_id = "SYN001", value = 1), draft,
+#'           row.names = FALSE)
+#' release <- publish_dataset(
+#'   draft,
+#'   "example_cohort",
+#'   published,
+#'   extract_date = "2026-09-21"
+#' )
+#' withdrawn <- withdraw_dataset_release(
+#'   "example_cohort",
+#'   release$release_id,
+#'   published,
+#'   reason = "Synthetic example correction"
+#' )
+#' withdrawn$status
+#' file.exists(file.path(published, release$file))
+#' unlink(c(draft, published), recursive = TRUE)
 #'
 #' @export
 withdraw_dataset_release <- function(dataset_id, release_id, datasets_dir,
