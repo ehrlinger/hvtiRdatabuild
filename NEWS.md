@@ -1,4 +1,4 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.2.3
 
 * **New `publish_dataset()`.** A programmer can publish a mutable clinical-data
   draft as an immutable dated release. Publication preserves the draft bytes,
