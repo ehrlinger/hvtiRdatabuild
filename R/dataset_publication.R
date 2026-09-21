@@ -408,7 +408,7 @@
   if (!any(matches)) {
     return(NULL)
   }
-  release <- dataset$releases[[tail(which(matches), 1L)]]
+  release <- dataset$releases[[utils::tail(which(matches), 1L)]]
   path <- file.path(request$datasets_dir, release$file)
   actual <- if (file.exists(path)) {
     digest::digest(path, algo = "sha256", file = TRUE)
