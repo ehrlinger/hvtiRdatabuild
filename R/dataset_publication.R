@@ -1,5 +1,4 @@
 # Dataset publication: producer-owned immutable release state.
-# Design: hvtiRutilities/dev/specs/2026-09-21-dataset-release-contract-design.md.
 
 .publication_abort <- function(message) {
   stop("dataset catalog: ", message, call. = FALSE)
@@ -105,7 +104,7 @@
 
   release$file <- .publication_scalar(release$file, paste0(where, ".file"))
   if (!identical(basename(release$file), release$file) ||
-      !nzchar(tools::file_ext(release$file))) {
+        !nzchar(tools::file_ext(release$file))) {
     .publication_abort(paste0(where, ".file must be one basename with an extension"))
   }
   release$extract_date <- .publication_scalar(
@@ -257,7 +256,7 @@
     stop("Draft dataset does not exist: ", draft, call. = FALSE)
   }
   if (!is.character(dataset_id) || length(dataset_id) != 1L ||
-      is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
+        is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
     stop(
       "`dataset_id` must use lower-case letters, digits and underscores, ",
       "starting with a letter.",
@@ -265,27 +264,30 @@
     )
   }
   if (!is.character(datasets_dir) || length(datasets_dir) != 1L ||
-      is.na(datasets_dir) || !dir.exists(datasets_dir)) {
+        is.na(datasets_dir) || !dir.exists(datasets_dir)) {
     stop("`datasets_dir` must be one existing directory.", call. = FALSE)
   }
   if (!is.character(file_stem) || length(file_stem) != 1L ||
-      is.na(file_stem) || !grepl("^[a-z][a-z0-9_-]*$", file_stem)) {
+        is.na(file_stem) || !grepl("^[a-z][a-z0-9_-]*$", file_stem)) {
     stop(
       "`file_stem` must be a safe basename using lower-case letters, digits, ",
       "underscores or hyphens, starting with a letter.",
       call. = FALSE
     )
   }
-  if (!is.null(source) && (!is.character(source) || length(source) != 1L ||
-      is.na(source) || !nzchar(source))) {
+  valid_source <- is.null(source) ||
+    (is.character(source) && length(source) == 1L && !is.na(source) && nzchar(source))
+  if (!valid_source) {
     stop("`source` must be NULL or one non-empty string.", call. = FALSE)
   }
 
-  date <- if (inherits(extract_date, "Date") && length(extract_date) == 1L &&
-      !is.na(extract_date)) {
+  date_object <- inherits(extract_date, "Date") &&
+    length(extract_date) == 1L && !is.na(extract_date)
+  date_string <- is.character(extract_date) &&
+    length(extract_date) == 1L && !is.na(extract_date)
+  date <- if (date_object) {
     format(extract_date, "%Y-%m-%d")
-  } else if (is.character(extract_date) && length(extract_date) == 1L &&
-      !is.na(extract_date)) {
+  } else if (date_string) {
     extract_date
   } else {
     NA_character_
@@ -626,28 +628,30 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
 withdraw_dataset_release <- function(dataset_id, release_id, datasets_dir,
                                      reason, replacement_release_id = NULL) {
   if (!is.character(dataset_id) || length(dataset_id) != 1L ||
-      is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
+        is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
     stop("`dataset_id` is invalid.", call. = FALSE)
   }
   if (!is.character(release_id) || length(release_id) != 1L ||
-      is.na(release_id) || !grepl("^[a-z0-9][a-z0-9_-]*$", release_id) ||
-      identical(release_id, "latest")) {
+        is.na(release_id) || !grepl("^[a-z0-9][a-z0-9_-]*$", release_id) ||
+        identical(release_id, "latest")) {
     stop("`release_id` is invalid.", call. = FALSE)
   }
   if (!is.character(datasets_dir) || length(datasets_dir) != 1L ||
-      is.na(datasets_dir) || !dir.exists(datasets_dir)) {
+        is.na(datasets_dir) || !dir.exists(datasets_dir)) {
     stop("`datasets_dir` must be one existing directory.", call. = FALSE)
   }
   if (!is.character(reason) || length(reason) != 1L || is.na(reason) || !nzchar(reason)) {
     stop("`reason` must be one non-empty string.", call. = FALSE)
   }
-  if (!is.null(replacement_release_id) &&
-      (!is.character(replacement_release_id) ||
-       length(replacement_release_id) != 1L ||
-       is.na(replacement_release_id) ||
-       !grepl("^[a-z0-9][a-z0-9_-]*$", replacement_release_id) ||
-       identical(replacement_release_id, "latest"))) {
-    stop("`replacement_release_id` is invalid.", call. = FALSE)
+  if (!is.null(replacement_release_id)) {
+    valid_replacement <- is.character(replacement_release_id) &&
+      length(replacement_release_id) == 1L &&
+      !is.na(replacement_release_id) &&
+      grepl("^[a-z0-9][a-z0-9_-]*$", replacement_release_id) &&
+      !identical(replacement_release_id, "latest")
+    if (!valid_replacement) {
+      stop("`replacement_release_id` is invalid.", call. = FALSE)
+    }
   }
   if (identical(replacement_release_id, release_id)) {
     stop("A withdrawn release cannot replace itself.", call. = FALSE)
