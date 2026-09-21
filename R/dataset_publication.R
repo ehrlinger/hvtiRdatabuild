@@ -367,3 +367,161 @@
     )
   )
 }
+
+.with_catalog_lock <- function(path, code, timeout = 10000) {
+  lock_path <- paste0(path, ".lock")
+  lock <- filelock::lock(lock_path, timeout = timeout)
+  if (is.null(lock)) {
+    stop("Timed out waiting for dataset catalog lock: ", lock_path, call. = FALSE)
+  }
+  on.exit(filelock::unlock(lock), add = TRUE)
+  force(code)
+}
+
+.publication_write_catalog <- function(catalog, path) {
+  tmp <- tempfile(pattern = ".catalog-", tmpdir = dirname(path), fileext = ".yml")
+  on.exit(unlink(tmp), add = TRUE)
+  yaml::write_yaml(catalog, tmp)
+  .publication_read_catalog(tmp)
+  if (!file.rename(tmp, path)) {
+    stop("Could not atomically replace dataset catalog: ", path, call. = FALSE)
+  }
+  invisible(path)
+}
+
+.publication_timestamp <- function(time = Sys.time()) {
+  paste0(format(time, "%Y-%m-%dT%H:%M:%S", tz = "UTC"), "Z")
+}
+
+.publication_existing_release <- function(catalog, request, staged) {
+  dataset <- catalog$datasets[[request$dataset_id]]
+  if (is.null(dataset)) {
+    return(NULL)
+  }
+  matches <- vapply(dataset$releases, function(release) {
+    identical(release$extract_date, request$extract_date) &&
+      identical(release$sha256, staged$sha256) &&
+      identical(release$status, "published")
+  }, logical(1))
+  if (!any(matches)) {
+    return(NULL)
+  }
+  release <- dataset$releases[[tail(which(matches), 1L)]]
+  path <- file.path(request$datasets_dir, release$file)
+  actual <- if (file.exists(path)) {
+    digest::digest(path, algo = "sha256", file = TRUE)
+  } else {
+    NA_character_
+  }
+  if (is.na(actual)) {
+    stop("Published release is missing: ", path, call. = FALSE)
+  }
+  if (!identical(actual, release$sha256)) {
+    stop(
+      "Published release changed in place: ", path,
+      "\n  expected: ", release$sha256,
+      "\n  actual:   ", actual,
+      call. = FALSE
+    )
+  }
+  release
+}
+
+.publication_record <- function(identity, request, staged) {
+  release <- list(
+    release_id = identity$release_id,
+    sequence = identity$sequence,
+    file = identity$file,
+    extract_date = request$extract_date,
+    revision = identity$revision,
+    published_at = .publication_timestamp(),
+    sha256 = staged$sha256,
+    n_rows = staged$n_rows,
+    n_cols = staged$n_cols,
+    status = "published"
+  )
+  if (!is.null(request$source)) {
+    release$source <- request$source
+  }
+  release
+}
+
+.publication_append <- function(catalog, dataset_id, release) {
+  if (is.null(catalog$datasets[[dataset_id]])) {
+    catalog$datasets[[dataset_id]] <- list(releases = list())
+  }
+  catalog$datasets[[dataset_id]]$releases <- append(
+    catalog$datasets[[dataset_id]]$releases,
+    list(release)
+  )
+  catalog
+}
+
+#' Publish an immutable dataset release
+#'
+#' @param draft Path to a mutable draft dataset.
+#' @param dataset_id Stable logical dataset identifier.
+#' @param datasets_dir Directory that owns published files and the catalog.
+#' @param extract_date Extract date as a `Date` or ISO date string.
+#' @param source Optional publisher provenance.
+#' @param file_stem Basename stem for dated release files.
+#'
+#' @return Invisibly, the published release record.
+#'
+#' @export
+publish_dataset <- function(draft, dataset_id, datasets_dir,
+                            extract_date = Sys.Date(), source = NULL,
+                            file_stem = dataset_id) {
+  request <- .publication_validate_request(
+    draft,
+    dataset_id,
+    datasets_dir,
+    extract_date,
+    source,
+    file_stem
+  )
+  staged <- .publication_stage_draft(request)
+  on.exit(unlink(staged$path), add = TRUE)
+  catalog_path <- .publication_catalog_path(request$datasets_dir)
+
+  release <- .with_catalog_lock(catalog_path, {
+    catalog <- .publication_read_catalog(catalog_path, allow_missing = TRUE)
+    existing <- .publication_existing_release(catalog, request, staged)
+    if (!is.null(existing)) {
+      existing
+    } else {
+      identity <- .publication_identity(catalog, request)
+      final_path <- file.path(request$datasets_dir, identity$file)
+      if (file.exists(final_path)) {
+        actual <- digest::digest(final_path, algo = "sha256", file = TRUE)
+        if (!identical(actual, staged$sha256)) {
+          stop(
+            "Refusing to replace published filename with different bytes: ",
+            final_path,
+            "\n  staged:   ", staged$sha256,
+            "\n  existing: ", actual,
+            call. = FALSE
+          )
+        }
+      } else if (!file.rename(staged$path, final_path)) {
+        stop("Could not move staged release to ", final_path, ".", call. = FALSE)
+      }
+
+      candidate <- .publication_record(identity, request, staged)
+      updated <- .publication_append(catalog, request$dataset_id, candidate)
+      tryCatch(
+        .publication_write_catalog(updated, catalog_path),
+        error = function(error) {
+          stop(
+            "Published bytes remain as an unregistered orphan: ", final_path,
+            ". Retry the same publication to complete registration.\n",
+            "Catalog error: ", conditionMessage(error),
+            call. = FALSE
+          )
+        }
+      )
+      candidate
+    }
+  })
+  invisible(release)
+}

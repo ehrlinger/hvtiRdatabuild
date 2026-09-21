@@ -283,3 +283,146 @@ test_that("release identity increments sequence and date-local revision", {
   expect_identical(later$release_id, "surgery_cohort-20260922-r1")
   expect_identical(later$file, "cohort_20260922.csv")
 })
+
+test_that("first publication creates immutable bytes and a catalog record", {
+  dir <- local_publication_dir()
+  draft <- write_synthetic_draft(dir, n = 3L)
+  draft_sha <- digest::digest(draft, algo = "sha256", file = TRUE)
+
+  expect_invisible(
+    publish_dataset(draft, "cohort", dir, extract_date = "2026-09-21")
+  )
+
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+  release <- catalog$datasets$cohort$releases[[1L]]
+  release_path <- file.path(dir, release$file)
+  expect_identical(release$release_id, "cohort-20260921-r1")
+  expect_identical(release$sequence, 1L)
+  expect_identical(release$revision, 1L)
+  expect_identical(release$file, "cohort_20260921.csv")
+  expect_identical(release$sha256, draft_sha)
+  expect_identical(release$n_rows, 3L)
+  expect_identical(release$n_cols, 3L)
+  expect_identical(release$status, "published")
+  expect_null(release$source)
+  expect_null(release$draft)
+  expect_identical(
+    readBin(release_path, "raw", n = file.info(release_path)$size),
+    readBin(draft, "raw", n = file.info(draft)$size)
+  )
+  expect_length(list.files(dir, pattern = "^\\.publish-", all.files = TRUE), 0L)
+})
+
+test_that("publication assigns same-day revisions and later-date identity", {
+  dir <- local_publication_dir()
+  first_draft <- write_synthetic_draft(dir, "first.csv", n = 3L)
+  second_draft <- write_synthetic_draft(dir, "second.csv", n = 4L)
+  third_draft <- write_synthetic_draft(dir, "third.csv", n = 5L)
+
+  first <- publish_dataset(
+    first_draft, "cohort", dir, "2026-09-21", source = "Synthetic build 1"
+  )
+  second <- publish_dataset(second_draft, "cohort", dir, "2026-09-21")
+  third <- publish_dataset(third_draft, "cohort", dir, "2026-09-22")
+
+  expect_identical(first$file, "cohort_20260921.csv")
+  expect_identical(first$source, "Synthetic build 1")
+  expect_identical(second$file, "cohort_20260921_r2.csv")
+  expect_identical(second$sequence, 2L)
+  expect_identical(second$revision, 2L)
+  expect_identical(third$file, "cohort_20260922.csv")
+  expect_identical(third$sequence, 3L)
+  expect_identical(third$revision, 1L)
+})
+
+test_that("publishing identical same-date bytes is idempotent", {
+  dir <- local_publication_dir()
+  draft <- write_synthetic_draft(dir)
+
+  first <- publish_dataset(draft, "cohort", dir, "2026-09-21")
+  second <- publish_dataset(draft, "cohort", dir, "2026-09-21")
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+
+  expect_identical(second, first)
+  expect_length(catalog$datasets$cohort$releases, 1L)
+  expect_identical(list.files(dir, pattern = "^cohort_.*\\.csv$"), first$file)
+})
+
+test_that("publication refuses different bytes at the next final filename", {
+  dir <- local_publication_dir()
+  first_draft <- write_synthetic_draft(dir, "first.csv", n = 3L)
+  next_draft <- write_synthetic_draft(dir, "next.csv", n = 4L)
+  publish_dataset(first_draft, "cohort", dir, "2026-09-21")
+  collision <- file.path(dir, "cohort_20260921_r2.csv")
+  writeLines("different synthetic bytes", collision)
+  collision_sha <- digest::digest(collision, algo = "sha256", file = TRUE)
+  catalog_before <- readLines(.publication_catalog_path(dir))
+
+  expect_error(
+    publish_dataset(next_draft, "cohort", dir, "2026-09-21"),
+    "different bytes"
+  )
+
+  expect_identical(digest::digest(collision, algo = "sha256", file = TRUE), collision_sha)
+  expect_identical(readLines(.publication_catalog_path(dir)), catalog_before)
+  expect_length(list.files(dir, pattern = "^\\.publish-", all.files = TRUE), 0L)
+})
+
+test_that("retry registers a matching orphan without rewriting it", {
+  dir <- local_publication_dir()
+  draft <- write_synthetic_draft(dir)
+  orphan <- file.path(dir, "cohort_20260921.csv")
+
+  testthat::with_mocked_bindings(
+    expect_error(
+      publish_dataset(draft, "cohort", dir, "2026-09-21"),
+      "unregistered orphan"
+    ),
+    .publication_write_catalog = function(...) stop("injected catalog failure"),
+    .package = "hvtiRdatabuild"
+  )
+  expect_true(file.exists(orphan))
+  expect_false(file.exists(.publication_catalog_path(dir)))
+  orphan_sha <- digest::digest(orphan, algo = "sha256", file = TRUE)
+  orphan_mtime <- file.info(orphan)$mtime
+
+  release <- publish_dataset(draft, "cohort", dir, "2026-09-21")
+
+  expect_identical(release$sha256, orphan_sha)
+  expect_identical(file.info(orphan)$mtime, orphan_mtime)
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+  expect_length(catalog$datasets$cohort$releases, 1L)
+})
+
+test_that("concurrent publications serialize catalog identity", {
+  testthat::skip_on_os("windows")
+  dir <- local_publication_dir()
+  drafts <- c(
+    write_synthetic_draft(dir, "first.csv", n = 3L),
+    write_synthetic_draft(dir, "second.csv", n = 4L)
+  )
+
+  results <- parallel::mclapply(
+    drafts,
+    function(draft) {
+      tryCatch(
+        publish_dataset(draft, "cohort", dir, "2026-09-21"),
+        error = function(error) error
+      )
+    },
+    mc.cores = 2L
+  )
+
+  expect_false(any(vapply(results, inherits, logical(1), "error")))
+  catalog <- .publication_read_catalog(.publication_catalog_path(dir))
+  releases <- catalog$datasets$cohort$releases
+  expect_identical(vapply(releases, function(x) x$sequence, integer(1)), 1:2)
+  expect_identical(vapply(releases, function(x) x$revision, integer(1)), 1:2)
+  expect_length(unique(vapply(releases, function(x) x$file, character(1))), 2L)
+  for (release in releases) {
+    expect_identical(
+      digest::digest(file.path(dir, release$file), algo = "sha256", file = TRUE),
+      release$sha256
+    )
+  }
+})
