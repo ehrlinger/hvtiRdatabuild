@@ -59,6 +59,10 @@ jobs:
         if: runner.os == 'macOS'
         run: brew reinstall unixodbc
 
+      - name: Install XQuartz runtime
+        if: runner.os == 'macOS'
+        run: brew install --cask xquartz
+
       # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
