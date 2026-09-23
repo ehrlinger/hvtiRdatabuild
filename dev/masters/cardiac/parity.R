@@ -84,3 +84,31 @@ parity_summary <- function(res) {
           sum(res$columns$verdict == "mismatch"), nrow(res$columns),
           sum(res$sample$verdict == "mismatch"), nrow(res$sample))
 }
+
+# The full gate: every non-key column, every row, compared by key. parity_check
+# is aggregates plus a sample, which a compensating swap of two cells can pass;
+# this cannot, because every row is in the comparison.
+parity_full <- function(con, table, parquet, key, dialect = "mssql") {
+  q <- quoter(dialect)
+  reader <- arrow::ParquetFileReader$create(parquet)
+  cols <- setdiff(names(reader$GetSchema()), key)
+  make_id <- function(d) do.call(paste, c(lapply(d[key], as.character), sep = "\r"))
+  rows <- lapply(cols, function(v) {
+    pq <- .zap_all(as.data.frame(
+      arrow::read_parquet(parquet, col_select = tidyselect::all_of(c(key, v)))))
+    db <- DBI::dbGetQuery(con, sprintf("SELECT %s FROM %s",
+                                       paste(q(c(key, v)), collapse = ", "), q(table)))
+    pq_v <- data.frame(.parity_key = make_id(pq), value = pq[[v]], stringsAsFactors = FALSE)
+    db_v <- data.frame(.parity_key = make_id(db), value = db[[v]], stringsAsFactors = FALSE)
+    cmp <- hvtiRdatabuild::compare_built(pq_v, db_v, id = ".parity_key")
+    keyed <- attr(cmp, "rows")
+    rows_complete <- length(keyed$only_oracle) == 0L && length(keyed$only_r) == 0L
+    ok <- isTRUE(cmp$verdict %in% c("identical", "within_tolerance")) && rows_complete
+    data.frame(variable = v, verdict = if (ok) "match" else "mismatch", stringsAsFactors = FALSE)
+  })
+  do.call(rbind, rows)
+}
+
+full_summary <- function(df) {
+  sprintf("parity_full: %d of %d columns mismatch", sum(df$verdict == "mismatch"), nrow(df))
+}

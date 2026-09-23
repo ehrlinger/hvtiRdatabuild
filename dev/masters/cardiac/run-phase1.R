@@ -64,6 +64,14 @@ if (res$verdict != "pass") {
   stop("Parity failed; the view was not created.", call. = FALSE)
 }
 
+full <- run_step("full parity check", parity_full(con, base, parquet, key))
+message(full_summary(full))
+if (any(full$verdict == "mismatch")) {
+  message("mismatched columns: ", paste(full$variable[full$verdict == "mismatch"],
+                                        collapse = ", "))
+  stop("Full parity failed; the view was not created.", call. = FALSE)
+}
+
 meta_json <- jsonlite::read_json(sub("\\.parquet$", ".meta.json", parquet),
                                  simplifyVector = TRUE)
 meta <- meta_json$columns
