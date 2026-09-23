@@ -127,8 +127,11 @@ because it round-tripped.
    `arrow::ParquetFileWriter`, so the output stays **one file with one SHA-256**. A chunk
    whose schema differs from the first chunk's is an error. A 36 GB file cannot be read
    whole, which is the reason this exists.
-2. **A source checksum** beside the parquet one. Hashing 36 GB takes minutes, and it is the
-   only thing that pins which `sas7bdat` was read. Both go to the manifest.
+2. **A source checksum** beside the parquet one, hashed before the read and again after it.
+   Hashing 36 GB takes minutes, and the before/after pair is what pins which `sas7bdat` was
+   read: a difference between them means the file changed mid-read, and the snapshot is
+   removed rather than kept under a checksum that no longer describes it. Both hashes go to
+   the manifest.
 3. **A metadata sidecar**, `<name>.meta.json`: variable, label, SAS format, SAS type and R
    class. Arrow keeps labels for R readers; SQL Server and the other eleven builds need
    them written down somewhere language-neutral.
@@ -168,26 +171,37 @@ key in one column, and phase 0 checks it too.
 Scripts, under `dev/masters/cardiac/`:
 
 - **DDL generator.** Arrow schema plus sidecar gives `CREATE TABLE`: doubles to `float`,
-  dates to `date`, character to `nvarchar(n)` with `n` measured from the data. A
-  **preflight fails loudly** past SQL Server's 8,060-byte fixed-width row limit or its
-  1,024-column limit. 800 `float` columns is already 6,400 bytes, so this is a live risk.
-  If it trips, the fix is two tables joined by the view.
+  dates to `date`, character to `nvarchar(n)` with `n` the wider of the observed data and
+  the SAS-declared width parsed from `format.sas` (a `$<n>.` format); with neither
+  available (all-missing, no format) `n` is 255. A **preflight fails loudly** past SQL
+  Server's 8,060-byte fixed-width row limit or its 1,024-column limit. 800 `float` columns
+  is already 6,400 bytes, so this is a live risk. If it trips, the fix is two tables joined
+  by the view.
 - **Base table named for its release**, `master_cardiac_base_<release>`. The view
   `master_cardiac` selects from it. A later rebuild loads alongside, and the view is
-  repointed in one statement. **That repoint is the phase 1 freeze record**: a study citing
-  the base-table name and the parquet SHA-256 has pinned its master exactly. A partial
-  refresh becomes its own base table, so "which build of the master" is answered by the
-  view definition at a moment in time rather than by a date.
+  repointed in one statement. **That repoint, together with the corrections watermark, is
+  the phase 1 freeze record**: a study citing the base-table name, the parquet SHA-256, and
+  an `as_of` timestamp on the corrections has pinned its master exactly, including which
+  corrections were in effect. Reproducing the view at that point is exact because the
+  correction tables are append-only: querying with `as_of` set to the watermark recovers
+  the same decisions and the same winners it saw. A partial refresh becomes its own base
+  table, so "which build of the master" is answered by the view definition at a moment in
+  time rather than by a date.
 - **Load.** Arrow reads the parquet row group by row group into `DBI::dbAppendTable()`,
-  with a load-log table so a failure resumes rather than restarts. Throughput is measured on
-  the first row group; `bcp` is the fallback only if that is too slow.
+  with a load-log table so a failure resumes rather than restarts: each row group and its
+  log row commit in one transaction, so a crash between them cannot double-load a group.
+  Throughput is measured on the first row group; `bcp` is the fallback only if that is too
+  slow.
 - **Labels table**, `master_cardiac_meta`, loaded from the sidecar.
-- **Parity check**, on both sides: row count; per column, non-null count, distinct count
-  and numeric sum; **and a full value compare on a random sample of rows joined on the
-  key.** Aggregates alone pass with compensating errors: `sum` cannot see two cells swap,
-  `distinct` cannot see a consistent shift. This is the same argument the vars-port design
-  makes for per-rule attrition over one aggregate count. **Output is verdicts**, match or
-  mismatch per column, never a minimum, maximum or value.
+- **Parity check, in two stages.** Aggregates (row count; per column, non-null count,
+  distinct count and numeric sum) plus **a value compare on a random sample of rows joined
+  on the key** run as a quick pre-check. Aggregates alone pass with compensating errors:
+  `sum` cannot see two cells swap, `distinct` cannot see a consistent shift, and a sample
+  can miss whatever it did not draw. **The gate is a full keyed column-by-column
+  comparison**, every non-key column against every row, which a swap or a shift cannot
+  survive. This is the same argument the vars-port design makes for per-rule attrition over
+  one aggregate count. **Output is verdicts**, match or mismatch per column, never a
+  minimum, maximum or value.
 
 **Who runs the DDL is open (§9), and the design does not depend on the answer.** The R side
 produces the parquet, the DDL and the load step. If we hold the rights we run them; if not,
@@ -224,6 +238,7 @@ HVTR takes over.
 | `expected_prior` | the value the corrector saw, as text |
 | `expected_prior_missing` | `1` the corrector saw a missing value, `0` a value, `NULL` **unknown**. Unknown is the legacy case (§5.4), and a correction with an unknown prior never applies |
 | `new_value` | text, cast through the type in the metadata table; missing is an explicit flag, not an empty string |
+| `new_value_missing` | `1` new_value is missing, `0` a value. Unlike `expected_prior_missing` this is never unknown: a correction always asserts what it sets |
 | `evidence_type`, `evidence_ref` | chart review, source document or investigator return, and a pointer to it |
 | `asserted_by`, `asserted_on` | provenance |
 
@@ -244,6 +259,10 @@ the derivations, not this table. The schema cannot express a rule, which is the 
 
 - The latest accepted correction for a cell applies **while the base still holds
   `expected_prior`**. `NA` matches `NULL`.
+- Both `expected_prior` and `new_value` are stored as text and applied through `TRY_CAST`,
+  not `CAST`: one uncastable stored value must not break the view for every other row. A
+  winning correction whose non-missing `expected_prior` or non-missing `new_value` does not
+  cast is not applied.
 - If the base holds something else, the correction is **stale**: not applied, and listed in
   `master_cardiac_corrections_stale` for re-adjudication. That is the case where upstream
   fixed the value, or broke it differently, after the correction was made. This is
@@ -251,7 +270,12 @@ the derivations, not this table. The schema cannot express a rule, which is the 
   shared volume, applied one level down.
 - The stale view gives one reason per correction, checked in this order: `no_variable` (not
   a correctable column of the master), `no_record` (the key matches no row),
-  `prior_unknown`, `prior_mismatch`.
+  `prior_unknown`, `does_not_cast` (the stored text does not `TRY_CAST` to the variable's
+  type), `prior_mismatch`.
+- **`as_of`** freezes this whole resolution at a point in time: only decisions with
+  `decided_on <= as_of` and corrections with `asserted_on <= as_of` are considered. This is
+  what makes the phase 1 freeze record (§4.3) exact for the corrections half of the view,
+  not just the base table half.
 - Corrections are long, one row per cell; the master is wide, 700 to 800 columns. So **the
   view is generated**. Only variables with at least one correction get a join and a `CASE`,
   and the view is regenerated when a variable gets its first. Keeping the pivot out of human
@@ -312,16 +336,23 @@ what correct means once it starts. Phase 3 gets its own spec once phases 0 to 2 
   `chunk_rows`: the output **reads back** identical to the unchunked snapshot, labels
   included. ⚠️ Its bytes differ, because the row groups differ, so its SHA-256 differs by
   design; an earlier draft of this spec said the checksums would match, and they cannot.
-  A mismatched chunk schema fails and removes the partial file; the sidecar is right.
+  A mismatched chunk schema fails and removes the partial file; the sidecar is right. A
+  source file that changes between the before and after hash also fails and removes the
+  snapshot, the same compare-and-swap argument as §4.2.
 - **DDL generator:** snapshot tests on synthetic arrow schemas, and a deliberately over-wide
-  schema that must fail the preflight.
+  schema that must fail the preflight; an all-missing character column falls back to
+  `nvarchar(255)`, and a `format.sas` of `$20.` wider than the observed data wins.
 - **Correction resolution:** an R reference implementation over data frames, tested on
   synthetic cases: applied, stale, `NA` matching `NULL`, two accepted (latest wins),
-  rejected (ignored), baked (not applied). **The generated SQL is restricted to an ANSI
-  subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so the standalone tests under
-  `dev/masters/cardiac/` run it on duckdb and assert it agrees with the reference. They run
-  by hand, as the scan tests in `dev/specs/artifacts/` do, not in CI; CI coverage arrives
-  when the scripts are promoted to exports.
+  rejected (ignored), baked (not applied), an uncastable stored value (`does_not_cast`, not
+  applied), and `as_of` freezing the resolution between two competing corrections. **The
+  generated SQL is restricted to an ANSI subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so
+  the standalone tests under `dev/masters/cardiac/` run it on duckdb and assert it agrees
+  with the reference for all of the above. They run by hand, as the scan tests in
+  `dev/specs/artifacts/` do, not in CI; CI coverage arrives when the scripts are promoted to
+  exports.
+- **Parity:** the full keyed comparison catches a compensating swap that the aggregate and
+  sample pre-check both pass.
 - **Real data:** gated, asserting shape and verdicts only, with every failure message checked
   for what it prints.
 
