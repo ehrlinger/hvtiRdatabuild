@@ -3,7 +3,7 @@
 # nolint next: commented_code_linter
 # Design: dev/specs/2026-09-14-analysis-sets-design.md.
 
-.set_keys <- c("id", "vars", "exclude", "expect")
+.set_keys <- c("id", "vars", "event", "exclude", "expect")
 .expect_keys <- c("n", "n_events", "n_censored")
 
 # The set's block exactly as yaml::read_yaml() returns it. The declaration hash
@@ -48,6 +48,13 @@
   if (anyDuplicated(vars))
     stop(where, ": duplicate variable `", vars[anyDuplicated(vars)], "` in `vars`.",
          call. = FALSE)
+  event <- raw$event
+  if (!is.null(event)) {
+    if (!is.character(event) || length(event) != 1L || is.na(event) || !nzchar(event))
+      stop(where, ": `event` must name one column.", call. = FALSE)
+    if (!event %in% vars)
+      stop(where, ": the event column `", event, "` is not in `vars`.", call. = FALSE)
+  }
   rules <- raw$exclude %||% list()
   for (k in seq_along(rules)) {
     r <- rules[[k]]
@@ -87,7 +94,11 @@
       stop(where, ": `expect: ", k, "` must be a non-negative whole number.",
            call. = FALSE)
   }
-  list(id = raw$id, vars = vars, exclude = rules, expect = expect)
+  needs_event <- intersect(names(expect), c("n_events", "n_censored"))
+  if (length(needs_event) && is.null(event))
+    stop(where, ": `expect: ", needs_event[1L], "` needs an `event` column. ",
+         "Name it with `event:` in the set.", call. = FALSE)
+  list(id = raw$id, vars = vars, event = event, exclude = rules, expect = expect)
 }
 
 # Re-serialized, so comments and layout in _study.yml do not change the hash
@@ -241,7 +252,9 @@
 #' against the data with only base R visible; a missing value counts as not
 #' excluded, as SAS `if <missing> then delete` does. The identifier column named
 #' by `id` is used to track exclusions and is never written to the sidecar or
-#' the manifest.
+#' the manifest. A set that names an `event` column, one of its `vars`, also
+#' counts `n_events` (rows where it equals 1) and `n_censored`; an `expect` on
+#' either count needs that `event` key.
 #'
 #' @param name Character(1). The set's name in `_study.yml`.
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
@@ -279,15 +292,11 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   rownames(out) <- NULL
 
   counts <- list(n = nrow(out))
-  ev <- cfg$cohort$event
-  if (ev %in% b$vars) {
-    counts$n_events <- as.integer(sum(out[[ev]] == 1, na.rm = TRUE))
+  if (!is.null(b$event)) {
+    counts$n_events <- as.integer(sum(out[[b$event]] == 1, na.rm = TRUE))
     counts$n_censored <- counts$n - counts$n_events
   }
   for (k in names(b$expect)) {
-    if (is.null(counts[[k]]))
-      stop("analysis set `", name, "`: cannot check `expect: ", k, "` because ",
-           "the event column `", ev, "` is not in `vars`.", call. = FALSE)
     if (!isTRUE(counts[[k]] == b$expect[[k]]))
       stop("analysis set `", name, "`: expected ", k, " = ", b$expect[[k]], ", got ",
            counts[[k]], ". Nothing was written.", call. = FALSE)

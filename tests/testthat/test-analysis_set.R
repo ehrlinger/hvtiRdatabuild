@@ -27,6 +27,27 @@ test_that("validation rejects unknown keys, missing id/vars, bad rules", {
   expect_error(v(eda_set(expect = list(n = c(18, 19)))), "`expect: n`.*single")
 })
 
+test_that("event is optional, set-local, and required by event counts", {
+  cfg <- local_study(list(eda = eda_set()))
+  v <- function(b) .set_validate(b, "eda", cfg)
+  expect_null(v(eda_set(event = NULL))$event)
+  expect_error(v(eda_set(event = c("dead", "age"))), "`event` must name one column")
+  expect_error(v(eda_set(event = "")), "`event` must name one column")
+  expect_error(v(eda_set(event = "junk")), "event column `junk` is not in `vars`")
+  expect_error(v(eda_set(event = NULL, expect = list(n_events = 9))),
+               "`expect: n_events` needs an `event`")
+  expect_error(v(eda_set(event = NULL, expect = list(n_censored = 9))),
+               "`expect: n_censored` needs an `event`")
+})
+
+test_that("a set without an event writes only n", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set(event = NULL)))
+  side <- write_analysis_set("eda", cfg)
+  expect_named(side$counts, "n")
+})
+
 test_that("a set may not be named like the built dataset", {
   cfg <- local_study(list(built = eda_set()))
   expect_error(.set_validate(.set_raw("built", cfg), "built", cfg), "same name")
@@ -61,7 +82,7 @@ test_that("the declaration hash tracks content and rule order", {
 
 test_that("the declaration hash ignores mapping key order", {
   a <- eda_set(expect = list(n = 18, n_events = 9))
-  b <- a[c("expect", "exclude", "vars", "id")]
+  b <- a[c("expect", "exclude", "event", "vars", "id")]
   b$expect <- b$expect[c("n_events", "n")]
   b$exclude <- lapply(b$exclude, function(rule) rule[c("when", "reason")])
   expect_identical(.declaration_sha(a), .declaration_sha(b))
@@ -225,7 +246,7 @@ test_that("an expect mismatch writes nothing", {
 test_that("missing columns and a non-unique id are errors", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
-  cfg <- local_study(list(a = eda_set(vars = c("age", "nope")),
+  cfg <- local_study(list(a = eda_set(vars = c("age", "nope"), event = NULL),
                           b = eda_set(id = "junk")))
   expect_error(write_analysis_set("a", cfg), "not in the built dataset: nope")
   expect_error(write_analysis_set("b", cfg), "`junk` is not unique")
