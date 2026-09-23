@@ -142,6 +142,10 @@ background batch from a resumable `dev/` script; `snapshot_oracle()` already ref
 overwrite, which makes the resume free. It should run on the scan host, not over SMB from
 a laptop.
 
+⚠️ Only the current build's log is retained, so the eleven historical snapshots record their
+shape without validating it against SAS. The batch also hashes the undated
+`built.sas7bdat` and reports whether it matches a dated build's source checksum.
+
 The spec commits to converting **all twelve**. The history is evidence: consecutive
 builds separate upstream warehouse drift (many cells, no code change) from corrections (few
 cells, tied to a code change), which a single diff cannot. Arrow and duckdb read only the
@@ -217,12 +221,14 @@ HVTR takes over.
 | `correction_id` | identity |
 | `master`, `ccfid`, `surgery_date`, and `emrn`, `encounter_date` where known | which record |
 | `variable` | **exactly one cell** |
-| `expected_prior` | the value the corrector saw |
+| `expected_prior` | the value the corrector saw, as text |
+| `expected_prior_missing` | `1` the corrector saw a missing value, `0` a value, `NULL` **unknown**. Unknown is the legacy case (§5.4), and a correction with an unknown prior never applies |
 | `new_value` | text, cast through the type in the metadata table; missing is an explicit flag, not an empty string |
 | `evidence_type`, `evidence_ref` | chart review, source document or investigator return, and a pointer to it |
 | `asserted_by`, `asserted_on` | provenance |
 
-**`correction_decisions`**: accept, reject or supersede, with who, when and why.
+**`correction_decisions`**: `accept`, `reject`, `supersede` or `bake`, with who, when and
+why. `bake` means recorded but already present in the base, so not applied (§5.4).
 
 A correction's status is **derived at query time** from the two tables. Nothing is edited in
 place, and a losing assertion is retained.
@@ -243,6 +249,9 @@ the derivations, not this table. The schema cannot express a rule, which is the 
   fixed the value, or broke it differently, after the correction was made. This is
   compare-and-swap, and it is the argument `snapshot_oracle()` makes about a SAS dataset on a
   shared volume, applied one level down.
+- The stale view gives one reason per correction, checked in this order: `no_variable` (not
+  a correctable column of the master), `no_record` (the key matches no row),
+  `prior_unknown`, `prior_mismatch`.
 - Corrections are long, one row per cell; the master is wide, 700 to 800 columns. So **the
   view is generated**. Only variables with at least one correction get a join and a `CASE`,
   and the view is regenerated when a variable gets its first. Keeping the pivot out of human
@@ -272,6 +281,10 @@ assumed.
 the variable exists and the value casts, then appends a row. It prints a verdict, never a
 value.
 
+It reports when a variable receives its first correction, because the generated view only
+joins variables that already have one and must be regenerated. `decide_correction()` records
+a decision the same way.
+
 ## 6. Failure handling
 
 - A preflight failure (row size, column count, key not unique) **stops before the DDL
@@ -296,16 +309,18 @@ what correct means once it starts. Phase 3 gets its own spec once phases 0 to 2 
 **Tests:**
 
 - **Chunked `snapshot_oracle()`** on the synthetic `oracle_small.sas7bdat` with a tiny
-  `chunk_rows`: chunked and unchunked output identical, same SHA-256; a mismatched chunk
-  schema fails; the sidecar is right.
+  `chunk_rows`: the output **reads back** identical to the unchunked snapshot, labels
+  included. ⚠️ Its bytes differ, because the row groups differ, so its SHA-256 differs by
+  design; an earlier draft of this spec said the checksums would match, and they cannot.
+  A mismatched chunk schema fails and removes the partial file; the sidecar is right.
 - **DDL generator:** snapshot tests on synthetic arrow schemas, and a deliberately over-wide
   schema that must fail the preflight.
 - **Correction resolution:** an R reference implementation over data frames, tested on
   synthetic cases: applied, stale, `NA` matching `NULL`, two accepted (latest wins),
   rejected (ignored), baked (not applied). **The generated SQL is restricted to an ANSI
-  subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so CI runs it on duckdb and asserts it
-  agrees with the reference. SQL Server runs only in an integration test gated on an
-  environment variable, following `HVTI_ORACLE_DIR`.
+  subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so the standalone tests under `dev/masters/cardiac/` run it on duckdb and assert it agrees
+with the reference. They run by hand, as the scan tests in `dev/specs/artifacts/` do, not in
+CI; CI coverage arrives when the scripts are promoted to exports
 - **Real data:** gated, asserting shape and verdicts only, with every failure message checked
   for what it prints.
 
