@@ -11,6 +11,8 @@ source(file.path(here, "ddl.R"))
 pq <- tempfile(fileext = ".parquet")
 sex <- c("M", "Foo")
 attr(sex, "format.sas") <- "$20."
+site <- c("Cleveland Clinic Main Campus", "X")
+attr(site, "format.sas") <- "$10."
 arrow::write_parquet(data.frame(
   id      = c("K1", "K22"),
   age     = c(60.5, NA),
@@ -19,6 +21,7 @@ arrow::write_parquet(data.frame(
   dt_surg = as.Date(c("2020-01-01", "2021-02-03")),
   note    = c(NA_character_, NA_character_),
   sex     = sex,
+  site    = site,
   stringsAsFactors = FALSE
 ), pq)
 
@@ -28,11 +31,13 @@ check("table is schema-qualified and quoted",
 check("character width is measured", d$types[["id"]] == "nvarchar(3)")
 check("an all-missing character column gets width 255", d$types[["note"]] == "nvarchar(255)")
 check("a SAS-declared width wider than the data wins", d$types[["sex"]] == "nvarchar(20)")
+check("observed data wider than the SAS-declared width wins",
+      d$types[["site"]] == sprintf("nvarchar(%d)", nchar("Cleveland Clinic Main Campus")))
 check("double maps to float", d$types[["age"]] == "float")
 check("integer maps to int", d$types[["n"]] == "int")
 check("logical maps to bit", d$types[["flag"]] == "bit")
 check("date maps to date", d$types[["dt_surg"]] == "date")
-check("every column is nullable", lengths(regmatches(d$sql, gregexpr(" NULL", d$sql))) == 7L)
+check("every column is nullable", lengths(regmatches(d$sql, gregexpr(" NULL", d$sql))) == 8L)
 
 check_error("an unknown arrow type is an error", mssql_type("list<item: int32>"), "No SQL")
 check("a very long string becomes nvarchar(max)",

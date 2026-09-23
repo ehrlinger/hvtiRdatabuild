@@ -174,7 +174,8 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
       "(", a, ".expected_prior_missing = 0 AND ", prior_cast, " IS NOT NULL AND ",
       prior_eq, "))",
       " AND (", a, ".new_value_missing = 1 OR ", new_cast, " IS NOT NULL)")
-    sprintf("CASE WHEN %s THEN CASE WHEN %s.new_value_missing = 1 THEN NULL ELSE %s END ELSE %s END AS %s",
+    sprintf(paste("CASE WHEN %s THEN CASE WHEN %s.new_value_missing = 1 THEN NULL",
+                  "ELSE %s END ELSE %s END AS %s"),
             cond, a, new_cast, b, q(v))
   }, character(1))
   joins <- vapply(corrected, function(v) {

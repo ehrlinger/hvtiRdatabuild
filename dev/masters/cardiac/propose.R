@@ -40,13 +40,13 @@ propose_correction <- function(con, master, base_table, corrections_table, key_v
          paste(EVIDENCE_TYPES, collapse = ", "), call. = FALSE)
   }
   r_class <- meta$r_class[match(variable, meta$variable)]
-  if (!is.null(widths) && identical(r_class, "character") && !is.na(new_value) &&
-        variable %in% names(widths) && nchar(new_value) > widths[[variable]]) {
+  prior_text <- .checked_text(expected_prior, r_class, "expected_prior")
+  new_text <- .checked_text(new_value, r_class, "new_value")
+  if (!is.null(widths) && identical(r_class, "character") && !is.na(new_text) &&
+        variable %in% names(widths) && nchar(new_text) > widths[[variable]]) {
     stop("'new_value' is longer than the column allows (", widths[[variable]],
          " characters).", call. = FALSE)
   }
-  prior_text <- .checked_text(expected_prior, r_class, "expected_prior")
-  new_text <- .checked_text(new_value, r_class, "new_value")
 
   where <- paste(sprintf("%s = ?", q(names(key_values))), collapse = " AND ")
   n <- DBI::dbGetQuery(con, sprintf("SELECT COUNT(*) AS n FROM %s WHERE %s",

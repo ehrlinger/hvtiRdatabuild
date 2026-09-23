@@ -80,6 +80,9 @@ msg_wide <- check_error("an over-width character value is rejected",
                         "longer than the column allows")
 check("the over-width message carries no value", !grepl("way too long", msg_wide))
 check("no widths means no width check", propose_chr()$verdict == "appended")
+check_error("a factor value with widths supplied still fails the cast check first",
+           propose_chr(new_value = factor("x"), widths = c(surgeon = 5L)),
+           "does not cast")
 
 d <- suppressMessages(decide_correction(con, "dec", "corr", r$correction_id, "accept",
                                         "tester", dialect = "duckdb"))
