@@ -34,10 +34,15 @@
   text <- paste(lines, collapse = "\n")
   m <- gregexpr("/\\*[\\s\\S]*?\\*/", text, perl = TRUE)
   regmatches(text, m) <- list(gsub("[^\n]", " ", regmatches(text, m)[[1]]))
+  # Quote-aware split: a ';' inside a quoted literal is not a statement end.
+  qpat <- "'(?:[^']|'')*'|\"(?:[^\"]|\"\")*\""
+  qm <- gregexpr(qpat, text, perl = TRUE)
+  regmatches(text, qm) <- list(gsub(";", "\001", regmatches(text, qm)[[1]], fixed = TRUE))
   pieces <- strsplit(text, ";", fixed = TRUE)[[1]]
   nl <- nchar(gsub("[^\n]", "", pieces))
   lead <- sub("^(\\s*)[\\s\\S]*$", "\\1", pieces, perl = TRUE)
   line <- 1L + c(0L, cumsum(nl)[-length(nl)]) + nchar(gsub("[^\n]", "", lead))
+  pieces <- gsub("\001", ";", pieces, fixed = TRUE)
   stmt <- trimws(gsub("\\s+", " ", pieces))
   keep <- nzchar(stmt) & !startsWith(stmt, "*")
   data.frame(line = as.integer(line[keep]), stmt = stmt[keep], stringsAsFactors = FALSE)
@@ -54,9 +59,12 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
   p_do <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .LIT, "\\s*\\)?\\s*then\\s+do$")
   p_assign <- paste0("^", .VAR, "\\s*=\\s*", .LIT, "$")
   p_mentions <- paste0("^if\\b.*\\b", k, "\\b")
+  p_else <- "^else\\b"
+  p_mentions_key <- paste0("\\b", k, "\\b")
 
   facts <- list()
   unparsed <- integer()
+  last_key_if <- FALSE
   add <- function(line, key_lit, var, val_lit) {
     kv <- .lit_text(key_lit)
     vv <- .lit_text(val_lit)
@@ -71,12 +79,20 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
   while (i <= nrow(st)) {
     s <- st$stmt[[i]]
     line <- st$line[[i]]
-    if (length(m <- grab(p_simple, s))) {
+    if (grepl(p_else, s, perl = TRUE, ignore.case = TRUE)) {
+      # A rule over every other patient, not a fact: never parsed as one, but
+      # only worth flagging when it could be mistaken for a key fact.
+      mentions_key <- grepl(p_mentions_key, s, perl = TRUE, ignore.case = TRUE)
+      if (mentions_key || last_key_if) unparsed <- c(unparsed, line)
+      last_key_if <- FALSE
+    } else if (length(m <- grab(p_simple, s))) {
       if (!add(line, m[[2]], m[[3]], m[[4]])) unparsed <- c(unparsed, line)
+      last_key_if <- TRUE
     } else if (length(m <- grab(p_in, s))) {
       keys <- regmatches(m[[2]], gregexpr(.LIT, m[[2]], perl = TRUE))[[1]]
       ok <- vapply(keys, function(kl) add(line, kl, m[[3]], m[[4]]), logical(1))
       if (!all(ok)) unparsed <- c(unparsed, line)
+      last_key_if <- TRUE
     } else if (length(m <- grab(p_do, s))) {
       block <- list()
       good <- TRUE
@@ -92,8 +108,12 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
       } else {
         unparsed <- c(unparsed, line)
       }
+      last_key_if <- TRUE
     } else if (grepl(p_mentions, s, perl = TRUE, ignore.case = TRUE)) {
       unparsed <- c(unparsed, line)
+      last_key_if <- FALSE
+    } else {
+      last_key_if <- FALSE
     }
     i <- i + 1L
   }

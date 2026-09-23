@@ -37,6 +37,21 @@ check("a quoted value is unquoted", f$value_text[f$variable == "surgeon"] == "Jo
 check("an IN list gives one fact per key", setequal(f$key_value[f$line == 9L],
                                                     c("1004", "1005")))
 
+p2 <- parse_legacy_facts(c(
+  "if ccfid = 2001 then age = 66;",              # 1  fact
+  "else age = 70;",                              # 2  else after a key-if: unparsed
+  "if age > 1 then x = 1;",                      # 3  a rule with no key: no fact
+  "else if ccfid = 2002 then age = 71;",         # 4  else mentions the key: unparsed
+  "if ccfid = 2003 then note = 'a;b';"))         # 5  fact; ';' inside quotes
+f2 <- p2$facts
+check("the 2001 fact parses", "2001" %in% f2$key_value)
+check("line 2 is unparsed (else after a key-if)", 2L %in% p2$unparsed)
+check("line 4 is unparsed (else mentions the key)", 4L %in% p2$unparsed)
+check("the 2003 fact parses with a literal semicolon",
+      f2$value_text[f2$variable == "note"] == "a;b")
+check("line 3 is not unparsed", !3L %in% p2$unparsed)
+check("line 3 yields no fact", !3L %in% f2$line)
+
 base_keys <- data.frame(ccfid = c(1001, 1002, 1003, 1004, 1004),
                         dt_surg = as.Date("2020-01-01") + 0:4)
 meta <- data.frame(variable = c("ccfid", "dt_surg", "age", "surgeon", "bmi", "dt_dis"),
