@@ -24,10 +24,12 @@ corrections_ddl <- function(corrections_table, decisions_table, key_types,
             col("expected_prior", ty$text), col("expected_prior_missing", ty$flag),
             col("new_value", ty$text), col("new_value_missing", ty$flag, FALSE),
             col("evidence_type", ty$id, FALSE), col("evidence_ref", ty$text, FALSE),
-            col("asserted_by", ty$id, FALSE), col("asserted_on", ty$ts, FALSE))
+            col("asserted_by", ty$id, FALSE), col("asserted_on", ty$ts, FALSE),
+            sprintf("  PRIMARY KEY (%s)", q("correction_id")))
   dec <- c(col("decision_id", ty$id, FALSE), col("correction_id", ty$id, FALSE),
            col("decision", ty$id, FALSE), col("decided_by", ty$id, FALSE),
-           col("decided_on", ty$ts, FALSE), col("reason", ty$text))
+           col("decided_on", ty$ts, FALSE), col("reason", ty$text),
+           sprintf("  PRIMARY KEY (%s)", q("decision_id")))
   c(corrections = sprintf("CREATE TABLE %s (\n%s\n);", q(corrections_table),
                           paste(corr, collapse = ",\n")),
     decisions   = sprintf("CREATE TABLE %s (\n%s\n);", q(decisions_table),
@@ -90,6 +92,19 @@ resolve_corrections <- function(base, corrections, decisions, key, master) {
   list(data = out, stale = stale)
 }
 
+# SQL Server's default collation compares strings case- and trailing-space-
+# insensitively; a binary collation with an explicit length check compares the
+# stored characters exactly, as R and the other dialects do.
+.string_eq_sql <- function(a, b, type, dialect) {
+  is_string <- dialect == "mssql" && grepl("^n?(var)?char\\b", type, ignore.case = TRUE)
+  if (is_string) {
+    sprintf(paste0("(%1$s COLLATE Latin1_General_BIN2 = %2$s COLLATE Latin1_General_BIN2 ",
+                   "AND DATALENGTH(%1$s) = DATALENGTH(%2$s))"), a, b)
+  } else {
+    sprintf("%s = %s", a, b)
+  }
+}
+
 .winners_cte <- function(q, corrections_table, decisions_table, master, key) {
   paste0(
     "WITH latest AS (\n",
@@ -123,14 +138,16 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
   select <- vapply(columns, function(v) {
     b <- paste0("b.", q(v))
     if (!v %in% corrected) return(b)
+    a <- alias[[v]]
+    prior_eq <- .string_eq_sql(b, sprintf("CAST(%s.expected_prior AS %s)", a, types[[v]]),
+                               types[[v]], dialect)
     sprintf(paste0("CASE WHEN %1$s.correction_id IS NOT NULL AND (",
                    "(%1$s.expected_prior_missing = 1 AND %2$s IS NULL) OR ",
-                   "(%1$s.expected_prior_missing = 0 AND ",
-                   "%2$s = CAST(%1$s.expected_prior AS %3$s)))",
+                   "(%1$s.expected_prior_missing = 0 AND %5$s))",
                    " THEN CASE WHEN %1$s.new_value_missing = 1 THEN NULL",
                    " ELSE CAST(%1$s.new_value AS %3$s) END",
                    " ELSE %2$s END AS %4$s"),
-            alias[[v]], b, types[[v]], q(v))
+            a, b, types[[v]], q(v), prior_eq)
   }, character(1))
   joins <- vapply(corrected, function(v) {
     a <- alias[[v]]
@@ -165,12 +182,13 @@ stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
             q(base_table), on, in_valid),
     vapply(corrected, function(v) {
       b <- paste0("b.", q(v))
+      prior_eq <- .string_eq_sql(b, sprintf("CAST(w.expected_prior AS %s)", types[[v]]),
+                                 types[[v]], dialect)
       sprintf(paste("SELECT w.correction_id, w.variable, 'prior_mismatch' AS reason FROM w",
                     "JOIN %s b ON %s WHERE w.variable = %s AND (",
                     "(w.expected_prior_missing = 1 AND %s IS NOT NULL) OR",
-                    "(w.expected_prior_missing = 0 AND (%s IS NULL OR",
-                    "%s <> CAST(w.expected_prior AS %s))))"),
-              q(base_table), on, sql_string(v), b, b, b, types[[v]])
+                    "(w.expected_prior_missing = 0 AND (%s IS NULL OR NOT (%s))))"),
+              q(base_table), on, sql_string(v), b, b, prior_eq)
     }, character(1)))
   paste0(view_header(dialect), " ", q(view), " AS\n",
          .winners_cte(q, corrections_table, decisions_table, master, key),

@@ -102,5 +102,36 @@ check("the stale view agrees with the R reference",
       identical(sql_stale$correction_id, stale$correction_id) &&
         identical(sql_stale$reason, stale$reason))
 
+# mssql string comparison: nvarchar/varchar/nchar/char get a binary-collation,
+# length-checked comparison; other types keep plain equality. duckdb is
+# unaffected (checked above; dialect gates the helper).
+str_cols <- c("id", "dt_surg", "bmi")
+str_view <- corrections_view_sql("v", "base", "corr", "dec", "m", key,
+                                 str_cols, "bmi", c(bmi = "nvarchar(20)"), dialect = "mssql")
+check("mssql nvarchar comparison uses BIN2 collation", grepl("Latin1_General_BIN2", str_view))
+check("mssql nvarchar comparison checks DATALENGTH", grepl("DATALENGTH", str_view))
+
+num_cols <- c("id", "dt_surg", "age")
+num_view <- corrections_view_sql("v", "base", "corr", "dec", "m", key,
+                                 num_cols, "age", c(age = "float"), dialect = "mssql")
+check("mssql float comparison stays plain equality",
+      !grepl("Latin1_General_BIN2|DATALENGTH", num_view))
+
+str_stale <- stale_view_sql("v_stale", "base", "corr", "dec", "m", key,
+                            str_cols, "bmi", c(bmi = "varchar(20)"), dialect = "mssql")
+check("mssql stale view's varchar mismatch uses BIN2 collation",
+      grepl("Latin1_General_BIN2", str_stale))
+check("mssql stale view's varchar mismatch checks DATALENGTH", grepl("DATALENGTH", str_stale))
+
+num_stale <- stale_view_sql("v_stale", "base", "corr", "dec", "m", key,
+                            num_cols, "age", c(age = "float"), dialect = "mssql")
+check("mssql stale view's float mismatch stays plain equality",
+      !grepl("Latin1_General_BIN2|DATALENGTH", num_stale))
+
+check_error("a duplicate correction_id is rejected by the primary key",
+           DBI::dbAppendTable(con, "corr", corrections[corrections$correction_id == "c01", ]))
+check_error("a duplicate decision_id is rejected by the primary key",
+           DBI::dbAppendTable(con, "dec", decisions[decisions$decision_id == "dc01", ]))
+
 DBI::dbDisconnect(con, shutdown = TRUE)
 finish()
