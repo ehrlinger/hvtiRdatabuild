@@ -22,9 +22,7 @@ local_study <- function(sets = list(), env = parent.frame()) {
   )
   suppressMessages(invisible(hvtiRutilities::register_data(
     root,
-    built = "built.csv",
-    event = "dead",
-    time = "iv_dead"
+    built = "built.csv"
   )))
   if (length(sets)) {
     yml <- file.path(root, "_study.yml")
@@ -39,6 +37,7 @@ eda_set <- function(...) {
   b <- list(
     id = "ccfid",
     vars = c("age", "aggrc", "dead", "iv_dead"),
+    event = "dead",
     exclude = list(
       list(reason = "No aggrecan", when = "is.na(aggrc)"),
       list(reason = "Under 18", when = "age < 18")
