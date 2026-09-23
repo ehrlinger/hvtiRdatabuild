@@ -10,6 +10,8 @@
   `event` records `n` alone. A set that relied on the study-wide cohort needs
   the one-line `event:` added, which also changes its declaration hash, so
   `read_analysis_set()` asks for one rewrite.
+  hvtiRdatabuild now requires hvtiRutilities 1.4.0 or later, since its tests
+  and registration fixture use the endpoint-neutral `register_data()`.
 
 # hvtiRdatabuild 0.2.3
 
