@@ -28,6 +28,16 @@ view_header <- function(dialect) {
          stop("Unknown dialect '", dialect, "'.", call. = FALSE))
 }
 
+# Run a warehouse write/DDL/view/load/record step, withholding the driver's
+# own error message: it can quote a data value, and PHI must never reach the
+# console or a transcript. Rerun the step interactively to see it.
+run_step <- function(name, expr) {
+  tryCatch(expr, error = function(e) stop("Step '", name, "' failed (", class(e)[[1]],
+                                          "). The driver's message is withheld because ",
+                                          "it can contain a data value; rerun the step ",
+                                          "interactively to see it.", call. = FALSE))
+}
+
 # SQL Server column types of a table, as they would be written in a CAST.
 table_types <- function(con, table) {
   cols <- DBI::dbGetQuery(con, paste(

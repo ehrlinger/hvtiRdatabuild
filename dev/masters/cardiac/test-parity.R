@@ -9,6 +9,10 @@ skip_unless(c("arrow", "duckdb", "DBI", "dplyr", "withr", "tidyselect", "hvtiRda
 source(file.path(here, "sql-common.R"))
 source(file.path(here, "parity.R"))
 
+msg <- check_error("run_step withholds the driver's message",
+                   run_step("x", stop("secret K9")), "Step 'x'")
+check("run_step's message does not leak the driver's text", !grepl("K9", msg))
+
 check("mssql quoting doubles a closing bracket", quoter("mssql")("a]b") == "[a]]b]")
 check("duckdb quoting doubles a quote", quoter("duckdb")("a\"b") == "\"a\"\"b\"")
 check("string literals double a single quote", sql_string("O'Neil") == "'O''Neil'")
