@@ -318,9 +318,10 @@ what correct means once it starts. Phase 3 gets its own spec once phases 0 to 2 
 - **Correction resolution:** an R reference implementation over data frames, tested on
   synthetic cases: applied, stale, `NA` matching `NULL`, two accepted (latest wins),
   rejected (ignored), baked (not applied). **The generated SQL is restricted to an ANSI
-  subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so the standalone tests under `dev/masters/cardiac/` run it on duckdb and assert it agrees
-with the reference. They run by hand, as the scan tests in `dev/specs/artifacts/` do, not in
-CI; CI coverage arrives when the scripts are promoted to exports
+  subset** (`CASE`, `LEFT JOIN`, `ROW_NUMBER()`), so the standalone tests under
+  `dev/masters/cardiac/` run it on duckdb and assert it agrees with the reference. They run
+  by hand, as the scan tests in `dev/specs/artifacts/` do, not in CI; CI coverage arrives
+  when the scripts are promoted to exports.
 - **Real data:** gated, asserting shape and verdicts only, with every failure message checked
   for what it prints.
 
