@@ -1,3 +1,16 @@
+# hvtiRdatabuild (unreleased)
+
+* **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
+  study registration endpoint-neutral: `register_data()` no longer takes
+  `event` or `time`, and `study_config()` no longer carries a study-wide
+  `cohort`. `write_analysis_set()` had counted `n_events` and `n_censored` from
+  that cohort, so under 1.4.0 every write failed. A set now declares `event:`
+  (one of its `vars`) to get both counts, and an `expect` on either count
+  without one stops with a message naming the missing key. A set with no
+  `event` records `n` alone. A set that relied on the study-wide cohort needs
+  the one-line `event:` added, which also changes its declaration hash, so
+  `read_analysis_set()` asks for one rewrite.
+
 # hvtiRdatabuild 0.2.3
 
 * **New `publish_dataset()`.** A programmer can publish a mutable clinical-data

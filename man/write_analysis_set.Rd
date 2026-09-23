@@ -29,5 +29,7 @@ Nothing is written unless every check passes. Each \code{when} is R code evaluat
 against the data with only base R visible; a missing value counts as not
 excluded, as SAS \verb{if <missing> then delete} does. The identifier column named
 by \code{id} is used to track exclusions and is never written to the sidecar or
-the manifest.
+the manifest. A set that names an \code{event} column, one of its \code{vars}, also
+counts \code{n_events} (rows where it equals 1) and \code{n_censored}; an \code{expect} on
+either count needs that \code{event} key.
 }
