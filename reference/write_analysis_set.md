@@ -36,4 +36,7 @@ Nothing is written unless every check passes. Each `when` is R code
 evaluated against the data with only base R visible; a missing value
 counts as not excluded, as SAS `if <missing> then delete` does. The
 identifier column named by `id` is used to track exclusions and is never
-written to the sidecar or the manifest.
+written to the sidecar or the manifest. A set that names an `event`
+column, one of its `vars`, also counts `n_events` (rows where it
+equals 1) and `n_censored`; an `expect` on either count needs that
+`event` key.

@@ -68,6 +68,7 @@ analysis_sets:
       - biomarker
       - event
       - follow_up
+    event: event
     expect:
       n: 1200
 ```
@@ -77,10 +78,11 @@ contract, such as `primary_analysis`, rather than for its first
 consumer, such as a particular plot. Add another set only when the study
 has a different population or variable contract. If the SAS step keeps
 every row, omit `exclude`; the `vars` list alone expresses its
-projection. Add `n_events` and `n_censored` expectations only when
-`vars` contains the event column registered in `_study.yml`;
+projection. `event` names the set’s own event column, which must be one
+of its `vars`; from it
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
-calculates both from that column.
+calculates `n_events` and `n_censored`, and only a set with an `event`
+may add expectations for them.
 
 Write the checkpoint explicitly after the built dataset is ready:
 

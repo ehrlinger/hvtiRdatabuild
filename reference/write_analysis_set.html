@@ -88,7 +88,9 @@ parent dataset and the attrition.</p>
 against the data with only base R visible; a missing value counts as not
 excluded, as SAS <code>if &lt;missing&gt; then delete</code> does. The identifier column named
 by <code>id</code> is used to track exclusions and is never written to the sidecar or
-the manifest.</p>
+the manifest. A set that names an <code>event</code> column, one of its <code>vars</code>, also
+counts <code>n_events</code> (rows where it equals 1) and <code>n_censored</code>; an <code>expect</code> on
+either count needs that <code>event</code> key.</p>
     </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
