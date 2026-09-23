@@ -36,6 +36,16 @@ on.exit(DBI::dbDisconnect(con), add = TRUE)
 q <- quoter("mssql")
 types <- table_types(con, base)
 
+parity_t <- paste0(view, "_parity")
+parity_pass <- DBI::dbExistsTable(con, parity_t) && nrow(DBI::dbGetQuery(con, sprintf(
+  "SELECT 1 AS x FROM %s WHERE base_table = ? AND verdict = 'pass'", q(parity_t)),
+  params = list(base))) > 0L
+if (execute && !parity_pass) {
+  stop("Base ", base, " has no passing parity record; run run-phase1.R first.", call. = FALSE)
+}
+message("parity  ", if (parity_pass) "passing record found for base " else
+  "no passing record for base ", base)
+
 parsed <- parse_legacy_facts(readLines(args[[5]], warn = FALSE), key_var = key[[1]])
 base_keys <- DBI::dbGetQuery(con, sprintf("SELECT %s FROM %s",
                                           paste(q(key), collapse = ", "),
@@ -56,6 +66,10 @@ if (length(parsed$unparsed)) {
   message("  unparsed statements at lines: ",
           paste(parsed$unparsed, collapse = ", "))
 }
+if (nrow(parsed$facts) == 0L && length(parsed$unparsed) == 0L) {
+  stop("No inline fixes found for key '", key[[1]], "' in ", basename(args[[5]]),
+       "; check that the first key column is the one the SAS build tests.", call. = FALSE)
+}
 if (!execute) {
   message("dry run: nothing written; rerun with --execute")
   quit(save = "no", status = 0)
@@ -63,20 +77,20 @@ if (!execute) {
 
 if (!DBI::dbExistsTable(con, corr_t)) {
   ddl <- corrections_ddl(corr_t, dec_t, key_types = types[key])
-  invisible(DBI::dbExecute(con, ddl[["corrections"]]))
-  invisible(DBI::dbExecute(con, ddl[["decisions"]]))
+  run_step("create corrections table", invisible(DBI::dbExecute(con, ddl[["corrections"]])))
+  run_step("create decisions table", invisible(DBI::dbExecute(con, ddl[["decisions"]])))
 }
-r <- record_legacy_facts(con, rows, corr_t, dec_t)
+r <- run_step("record legacy facts", record_legacy_facts(con, rows, corr_t, dec_t))
 message("record  ", r$appended, " appended, ", r$already_present,
         " already present")
 
 corrected <- corrected_variables(con, corr_t, view)
-invisible(DBI::dbExecute(con, corrections_view_sql(view, base, corr_t, dec_t,
-                                                   view, key, names(types),
-                                                   corrected, types)))
-invisible(DBI::dbExecute(con, stale_view_sql(stale_v, base, corr_t, dec_t,
-                                             view, key, names(types),
-                                             corrected, types)))
+run_step("create corrections view", invisible(DBI::dbExecute(con,
+        corrections_view_sql(view, base, corr_t, dec_t, view, key, names(types),
+                             corrected, types))))
+run_step("create stale corrections view", invisible(DBI::dbExecute(con,
+        stale_view_sql(stale_v, base, corr_t, dec_t, view, key, names(types),
+                       corrected, types))))
 n_stale <- DBI::dbGetQuery(con, sprintf("SELECT COUNT(*) AS n FROM %s",
                                         q(stale_v)))$n
 message("views   ", view, " regenerated over ", length(corrected),
