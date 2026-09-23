@@ -47,17 +47,23 @@ corrections <- rbind(
   corr("c11", "K1", "2020-01-01", "surgeon", "S1",   0L, NA,           1L, 11), # set missing
   corr("c12", "K2", "2020-02-01", "age",     "70.25", 0L, "71",        0L, 12), # other master
   corr("c13", "K3", "2020-03-01", "age",     value_text(1 / 3), 0L,
-       value_text(2 / 3), 0L, 13)) # full-precision double through CAST
+       value_text(2 / 3), 0L, 13), # full-precision double through CAST
+  corr("c14", "K2", "2020-02-01", "age",     "70.25", 0L, "not-a-number", 0L, 14)) # does_not_cast
 corrections$master[corrections$correction_id == "c12"] <- "other"
-decision <- function(did, cid, what, at) {
+decision <- function(did, cid, what, decided_at) {
   data.frame(decision_id = did, correction_id = cid, decision = what, decided_by = "tester",
-             decided_on = t0 + 100 + at, reason = NA_character_, stringsAsFactors = FALSE)
+             decided_on = t0 + decided_at, reason = NA_character_, stringsAsFactors = FALSE)
 }
+# Decided shortly after asserted, like a real review, so as_of can freeze at a
+# point between two corrections and still find their decisions already made.
+corr_at <- c(c01 = 1, c02 = 2, c03 = 3, c04 = 4, c05 = 5, c06 = 6, c07 = 7, c08 = 8,
+            c09 = 9, c10 = 10, c11 = 11, c12 = 12, c13 = 13, c14 = 14)
 decisions <- rbind(
-  do.call(rbind, lapply(sprintf("c%02d", c(1:5, 8:13)), function(cid)
-    decision(paste0("d", cid), cid, "accept", 0))),
-  decision("d06a", "c06", "accept", 0), decision("d06b", "c06", "reject", 1),
-  decision("d07", "c07", "bake", 0))
+  do.call(rbind, lapply(sprintf("c%02d", c(1:5, 8:14)), function(cid)
+    decision(paste0("d", cid), cid, "accept", corr_at[[cid]] + 0.5))),
+  decision("d06a", "c06", "accept", corr_at[["c06"]] + 0.5),
+  decision("d06b", "c06", "reject", corr_at[["c06"]] + 1),
+  decision("d07", "c07", "bake", corr_at[["c07"]] + 0.5))
 
 res <- resolve_corrections(base, corrections, decisions, key, "m")
 out <- res$data
@@ -70,10 +76,19 @@ check("c06 rejected after accept, not applied", out$dt_dis[2] == as.Date("2020-0
 check("c07 baked, not applied", out$surgeon[2] == "S2")
 check("c12 belongs to another master", out$age[2] == 70.25)
 check("c13 routes a full-precision double through the CAST", out$age[3] == 2 / 3)
+check("c14's new_value does not cast; K2 age is untouched", out$age[2] == 70.25)
 stale <- res$stale[order(res$stale$correction_id), ]
-check("stale ids", identical(stale$correction_id, c("c02", "c08", "c09", "c10")))
+check("stale ids", identical(stale$correction_id, c("c02", "c08", "c09", "c10", "c14")))
 check("stale reasons", identical(stale$reason,
-      c("prior_mismatch", "no_record", "prior_unknown", "no_variable")))
+      c("prior_mismatch", "no_record", "prior_unknown", "no_variable", "does_not_cast")))
+
+# C1: as_of freezes the correction state at a point in time.
+as_of <- t0 + 4.5
+res_asof <- resolve_corrections(base, corrections, decisions, key, "m", as_of = as_of)
+check("as_of between c04 and c05: K1 bmi takes c04's value", res_asof$data$bmi[1] == 30)
+check("as_of = NULL leaves resolve_corrections unchanged",
+      isTRUE(all.equal(resolve_corrections(base, corrections, decisions, key, "m")$data,
+                       out, check.attributes = FALSE)))
 
 con <- DBI::dbConnect(duckdb::duckdb())
 DBI::dbWriteTable(con, "base", base)
@@ -101,6 +116,14 @@ sql_stale <- DBI::dbGetQuery(con, "SELECT * FROM v_stale ORDER BY correction_id"
 check("the stale view agrees with the R reference",
       identical(sql_stale$correction_id, stale$correction_id) &&
         identical(sql_stale$reason, stale$reason))
+
+invisible(DBI::dbExecute(con, corrections_view_sql("v_asof", "base", "corr", "dec", "m", key,
+                                         names(base), corrected, types, "duckdb",
+                                         as_of = as_of)))
+sql_asof <- DBI::dbGetQuery(con, "SELECT * FROM v_asof ORDER BY id")
+check("the as_of SQL view agrees with the R reference",
+      isTRUE(all.equal(sql_asof, res_asof$data[order(res_asof$data$id), ],
+                       check.attributes = FALSE)))
 
 # mssql string comparison: nvarchar/varchar/nchar/char get a binary-collation,
 # length-checked comparison; other types keep plain equality. duckdb is

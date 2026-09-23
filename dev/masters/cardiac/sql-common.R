@@ -28,6 +28,13 @@ view_header <- function(dialect) {
          stop("Unknown dialect '", dialect, "'.", call. = FALSE))
 }
 
+# A timestamp literal for an as-of filter, rendered in UTC through the
+# dialect's own timestamp type so duckdb and SQL Server parse it the same way.
+sql_timestamp_literal <- function(ts, dialect) {
+  sprintf("CAST('%s' AS %s)", format(ts, "%Y-%m-%d %H:%M:%OS6", tz = "UTC"),
+          sql_types(dialect)$ts)
+}
+
 # Run a warehouse write/DDL/view/load/record step, withholding the driver's
 # own error message: it can quote a data value, and PHI must never reach the
 # console or a transcript. Rerun the step interactively to see it.

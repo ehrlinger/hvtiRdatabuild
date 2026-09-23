@@ -40,14 +40,21 @@ corrections_ddl <- function(corrections_table, decisions_table, key_types,
 # decided_on, then decision_id) must be 'accept'; among accepted corrections to
 # one cell the latest (by asserted_on, then correction_id) wins; the winner is
 # stale if its variable is not a correctable column, its key matches no row, its
-# prior is unknown, or the base no longer holds its prior. Otherwise it applies.
-resolve_corrections <- function(base, corrections, decisions, key, master) {
+# prior is unknown, either text fails to cast, or the base no longer holds its
+# prior. Otherwise it applies.
+#
+# `as_of`, when non-NULL, freezes the correction state: only decisions with
+# decided_on <= as_of and corrections with asserted_on <= as_of count, so the
+# same view can be reproduced at a point in time via the freeze record.
+resolve_corrections <- function(base, corrections, decisions, key, master, as_of = NULL) {
+  if (!is.null(as_of)) decisions <- decisions[decisions$decided_on <= as_of, ]
   dec <- decisions[order(decisions$correction_id, -xtfrm(decisions$decided_on),
                          -xtfrm(decisions$decision_id)), ]
   latest <- dec[!duplicated(dec$correction_id), ]
   accepted <- latest$correction_id[latest$decision == "accept"]
   acc <- corrections[corrections$master == master &
                        corrections$correction_id %in% accepted, ]
+  if (!is.null(as_of)) acc <- acc[acc$asserted_on <= as_of, ]
   acc <- acc[order(-xtfrm(acc$asserted_on), -xtfrm(acc$correction_id)), ]
   cell <- function(d, cols) do.call(paste, c(lapply(d[cols], as.character), sep = "\r"))
   winners <- acc[!duplicated(cell(acc, c(key, "variable"))), ]
@@ -68,17 +75,23 @@ resolve_corrections <- function(base, corrections, decisions, key, master) {
     } else {
       cls <- class(base[[w$variable]])[[1]]
       cur <- base[[w$variable]][row]
-      prior_ok <- if (w$expected_prior_missing == 1L) {
-        is.na(cur)
+      prior_casts <- w$expected_prior_missing == 1L || !is.na(parse_value(w$expected_prior, cls))
+      new_casts <- w$new_value_missing == 1L || !is.na(parse_value(w$new_value, cls))
+      if (!prior_casts || !new_casts) {
+        "does_not_cast"
       } else {
-        !is.na(cur) && isTRUE(cur == parse_value(w$expected_prior, cls))
-      }
-      if (prior_ok) {
-        out[[w$variable]][row] <- if (w$new_value_missing == 1L) NA else
-          parse_value(w$new_value, cls)
-        NULL
-      } else {
-        "prior_mismatch"
+        prior_ok <- if (w$expected_prior_missing == 1L) {
+          is.na(cur)
+        } else {
+          !is.na(cur) && isTRUE(cur == parse_value(w$expected_prior, cls))
+        }
+        if (prior_ok) {
+          out[[w$variable]][row] <- if (w$new_value_missing == 1L) NA else
+            parse_value(w$new_value, cls)
+          NULL
+        } else {
+          "prior_mismatch"
+        }
       }
     }
     if (!is.null(reason)) {
@@ -105,17 +118,29 @@ resolve_corrections <- function(base, corrections, decisions, key, master) {
   }
 }
 
-.winners_cte <- function(q, corrections_table, decisions_table, master, key) {
+.winners_cte <- function(q, corrections_table, decisions_table, master, key, dialect,
+                         as_of = NULL) {
+  dec_filter <- if (!is.null(as_of)) {
+    paste0("\n  WHERE decided_on <= ", sql_timestamp_literal(as_of, dialect))
+  } else {
+    ""
+  }
+  acc_filter <- if (!is.null(as_of)) {
+    paste0(" AND c.asserted_on <= ", sql_timestamp_literal(as_of, dialect))
+  } else {
+    ""
+  }
   paste0(
     "WITH latest AS (\n",
     "  SELECT correction_id, decision,\n",
     "         ROW_NUMBER() OVER (PARTITION BY correction_id\n",
     "                            ORDER BY decided_on DESC, decision_id DESC) AS rn\n",
-    "  FROM ", q(decisions_table), "\n",
+    "  FROM ", q(decisions_table), dec_filter, "\n",
     "), accepted AS (\n",
     "  SELECT c.* FROM ", q(corrections_table), " c\n",
     "  JOIN latest l ON l.correction_id = c.correction_id\n",
-    "  WHERE l.rn = 1 AND l.decision = 'accept' AND c.master = ", sql_string(master), "\n",
+    "  WHERE l.rn = 1 AND l.decision = 'accept' AND c.master = ", sql_string(master),
+    acc_filter, "\n",
     "), ranked AS (\n",
     "  SELECT a.*, ROW_NUMBER() OVER (PARTITION BY ",
     paste0("a.", q(key), collapse = ", "), ", a.variable\n",
@@ -130,7 +155,7 @@ resolve_corrections <- function(base, corrections, decisions, key, master) {
 # Regenerate the view when a variable receives its first correction.
 corrections_view_sql <- function(view, base_table, corrections_table, decisions_table,
                                  master, key, columns, corrected, types,
-                                 dialect = "mssql") {
+                                 dialect = "mssql", as_of = NULL) {
   q <- quoter(dialect)
   corrected <- intersect(corrected, setdiff(columns, key))
   stopifnot(all(key %in% columns), all(corrected %in% names(types)))
@@ -139,15 +164,18 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
     b <- paste0("b.", q(v))
     if (!v %in% corrected) return(b)
     a <- alias[[v]]
-    prior_eq <- .string_eq_sql(b, sprintf("CAST(%s.expected_prior AS %s)", a, types[[v]]),
-                               types[[v]], dialect)
-    sprintf(paste0("CASE WHEN %1$s.correction_id IS NOT NULL AND (",
-                   "(%1$s.expected_prior_missing = 1 AND %2$s IS NULL) OR ",
-                   "(%1$s.expected_prior_missing = 0 AND %5$s))",
-                   " THEN CASE WHEN %1$s.new_value_missing = 1 THEN NULL",
-                   " ELSE CAST(%1$s.new_value AS %3$s) END",
-                   " ELSE %2$s END AS %4$s"),
-            a, b, types[[v]], q(v), prior_eq)
+    # TRY_CAST, not CAST: an uncastable stored value must not break the view.
+    prior_cast <- sprintf("TRY_CAST(%s.expected_prior AS %s)", a, types[[v]])
+    prior_eq <- .string_eq_sql(b, prior_cast, types[[v]], dialect)
+    new_cast <- sprintf("TRY_CAST(%s.new_value AS %s)", a, types[[v]])
+    cond <- paste0(
+      a, ".correction_id IS NOT NULL AND (",
+      "(", a, ".expected_prior_missing = 1 AND ", b, " IS NULL) OR ",
+      "(", a, ".expected_prior_missing = 0 AND ", prior_cast, " IS NOT NULL AND ",
+      prior_eq, "))",
+      " AND (", a, ".new_value_missing = 1 OR ", new_cast, " IS NOT NULL)")
+    sprintf("CASE WHEN %s THEN CASE WHEN %s.new_value_missing = 1 THEN NULL ELSE %s END ELSE %s END AS %s",
+            cond, a, new_cast, b, q(v))
   }, character(1))
   joins <- vapply(corrected, function(v) {
     a <- alias[[v]]
@@ -155,7 +183,7 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
     sprintf("LEFT JOIN w %s ON %s AND %s.variable = %s", a, on, a, sql_string(v))
   }, character(1))
   paste0(view_header(dialect), " ", q(view), " AS\n",
-         .winners_cte(q, corrections_table, decisions_table, master, key),
+         .winners_cte(q, corrections_table, decisions_table, master, key, dialect, as_of),
          "SELECT\n  ", paste(select, collapse = ",\n  "), "\n",
          "FROM ", q(base_table), " b",
          if (length(joins)) paste0("\n", paste(joins, collapse = "\n")) else "",
@@ -163,7 +191,8 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
 }
 
 stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
-                           master, key, columns, corrected, types, dialect = "mssql") {
+                           master, key, columns, corrected, types, dialect = "mssql",
+                           as_of = NULL) {
   q <- quoter(dialect)
   valid <- setdiff(columns, key)
   corrected <- intersect(corrected, valid)
@@ -181,17 +210,30 @@ stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
                   "AND w.expected_prior_missing IS NULL"),
             q(base_table), on, in_valid),
     vapply(corrected, function(v) {
+      prior_cast <- sprintf("TRY_CAST(w.expected_prior AS %s)", types[[v]])
+      new_cast <- sprintf("TRY_CAST(w.new_value AS %s)", types[[v]])
+      sprintf(paste("SELECT w.correction_id, w.variable, 'does_not_cast' AS reason FROM w",
+                    "JOIN %s b ON %s WHERE w.variable = %s",
+                    "AND w.expected_prior_missing IS NOT NULL AND (",
+                    "(w.expected_prior_missing = 0 AND %s IS NULL) OR",
+                    "(w.new_value_missing = 0 AND %s IS NULL))"),
+              q(base_table), on, sql_string(v), prior_cast, new_cast)
+    }, character(1)),
+    vapply(corrected, function(v) {
       b <- paste0("b.", q(v))
-      prior_eq <- .string_eq_sql(b, sprintf("CAST(w.expected_prior AS %s)", types[[v]]),
-                                 types[[v]], dialect)
+      prior_cast <- sprintf("TRY_CAST(w.expected_prior AS %s)", types[[v]])
+      new_cast <- sprintf("TRY_CAST(w.new_value AS %s)", types[[v]])
+      prior_eq <- .string_eq_sql(b, prior_cast, types[[v]], dialect)
       sprintf(paste("SELECT w.correction_id, w.variable, 'prior_mismatch' AS reason FROM w",
-                    "JOIN %s b ON %s WHERE w.variable = %s AND (",
+                    "JOIN %s b ON %s WHERE w.variable = %s",
+                    "AND (w.expected_prior_missing = 1 OR %s IS NOT NULL)",
+                    "AND (w.new_value_missing = 1 OR %s IS NOT NULL) AND (",
                     "(w.expected_prior_missing = 1 AND %s IS NOT NULL) OR",
                     "(w.expected_prior_missing = 0 AND (%s IS NULL OR NOT (%s))))"),
-              q(base_table), on, sql_string(v), b, b, prior_eq)
+              q(base_table), on, sql_string(v), prior_cast, new_cast, b, b, prior_eq)
     }, character(1)))
   paste0(view_header(dialect), " ", q(view), " AS\n",
-         .winners_cte(q, corrections_table, decisions_table, master, key),
+         .winners_cte(q, corrections_table, decisions_table, master, key, dialect, as_of),
          "SELECT correction_id, variable, reason FROM (\n",
          paste(parts, collapse = "\nUNION ALL\n"),
          "\n) s;")
