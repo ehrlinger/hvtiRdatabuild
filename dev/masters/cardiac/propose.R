@@ -26,7 +26,8 @@ DECISIONS <- c("accept", "reject", "supersede", "bake")
 
 propose_correction <- function(con, master, base_table, corrections_table, key_values,
                                variable, expected_prior, new_value, evidence_type,
-                               evidence_ref, asserted_by, meta, dialect = "mssql") {
+                               evidence_ref, asserted_by, meta, widths = NULL,
+                               dialect = "mssql") {
   q <- quoter(dialect)
   if (!variable %in% meta$variable) {
     stop("Variable is not in the master's metadata: ", variable, call. = FALSE)
@@ -39,6 +40,11 @@ propose_correction <- function(con, master, base_table, corrections_table, key_v
          paste(EVIDENCE_TYPES, collapse = ", "), call. = FALSE)
   }
   r_class <- meta$r_class[match(variable, meta$variable)]
+  if (!is.null(widths) && identical(r_class, "character") && !is.na(new_value) &&
+        variable %in% names(widths) && nchar(new_value) > widths[[variable]]) {
+    stop("'new_value' is longer than the column allows (", widths[[variable]],
+         " characters).", call. = FALSE)
+  }
   prior_text <- .checked_text(expected_prior, r_class, "expected_prior")
   new_text <- .checked_text(new_value, r_class, "new_value")
 

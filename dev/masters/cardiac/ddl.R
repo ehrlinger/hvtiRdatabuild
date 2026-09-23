@@ -60,11 +60,19 @@ master_ddl <- function(parquet, table, schema_name = "dbo") {
       return(mssql_type(at))
     }
     x <- arrow::read_parquet(parquet, col_select = tidyselect::all_of(v))[[1]]
-    width <- if (all(is.na(x))) {
-      NA_integer_
+    observed <- if (all(is.na(x))) NA_integer_ else max(nchar(x, type = "chars"), na.rm = TRUE)
+    fmt <- attr(x, "format.sas", exact = TRUE)
+    declared <- if (!is.null(fmt) && length(fmt) == 1L && !is.na(fmt) &&
+                     grepl("^\\$(\\d+)\\.?$", fmt)) {
+      as.integer(sub("^\\$(\\d+)\\.?$", "\\1", fmt))
     } else {
-      max(nchar(x, type = "chars"), na.rm = TRUE)
+      NA_integer_
     }
+    # Width is the wider of the observed data and the SAS-declared width; with
+    # neither available (all-missing, no format) fall back to 255.
+    candidates <- c(observed, declared)
+    candidates <- candidates[!is.na(candidates)]
+    width <- if (length(candidates)) max(candidates) else 255L
     mssql_type(at, width)
   })
   pre <- ddl_preflight(types)

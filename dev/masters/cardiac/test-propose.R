@@ -65,6 +65,22 @@ check_error("a value that does not cast is an error", propose(new_value = "abc")
 check_error("a factor value is refused", propose(new_value = factor("66")),
             "does not cast")
 
+meta_chr <- rbind(meta, data.frame(variable = "surgeon", r_class = "character"))
+propose_chr <- function(...) {
+  args <- utils::modifyList(list(
+    con = con, master = "m", base_table = "base", corrections_table = "corr",
+    key_values = k1, variable = "surgeon", expected_prior = NA, new_value = "way too long",
+    evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
+    meta = meta_chr, dialect = "duckdb"), list(...), keep.null = TRUE)
+  args$meta <- meta_chr
+  suppressMessages(do.call(propose_correction, args))
+}
+msg_wide <- check_error("an over-width character value is rejected",
+                        propose_chr(widths = c(surgeon = 5L)),
+                        "longer than the column allows")
+check("the over-width message carries no value", !grepl("way too long", msg_wide))
+check("no widths means no width check", propose_chr()$verdict == "appended")
+
 d <- suppressMessages(decide_correction(con, "dec", "corr", r$correction_id, "accept",
                                         "tester", dialect = "duckdb"))
 check("a decision is recorded", d$verdict == "recorded")
