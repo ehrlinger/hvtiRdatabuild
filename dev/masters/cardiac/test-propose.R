@@ -39,9 +39,18 @@ check("two rows stored", DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM corr")$
 row <- DBI::dbGetQuery(con, sprintf("SELECT * FROM corr WHERE correction_id = '%s'",
                                     r$correction_id))
 check("the prior is stored as exact text", row$expected_prior == "65.5")
-check("a missing prior is flagged",
-      propose(key_values = list(id = "K2", dt_surg = as.Date("2020-02-01")),
-              expected_prior = NA)$verdict == "appended")
+
+Sys.time <- function() as.POSIXct("2026-01-01 00:00:00", tz = "UTC")
+suppressMessages(propose(new_value = 99))
+check_error("a colliding id is refused", propose(new_value = 99), "collides")
+rm(Sys.time)
+
+r_na <- propose(key_values = list(id = "K2", dt_surg = as.Date("2020-02-01")),
+                expected_prior = NA)
+check("a missing prior is flagged", r_na$verdict == "appended")
+row_na <- DBI::dbGetQuery(con, sprintf("SELECT * FROM corr WHERE correction_id = '%s'",
+                                       r_na$correction_id))
+check("missing prior is stored with flag", row_na$expected_prior_missing == 1L)
 
 check_error("an unknown variable is an error", propose(variable = "height"), "metadata")
 check_error("a key column cannot be corrected", propose(variable = "id"), "key column")
@@ -52,6 +61,8 @@ msg <- check_error("a key that matches no row is an error",
                    "matched 0 rows")
 check("and its message carries no key value", !grepl("K9", msg))
 check_error("a value that does not cast is an error", propose(new_value = "abc"),
+            "does not cast")
+check_error("a factor value is refused", propose(new_value = factor("66")),
             "does not cast")
 
 d <- suppressMessages(decide_correction(con, "dec", "corr", r$correction_id, "accept",

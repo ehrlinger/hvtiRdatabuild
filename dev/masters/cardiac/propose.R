@@ -11,6 +11,10 @@ DECISIONS <- c("accept", "reject", "supersede", "bake")
 .checked_text <- function(x, r_class, what) {
   if (length(x) != 1L) stop("'", what, "' must be a single value.", call. = FALSE)
   if (is.na(x)) return(NA_character_)
+  if (is.factor(x)) {
+    stop("'", what, "' does not cast to the variable's type (", r_class, ").",
+         call. = FALSE)
+  }
   text <- value_text(x)
   back <- parse_value(text, r_class)
   if (is.na(back) || !isTRUE(back == x)) {
@@ -54,6 +58,13 @@ propose_correction <- function(con, master, base_table, corrections_table, key_v
   id <- paste0("c", substr(digest::digest(
     list(master, key_values, variable, prior_text, new_text, asserted_by,
          format(now, "%Y-%m-%d %H:%M:%OS6")), algo = "sha1"), 1, 16))
+  n_id <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) AS n FROM %s WHERE correction_id = ?",
+    q(corrections_table)), params = list(id))$n
+  if (as.integer(n_id) > 0L) {
+    stop("The generated correction id collides with an existing row; ",
+         "retry the proposal.", call. = FALSE)
+  }
   row <- data.frame(correction_id = id, master = master, stringsAsFactors = FALSE)
   for (k in names(key_values)) row[[k]] <- key_values[[k]]
   row$variable <- variable
@@ -90,6 +101,13 @@ decide_correction <- function(con, decisions_table, corrections_table, correctio
   did <- paste0("d", substr(digest::digest(
     list(correction_id, decision, decided_by, format(now, "%Y-%m-%d %H:%M:%OS6")),
     algo = "sha1"), 1, 16))
+  n_did <- DBI::dbGetQuery(con, sprintf(
+    "SELECT COUNT(*) AS n FROM %s WHERE decision_id = ?",
+    q(decisions_table)), params = list(did))$n
+  if (as.integer(n_did) > 0L) {
+    stop("The generated decision id collides with an existing row; ",
+         "retry the decision.", call. = FALSE)
+  }
   DBI::dbAppendTable(con, decisions_table, data.frame(
     decision_id = did, correction_id = correction_id, decision = decision,
     decided_by = decided_by, decided_on = now, reason = reason,
