@@ -188,6 +188,26 @@ test_that("a failed validation removes the chunked output", {
   expect_false(file.exists(out))
 })
 
+test_that("a source that changes while being read is caught and cleaned up", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+
+  calls <- 0L
+  fake_hash <- function(path) {
+    calls <<- calls + 1L
+    if (calls == 2L) "different" else "same"
+  }
+  testthat::local_mocked_bindings(.file_sha256 = fake_hash)
+
+  out <- withr::local_tempfile(fileext = ".parquet")
+  expect_error(
+    snapshot_oracle(.fixture_path(), out),
+    "changed while it was being read"
+  )
+  expect_false(file.exists(out))
+  expect_false(file.exists(sub("\\.parquet$", ".meta.json", out)))
+})
+
 test_that("a chunk whose schema differs from the first is an error", {
   skip_if_not_installed("arrow")
 

@@ -5,7 +5,10 @@
   chunks as row groups of one parquet file. It also records a SHA-256 of the
   SAS source beside the parquet checksum, and writes a `.meta.json` sidecar
   holding each column's label, SAS format and type, so that metadata survives
-  into systems that cannot read R attributes. `jsonlite` joins `Suggests`.
+  into systems that cannot read R attributes. `jsonlite` joins `Suggests`. The
+  source checksum now brackets the read, taken before and after; a mismatch
+  removes the parquet and stops rather than write a snapshot of a file that
+  changed underneath it.
 
 # hvtiRdatabuild 0.2.3
 

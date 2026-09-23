@@ -78,6 +78,8 @@ snapshot_oracle <- function(sas_path, out_path, expect = NULL,
          call. = FALSE)
   }
 
+  source_sha_before <- .file_sha256(sas_path)
+
   if (is.null(chunk_rows)) {
     d <- .read_sas_dataset(sas_path)
     info <- list(path = out_path, n_rows = nrow(d), n_cols = ncol(d),
@@ -95,8 +97,15 @@ snapshot_oracle <- function(sas_path, out_path, expect = NULL,
     })
   }
 
-  info$sha256 <- digest::digest(out_path, algo = "sha256", file = TRUE)
-  info$source_sha256 <- digest::digest(sas_path, algo = "sha256", file = TRUE)
+  source_sha_after <- .file_sha256(sas_path)
+  if (!identical(source_sha_before, source_sha_after)) {
+    unlink(out_path)
+    stop("The SAS dataset changed while it was being read. ",
+         "The snapshot was removed; take it again from a stable copy.", call. = FALSE)
+  }
+
+  info$sha256 <- .file_sha256(out_path)
+  info$source_sha256 <- source_sha_after
   info$meta_path <- meta_path
   jsonlite::write_json(.snapshot_meta(d, info, sas_path), meta_path,
                        auto_unbox = TRUE, null = "null", pretty = TRUE)
@@ -177,6 +186,18 @@ snapshot_oracle <- function(sas_path, out_path, expect = NULL,
          call. = FALSE)
   }
   invisible(NULL)
+}
+
+#' SHA-256 of a file
+#'
+#' @param path Path to the file.
+#'
+#' @return A hex string, the file's SHA-256.
+#'
+#' @keywords internal
+#' @noRd
+.file_sha256 <- function(path) {
+  digest::digest(path, algo = "sha256", file = TRUE)
 }
 
 #' The sidecar path for a parquet snapshot
