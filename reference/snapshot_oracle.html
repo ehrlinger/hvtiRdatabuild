@@ -52,7 +52,13 @@ parquet file.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">snapshot_oracle</span><span class="op">(</span><span class="va">sas_path</span>, <span class="va">out_path</span>, expect <span class="op">=</span> <span class="cn">NULL</span>, manifest <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">snapshot_oracle</span><span class="op">(</span></span>
+<span>  <span class="va">sas_path</span>,</span>
+<span>  <span class="va">out_path</span>,</span>
+<span>  expect <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  manifest <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  chunk_rows <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -78,11 +84,25 @@ parquet file.</p>
 snapshot is recorded with <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html" class="external-link">hvtiRutilities::update_manifest()</a></code> so that
 <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/verify_manifest.html" class="external-link">hvtiRutilities::verify_manifest()</a></code> can later detect a drifted oracle.</p></dd>
 
+
+<dt id="arg-chunk-rows">chunk_rows<a class="anchor" aria-label="anchor" href="#arg-chunk-rows"></a></dt>
+<dd><p>Optional single positive number. When supplied, the SAS
+dataset is read and written this many rows at a time, as parquet row
+groups in one file, so a dataset too large to hold in memory can be
+snapshotted. A chunk whose schema differs from the first chunk's is an
+error, and the partial file is removed. The chunked file reads back
+identical to an unchunked one, but its bytes and checksum differ, because
+its row groups differ.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>Invisibly, a list with elements <code>path</code>, <code>n_rows</code>, <code>n_cols</code>,
-<code>variables</code>, and <code>sha256</code>.</p>
+<code>variables</code>, <code>sha256</code> (of the parquet file), <code>source_sha256</code> (of the SAS
+dataset) and <code>meta_path</code>. The metadata sidecar at <code>meta_path</code> records
+both checksums, the shape, and each column's label, SAS format, SAS type
+and R class, so the metadata survives into systems that cannot read R's
+attributes.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -94,6 +114,7 @@ meaningless. A checksummed snapshot is a citable fixed point.</p>
 confines it to a single audited step. A misread is faithfully preserved in
 the parquet file. Supply <code>expect</code> to validate the conversion against
 SAS-side <code>PROC CONTENTS</code> output.</p>
+<p>Writing the sidecar needs <span class="pkg">jsonlite</span>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

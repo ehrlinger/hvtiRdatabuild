@@ -7,7 +7,13 @@ file.
 ## Usage
 
 ``` r
-snapshot_oracle(sas_path, out_path, expect = NULL, manifest = NULL)
+snapshot_oracle(
+  sas_path,
+  out_path,
+  expect = NULL,
+  manifest = NULL,
+  chunk_rows = NULL
+)
 ```
 
 ## Arguments
@@ -35,10 +41,23 @@ snapshot_oracle(sas_path, out_path, expect = NULL, manifest = NULL)
   [`hvtiRutilities::verify_manifest()`](https://ehrlinger.github.io/hvtiRutilities/reference/verify_manifest.html)
   can later detect a drifted oracle.
 
+- chunk_rows:
+
+  Optional single positive number. When supplied, the SAS dataset is
+  read and written this many rows at a time, as parquet row groups in
+  one file, so a dataset too large to hold in memory can be snapshotted.
+  A chunk whose schema differs from the first chunk's is an error, and
+  the partial file is removed. The chunked file reads back identical to
+  an unchunked one, but its bytes and checksum differ, because its row
+  groups differ.
+
 ## Value
 
 Invisibly, a list with elements `path`, `n_rows`, `n_cols`, `variables`,
-and `sha256`.
+`sha256` (of the parquet file), `source_sha256` (of the SAS dataset) and
+`meta_path`. The metadata sidecar at `meta_path` records both checksums,
+the shape, and each column's label, SAS format, SAS type and R class, so
+the metadata survives into systems that cannot read R's attributes.
 
 ## Details
 
@@ -51,6 +70,8 @@ Note that this does not remove haven from the chain of custody; it
 confines it to a single audited step. A misread is faithfully preserved
 in the parquet file. Supply `expect` to validate the conversion against
 SAS-side `PROC CONTENTS` output.
+
+Writing the sidecar needs jsonlite.
 
 ## See also
 
