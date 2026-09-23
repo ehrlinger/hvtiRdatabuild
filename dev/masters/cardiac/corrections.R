@@ -150,6 +150,7 @@ stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
   q <- quoter(dialect)
   valid <- setdiff(columns, key)
   corrected <- intersect(corrected, valid)
+  stopifnot(all(corrected %in% names(types)))
   in_valid <- paste(sql_string(valid), collapse = ", ")
   on <- paste(sprintf("b.%s = w.%s", q(key), q(key)), collapse = " AND ")
   parts <- c(

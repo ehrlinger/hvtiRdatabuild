@@ -19,7 +19,7 @@ key <- c("id", "dt_surg")
 base <- data.frame(
   id      = c("K1", "K2", "K3", "K4"),
   dt_surg = as.Date(c("2020-01-01", "2020-02-01", "2020-03-01", "2020-04-01")),
-  age     = c(65.5, 70.25, 58, NA),
+  age     = c(65.5, 70.25, 1 / 3, NA),
   bmi     = c(31.2, NA, 22.8, 27.4),
   dt_dis  = as.Date(c("2020-01-09", "2020-02-09", "2020-03-09", "2020-04-09")),
   surgeon = c("S1", "S2", "S1", NA),
@@ -45,14 +45,16 @@ corrections <- rbind(
   corr("c09", "K3", "2020-03-01", "surgeon", NA,     NA, "S4",         0L, 9),  # prior_unknown
   corr("c10", "K1", "2020-01-01", "height",  "1",    0L, "2",          0L, 10), # no_variable
   corr("c11", "K1", "2020-01-01", "surgeon", "S1",   0L, NA,           1L, 11), # set missing
-  corr("c12", "K2", "2020-02-01", "age",     "70.25", 0L, "71",        0L, 12)) # other master
+  corr("c12", "K2", "2020-02-01", "age",     "70.25", 0L, "71",        0L, 12), # other master
+  corr("c13", "K3", "2020-03-01", "age",     value_text(1 / 3), 0L,
+       value_text(2 / 3), 0L, 13)) # full-precision double through CAST
 corrections$master[corrections$correction_id == "c12"] <- "other"
 decision <- function(did, cid, what, at) {
   data.frame(decision_id = did, correction_id = cid, decision = what, decided_by = "tester",
              decided_on = t0 + 100 + at, reason = NA_character_, stringsAsFactors = FALSE)
 }
 decisions <- rbind(
-  do.call(rbind, lapply(sprintf("c%02d", c(1:5, 8:12)), function(cid)
+  do.call(rbind, lapply(sprintf("c%02d", c(1:5, 8:13)), function(cid)
     decision(paste0("d", cid), cid, "accept", 0))),
   decision("d06a", "c06", "accept", 0), decision("d06b", "c06", "reject", 1),
   decision("d07", "c07", "bake", 0))
@@ -67,6 +69,7 @@ check("c02 not applied", out$bmi[3] == 22.8)
 check("c06 rejected after accept, not applied", out$dt_dis[2] == as.Date("2020-02-09"))
 check("c07 baked, not applied", out$surgeon[2] == "S2")
 check("c12 belongs to another master", out$age[2] == 70.25)
+check("c13 routes a full-precision double through the CAST", out$age[3] == 2 / 3)
 stale <- res$stale[order(res$stale$correction_id), ]
 check("stale ids", identical(stale$correction_id, c("c02", "c08", "c09", "c10")))
 check("stale reasons", identical(stale$reason,
