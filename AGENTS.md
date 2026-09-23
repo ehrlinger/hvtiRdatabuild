@@ -114,6 +114,26 @@ imports this file.
   judging by feel: if the file is excluded there, no bump and no `NEWS.md` entry. The
   docs-only commits already on `main` (`6ca1faa`, `ee28201`, `1f7d99a`) follow this.
 
+## Looking up a dependency's API
+
+Read the installed documentation before calling a function from a dependency you have not
+used in this session. Arguments get renamed, defaults change and functions are deprecated
+between releases, so recall is not a reliable source. The version that matters is the one
+installed in the library the gates run against; the minimum in `DESCRIPTION` is the oldest
+version the code must still work with.
+
+- Version: `Rscript -e 'packageVersion("pkg")'`.
+- Help page as text:
+  `Rscript -e 'tools::Rd2txt(utils:::.getHelpFile(help("fn", package = "pkg")))'`.
+- Signature and exports: `args(pkg::fn)`, `getNamespaceExports("pkg")`.
+- What changed between versions: `news(package = "pkg")` or the package's `NEWS.md`.
+- The source, when the help page is thin: `pkg:::fn` prints it.
+
+pkgdown sites and CRAN pages describe the latest release, which may not be the installed one;
+confirm the version before relying on them. If the installed docs contradict what you
+expected, the docs win. If an argument you need does not exist, say so instead of
+substituting a guess.
+
 ## Change discipline
 
 1. **Think before coding.** Do not assume, ask. If the request is ambiguous or a name, path
