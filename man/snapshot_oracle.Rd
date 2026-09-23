@@ -4,7 +4,13 @@
 \alias{snapshot_oracle}
 \title{Freeze a SAS-built dataset as a checksummed parquet oracle}
 \usage{
-snapshot_oracle(sas_path, out_path, expect = NULL, manifest = NULL)
+snapshot_oracle(
+  sas_path,
+  out_path,
+  expect = NULL,
+  manifest = NULL,
+  chunk_rows = NULL
+)
 }
 \arguments{
 \item{sas_path}{Path to the SAS dataset (\code{.sas7bdat}).}
@@ -18,10 +24,22 @@ snapshot_oracle(sas_path, out_path, expect = NULL, manifest = NULL)
 \item{manifest}{Optional path to a manifest YAML. When supplied, the
 snapshot is recorded with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}} so that
 \code{\link[hvtiRutilities:verify_manifest]{hvtiRutilities::verify_manifest()}} can later detect a drifted oracle.}
+
+\item{chunk_rows}{Optional single positive number. When supplied, the SAS
+dataset is read and written this many rows at a time, as parquet row
+groups in one file, so a dataset too large to hold in memory can be
+snapshotted. A chunk whose schema differs from the first chunk's is an
+error, and the partial file is removed. The chunked file reads back
+identical to an unchunked one, but its bytes and checksum differ, because
+its row groups differ.}
 }
 \value{
 Invisibly, a list with elements \code{path}, \code{n_rows}, \code{n_cols},
-\code{variables}, and \code{sha256}.
+\code{variables}, \code{sha256} (of the parquet file), \code{source_sha256} (of the SAS
+dataset) and \code{meta_path}. The metadata sidecar at \code{meta_path} records
+both checksums, the shape, and each column's label, SAS format, SAS type
+and R class, so the metadata survives into systems that cannot read R's
+attributes.
 }
 \description{
 Reads a SAS dataset once with \pkg{haven}, writes it as parquet, and
@@ -38,6 +56,8 @@ Note that this does not remove \pkg{haven} from the chain of custody; it
 confines it to a single audited step. A misread is faithfully preserved in
 the parquet file. Supply \code{expect} to validate the conversion against
 SAS-side \verb{PROC CONTENTS} output.
+
+Writing the sidecar needs \pkg{jsonlite}.
 }
 \examples{
 \donttest{

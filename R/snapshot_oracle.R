@@ -14,6 +14,8 @@
 #' the parquet file. Supply `expect` to validate the conversion against
 #' SAS-side `PROC CONTENTS` output.
 #'
+#' Writing the sidecar needs \pkg{jsonlite}.
+#'
 #' @param sas_path Path to the SAS dataset (`.sas7bdat`).
 #' @param out_path Path to write the parquet file. Must not already exist.
 #' @param expect Optional named list validating the conversion, with any of
@@ -22,9 +24,20 @@
 #' @param manifest Optional path to a manifest YAML. When supplied, the
 #'   snapshot is recorded with [hvtiRutilities::update_manifest()] so that
 #'   [hvtiRutilities::verify_manifest()] can later detect a drifted oracle.
+#' @param chunk_rows Optional single positive number. When supplied, the SAS
+#'   dataset is read and written this many rows at a time, as parquet row
+#'   groups in one file, so a dataset too large to hold in memory can be
+#'   snapshotted. A chunk whose schema differs from the first chunk's is an
+#'   error, and the partial file is removed. The chunked file reads back
+#'   identical to an unchunked one, but its bytes and checksum differ, because
+#'   its row groups differ.
 #'
 #' @return Invisibly, a list with elements `path`, `n_rows`, `n_cols`,
-#'   `variables`, and `sha256`.
+#'   `variables`, `sha256` (of the parquet file), `source_sha256` (of the SAS
+#'   dataset) and `meta_path`. The metadata sidecar at `meta_path` records
+#'   both checksums, the shape, and each column's label, SAS format, SAS type
+#'   and R class, so the metadata survives into systems that cannot read R's
+#'   attributes.
 #'
 #' @seealso [compare_built()]
 #'
@@ -39,30 +52,63 @@
 #'
 #' @export
 snapshot_oracle <- function(sas_path, out_path, expect = NULL,
-                            manifest = NULL) {
+                            manifest = NULL, chunk_rows = NULL) {
   if (!requireNamespace("arrow", quietly = TRUE)) {
     stop("Package 'arrow' is required to write oracle snapshots. ",
          "Install it with install.packages('arrow').", call. = FALSE)
+  }
+  if (!requireNamespace("jsonlite", quietly = TRUE)) {
+    stop("Package 'jsonlite' is required to write the snapshot's metadata ",
+         "sidecar. Install it with install.packages('jsonlite').", call. = FALSE)
+  }
+  if (!is.null(chunk_rows) &&
+        (!is.numeric(chunk_rows) || length(chunk_rows) != 1L ||
+           is.na(chunk_rows) || chunk_rows < 1)) {
+    stop("'chunk_rows' must be NULL or a single positive number.", call. = FALSE)
   }
   if (file.exists(out_path)) {
     stop("Oracle snapshot already exists: ", out_path,
          ". Refusing to overwrite; delete it explicitly if that is intended.",
          call. = FALSE)
   }
+  meta_path <- .snapshot_meta_path(out_path)
+  if (file.exists(meta_path)) {
+    stop("Snapshot metadata sidecar already exists: ", meta_path,
+         ". Refusing to overwrite; delete it explicitly if that is intended.",
+         call. = FALSE)
+  }
 
-  d <- .read_sas_dataset(sas_path)
+  source_sha_before <- .file_sha256(sas_path)
 
-  info <- list(
-    path      = out_path,
-    n_rows    = nrow(d),
-    n_cols    = ncol(d),
-    variables = names(d)
-  )
+  if (is.null(chunk_rows)) {
+    d <- .read_sas_dataset(sas_path)
+    info <- list(path = out_path, n_rows = nrow(d), n_cols = ncol(d),
+                 variables = names(d))
+    .validate_snapshot(info, expect)
+    arrow::write_parquet(d, out_path)
+  } else {
+    written <- .write_chunked(sas_path, out_path, as.integer(chunk_rows))
+    d <- written$first
+    info <- list(path = out_path, n_rows = written$n_rows, n_cols = ncol(d),
+                 variables = names(d))
+    tryCatch(.validate_snapshot(info, expect), error = function(e) {
+      unlink(out_path)
+      stop(e)
+    })
+  }
 
-  .validate_snapshot(info, expect)
+  source_sha_after <- .file_sha256(sas_path)
+  if (!identical(source_sha_before, source_sha_after)) {
+    unlink(out_path)
+    stop("The SAS dataset changed while it was being read. ",
+         "The snapshot was removed; take it again from a stable copy.", call. = FALSE)
+  }
 
-  arrow::write_parquet(d, out_path)
-  info$sha256 <- digest::digest(out_path, algo = "sha256", file = TRUE)
+  info$sha256 <- .file_sha256(out_path)
+  info$source_sha256 <- source_sha_after
+  info$meta_path <- meta_path
+  jsonlite::write_json(.snapshot_meta(d, info, sas_path), meta_path,
+                       auto_unbox = TRUE, null = "null", pretty = TRUE)
 
   if (!is.null(manifest)) {
     # n_rows is passed explicitly: hvtiRutilities:::.auto_count_rows() refuses
@@ -71,11 +117,127 @@ snapshot_oracle <- function(sas_path, out_path, expect = NULL,
       file          = out_path,
       manifest_path = manifest,
       n_rows        = info$n_rows,
-      source        = paste0("Oracle snapshot of ", basename(sas_path))
+      source        = paste0("Oracle snapshot of ", basename(sas_path),
+                             " (source sha256 ", info$source_sha256, ")")
     )
   }
 
   invisible(info)
+}
+
+#' Write a SAS dataset to one parquet file, a chunk of rows at a time
+#'
+#' @param sas_path Path to the SAS dataset.
+#' @param out_path Path of the parquet file to create.
+#' @param chunk_rows Integer. Rows per chunk, and per row group.
+#'
+#' @return A list with `n_rows`, the rows written, and `first`, the first
+#'   chunk as a data frame, which carries the labels and formats.
+#'
+#' @keywords internal
+#' @noRd
+.write_chunked <- function(sas_path, out_path, chunk_rows) {
+  first <- .read_sas_dataset(sas_path, skip = 0L, n_max = chunk_rows)
+  first_tbl <- arrow::arrow_table(first)
+  schema <- first_tbl$schema
+
+  sink <- arrow::FileOutputStream$create(out_path)
+  writer <- arrow::ParquetFileWriter$create(
+    schema, sink,
+    properties = arrow::ParquetWriterProperties$create(names(schema))
+  )
+  ok <- FALSE
+  on.exit({
+    writer$Close()
+    sink$close()
+    if (!ok) unlink(out_path)
+  }, add = TRUE)
+
+  writer$WriteTable(first_tbl, chunk_size = chunk_rows)
+  n_rows <- nrow(first)
+  last_n <- nrow(first)
+  while (last_n == chunk_rows) {
+    chunk <- .read_sas_dataset(sas_path, skip = n_rows, n_max = chunk_rows)
+    last_n <- nrow(chunk)
+    if (last_n == 0L) break
+    tbl <- arrow::arrow_table(chunk)
+    .check_chunk_schema(schema, tbl$schema, n_rows)
+    writer$WriteTable(tbl, chunk_size = chunk_rows)
+    n_rows <- n_rows + last_n
+  }
+  ok <- TRUE
+  list(n_rows = n_rows, first = first)
+}
+
+#' Stop when a chunk's schema differs from the first chunk's
+#'
+#' @param expected,got Arrow schemas.
+#' @param at_row Integer. Rows written before this chunk.
+#'
+#' @return `NULL`, invisibly. Called for the error it raises.
+#'
+#' @keywords internal
+#' @noRd
+.check_chunk_schema <- function(expected, got, at_row) {
+  if (!got$Equals(expected, check_metadata = FALSE)) {
+    stop("The chunk starting at row ", at_row + 1, " has a different schema ",
+         "from the first chunk. A SAS column's type cannot change within a ",
+         "file, so this is a reader defect; the partial parquet is removed.",
+         call. = FALSE)
+  }
+  invisible(NULL)
+}
+
+#' SHA-256 of a file
+#'
+#' @param path Path to the file.
+#'
+#' @return A hex string, the file's SHA-256.
+#'
+#' @keywords internal
+#' @noRd
+.file_sha256 <- function(path) {
+  digest::digest(path, algo = "sha256", file = TRUE)
+}
+
+#' The sidecar path for a parquet snapshot
+#'
+#' @param out_path Path of the parquet file.
+#'
+#' @return The path with `.parquet` replaced by `.meta.json`.
+#'
+#' @keywords internal
+#' @noRd
+.snapshot_meta_path <- function(out_path) {
+  paste0(sub("\\.parquet$", "", out_path, ignore.case = TRUE), ".meta.json")
+}
+
+#' The sidecar contents for a snapshot
+#'
+#' @param d Data frame holding at least the first rows, with attributes.
+#' @param info The snapshot record, with both checksums.
+#' @param sas_path Path to the SAS dataset.
+#'
+#' @return A list ready for [jsonlite::write_json()].
+#'
+#' @keywords internal
+#' @noRd
+.snapshot_meta <- function(d, info, sas_path) {
+  one_attr <- function(x, which) {
+    a <- attr(x, which, exact = TRUE)
+    if (is.null(a)) NULL else as.character(a)[[1]]
+  }
+  columns <- lapply(names(d), function(v) {
+    x <- d[[v]]
+    list(variable   = v,
+         label      = one_attr(x, "label"),
+         sas_format = one_attr(x, "format.sas"),
+         sas_type   = if (is.character(x)) "character" else "numeric",
+         r_class    = class(x)[[1]])
+  })
+  list(source = basename(sas_path), source_sha256 = info$source_sha256,
+       parquet = basename(info$path), parquet_sha256 = info$sha256,
+       n_rows = info$n_rows, n_cols = info$n_cols, columns = columns)
 }
 
 #' Validate a snapshot against SAS-side PROC CONTENTS

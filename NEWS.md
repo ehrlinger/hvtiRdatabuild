@@ -13,6 +13,16 @@
   hvtiRdatabuild now requires hvtiRutilities 1.4.0 or later, since its tests
   and registration fixture use the endpoint-neutral `register_data()`.
 
+* **`snapshot_oracle()` can snapshot a dataset too large for memory.** The new
+  `chunk_rows` argument reads the SAS dataset a chunk at a time and writes the
+  chunks as row groups of one parquet file. It also records a SHA-256 of the
+  SAS source beside the parquet checksum, and writes a `.meta.json` sidecar
+  holding each column's label, SAS format and type, so that metadata survives
+  into systems that cannot read R attributes. `jsonlite` joins `Suggests`. The
+  source checksum now brackets the read, taken before and after; a mismatch
+  removes the parquet and stops rather than write a snapshot of a file that
+  changed underneath it.
+
 # hvtiRdatabuild 0.2.3
 
 * **New `publish_dataset()`.** A programmer can publish a mutable clinical-data

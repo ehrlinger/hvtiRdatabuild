@@ -36,6 +36,7 @@ Suggests:
     arrow,
     dplyr,
     hvtiPlotR,
+    jsonlite,
     keyring,
     knitr,
     odbc,
