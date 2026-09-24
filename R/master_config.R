@@ -41,12 +41,32 @@ read_master_config <- function(path) {
          paste(missing, collapse = ", "), ".", call. = FALSE)
   }
 
+  key <- raw[["key"]]
+  if (length(key) < 1L) {
+    stop("'key' must name at least one column.", call. = FALSE)
+  }
+  if (!is.character(key)) {
+    stop("'key' and 'alt_keys' columns must be names, not numbers.",
+         call. = FALSE)
+  }
+
   alt_keys <- raw[["alt_keys"]]
   if (is.null(alt_keys)) alt_keys <- list()
+  if (length(alt_keys) > 0L) {
+    if (is.null(names(alt_keys)) || !all(nzchar(names(alt_keys)))) {
+      stop("'alt_keys' must be a mapping of names to columns.",
+           call. = FALSE)
+    }
+    for (i in seq_along(alt_keys)) {
+      if (!is.character(alt_keys[[i]])) {
+        stop("'key' and 'alt_keys' columns must be names, not numbers.",
+             call. = FALSE)
+      }
+    }
+  }
   alt_keys <- lapply(alt_keys, as.character)
 
-  all_cols <- c(as.character(raw[["key"]]),
-                unlist(alt_keys, use.names = FALSE))
+  all_cols <- c(as.character(key), unlist(alt_keys, use.names = FALSE))
   twice <- unique(all_cols[duplicated(all_cols)])
   if (length(twice)) {
     stop("Column(s) named more than once across key and alt_keys: ",
@@ -55,6 +75,10 @@ read_master_config <- function(path) {
 
   parent <- raw[["parent"]]
   if (!is.null(parent)) {
+    if (!is.list(parent)) {
+      stop("'parent' must name both master and libref; missing: master, libref.",
+           call. = FALSE)
+    }
     absent <- c("master", "libref")[!c(!is.null(parent[["master"]]),
                                         !is.null(parent[["libref"]]))]
     if (length(absent)) {
@@ -88,8 +112,8 @@ read_master_config <- function(path) {
   }
 
   structure(list(
-    name = as.character(raw[["name"]]), key = as.character(raw[["key"]]),
-    alt_keys = alt_keys, parent = parent, parent_release = parent_release,
+    name = as.character(raw[["name"]]), key = key, alt_keys = alt_keys,
+    parent = parent, parent_release = parent_release,
     snapshots = as.character(raw[["snapshots"]]),
     current = as.character(raw[["current"]]), history = history,
     build_program = as.character(raw[["build_program"]]), file = path

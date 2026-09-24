@@ -73,3 +73,27 @@ test_that(".master_tables derives every table name from the master's name", {
   expect_equal(t$parity, "master_x_parity")
   expect_equal(t$meta, "master_x_meta")
 })
+
+test_that("a parent that is not a mapping is refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg, "parent: master_parent"))),
+               "master and libref")
+})
+
+test_that("an empty key is refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg[!startsWith(base_cfg, "key:")],
+                                              "key: []"))),
+               "at least one")
+})
+
+test_that("an unnamed alt_keys sequence is refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys: [a, b]"))),
+               "mapping of names")
+})
+
+test_that("non-character key or alt_keys values are refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg[!startsWith(base_cfg, "key:")],
+                                              "key: 123"))),
+               "not numbers")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys:", "  epic: 456"))),
+               "not numbers")
+})
