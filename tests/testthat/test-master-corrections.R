@@ -11,7 +11,7 @@ corr_fixture <- function(env = parent.frame()) {
   pq <- file.path(dir, "built_t.parquet")
   arrow::write_parquet(d, pq)
   jsonlite::write_json(
-    list(parquet_sha256 = "invented", columns = list(
+    list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE), columns = list(
       list(variable = "ccfid", r_class = "character"),
       list(variable = "dt_surg", r_class = "Date"),
       list(variable = "emrn", r_class = "character"),
@@ -71,6 +71,16 @@ test_that("an executed backfill records baked facts, remaps the key, regenerates
   expect_true(DBI::dbExistsTable(f$con, "master_c_corrections_stale"))
 })
 
+test_that("a backfilled legacy row also stores the base row's alternate-key columns", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  row <- DBI::dbGetQuery(f$con,
+    "SELECT emrn FROM master_c_corrections WHERE evidence_type = 'legacy_sas_inline'"
+  )
+  expect_equal(row$emrn, "E1")
+})
+
 test_that("a proposal found by alternate key is stored against the primary key", {
   skip_corr()
   f <- corr_fixture()
@@ -87,6 +97,94 @@ test_that("a proposal found by alternate key is stored against the primary key",
   ))
   expect_equal(row$ccfid, "K3")
   expect_equal(row$emrn, "E3")
+})
+
+test_that("a primary-key proposal also carries the base row's alternate-key columns", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  r <- suppressMessages(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K3", dt_surg = as.Date("2020-01-03")),
+    variable = "age", expected_prior = 70, new_value = 72, evidence_type = "chart_review",
+    evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
+  ))
+  row <- DBI::dbGetQuery(f$con, sprintf(
+    "SELECT emrn FROM master_c_corrections WHERE correction_id = '%s'", r$correction_id
+  ))
+  expect_equal(row$emrn, "E3")
+})
+
+test_that("a primary-key proposal must name exactly the key columns, each one value", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  expect_error(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K1"), variable = "age", expected_prior = 65.5, new_value = 66,
+    evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
+    dialect = "duckdb"
+  ), "primary key columns")
+  expect_error(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K1", dt_surg = NA), variable = "age", expected_prior = 65.5,
+    new_value = 66, evidence_type = "chart_review", evidence_ref = "invented",
+    asserted_by = "tester", dialect = "duckdb"
+  ), "primary key columns")
+})
+
+test_that("an alternate-key column cannot be corrected through the primary-key path", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  expect_error(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
+    variable = "emrn", expected_prior = "E1", new_value = "E9",
+    evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
+    dialect = "duckdb"
+  ), "key column")
+})
+
+test_that("a failing warehouse call during propose is reported by step, without a value", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  testthat::local_mocked_bindings(
+    table_types = function(con, table) stop("mock failure quoting SECRET_VALUE"),
+    .package = "hvtiRdatabuild"
+  )
+  msg <- tryCatch(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
+    variable = "age", expected_prior = 65.5, new_value = 66, evidence_type = "chart_review",
+    evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
+  ), error = conditionMessage)
+  expect_match(msg, "Step 'read column types' failed")
+  expect_false(grepl("SECRET_VALUE", msg))
+})
+
+test_that("a failing warehouse call during decide is reported by step, without a value", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  r <- suppressMessages(propose_correction(
+    f$cfg, f$con,
+    key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
+    variable = "surgeon", expected_prior = "S1", new_value = "S9",
+    evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
+    dialect = "duckdb"
+  ))
+  testthat::local_mocked_bindings(
+    quoter = function(dialect) function(x) paste0("BOGUS_TOKEN(", x, ")"),
+    .package = "hvtiRdatabuild"
+  )
+  msg <- tryCatch(
+    decide_correction(f$cfg, f$con, r$correction_id, "accept", "tester", dialect = "duckdb"),
+    error = conditionMessage
+  )
+  expect_match(msg, "Step '.*' failed")
+  expect_false(grepl("BOGUS_TOKEN", msg))
 })
 
 test_that("an alternate key with a null part or no match stops without a value", {

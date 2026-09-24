@@ -68,6 +68,38 @@ DECISIONS <- c("accept", "reject", "supersede", "bake") # nolint: object_name_li
 #'
 #' @seealso [propose_correction()], [decide_correction()]
 #'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("duckdb", quietly = TRUE) &&
+#'     requireNamespace("arrow", quietly = TRUE) &&
+#'     requireNamespace("jsonlite", quietly = TRUE) &&
+#'     requireNamespace("tidyselect", quietly = TRUE) &&
+#'     requireNamespace("dplyr", quietly = TRUE) &&
+#'     requireNamespace("withr", quietly = TRUE) &&
+#'     requireNamespace("digest", quietly = TRUE)) {
+#'   dir <- tempfile("backfill")
+#'   dir.create(dir)
+#'   pq <- file.path(dir, "built_demo.parquet")
+#'   arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+#'   jsonlite::write_json(
+#'     list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+#'          columns = list(list(variable = "id", r_class = "character"),
+#'                         list(variable = "age", r_class = "numeric"))),
+#'     sub("\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+#'   writeLines(c("data m; set base;", "if id = 'K1' then age = 60;", "run;"),
+#'              file.path(dir, "bd.sas"))
+#'   cfg_path <- file.path(dir, "master.yml")
+#'   writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+#'                "current: built_demo.sas7bdat",
+#'                paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+#'   cfg <- read_master_config(cfg_path)
+#'   con <- DBI::dbConnect(duckdb::duckdb())
+#'   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+#'   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+#'   DBI::dbDisconnect(con, shutdown = TRUE)
+#' }
+#' }
+#'
 #' @export
 backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql") {
   if (!requireNamespace("digest", quietly = TRUE)) {
@@ -82,9 +114,10 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
   parsed <- parse_legacy_facts(readLines(config[["build_program"]], warn = FALSE),
     key_var = config[["key"]][[1]]
   )
+  alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
   base_keys <- DBI::dbGetQuery(con, sprintf(
     "SELECT %s FROM %s",
-    paste(q(config[["key"]]), collapse = ", "), q(base)
+    paste(q(c(config[["key"]], alt_cols)), collapse = ", "), q(base)
   ))
   rows <- legacy_rows(
     parsed$facts, base_keys, config[["key"]], config[["name"]], meta,
@@ -146,11 +179,16 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' value: an unmatched or ambiguous key is reported by count only, and an
 #' over-width or uncastable value is reported by column and limit only.
 #'
-#' When `alt_key` is given, `key_values` must name exactly that alternate
-#' key's columns, none may be missing, and it must match exactly one row in
-#' the master's current base table; the correction is then stored against
-#' that row's primary key, with the alternate-key columns also carried on the
-#' row for reference.
+#' By default, `key_values` must name exactly the master's primary key
+#' columns, each a single non-missing value. When `alt_key` is given instead,
+#' `key_values` must name exactly that alternate key's columns, none may be
+#' missing, and it must match exactly one row in the master's current base
+#' table; the correction is then stored against that row's primary key.
+#' Either way, every alternate-key column present in the base table is filled
+#' from that row and carried on the correction for reference; `variable` may
+#' not be the primary key or any alternate key's column. A failing warehouse
+#' call is reported by step, with the driver's message withheld, because it
+#' can quote a data value.
 #'
 #' @details Requires the master's corrections tables, which
 #'   [backfill_corrections()] creates.
@@ -159,7 +197,8 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' @param con A DBI connection.
 #' @param key_values A named list of key values identifying the record: the
 #'   primary key by default, or `alt_key`'s columns when `alt_key` is given.
-#' @param variable Character. The column to correct; must not be a key column.
+#' @param variable Character. The column to correct; must not be a key or
+#'   alternate-key column.
 #' @param expected_prior The value the record is expected to currently hold,
 #'   or `NA` when it is expected to be missing.
 #' @param new_value The corrected value, or `NA` to correct to missing.
@@ -181,6 +220,40 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #'
 #' @seealso [backfill_corrections()], [decide_correction()]
 #'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("duckdb", quietly = TRUE) &&
+#'     requireNamespace("arrow", quietly = TRUE) &&
+#'     requireNamespace("jsonlite", quietly = TRUE) &&
+#'     requireNamespace("tidyselect", quietly = TRUE) &&
+#'     requireNamespace("dplyr", quietly = TRUE) &&
+#'     requireNamespace("withr", quietly = TRUE) &&
+#'     requireNamespace("digest", quietly = TRUE)) {
+#'   dir <- tempfile("propose")
+#'   dir.create(dir)
+#'   pq <- file.path(dir, "built_demo.parquet")
+#'   arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+#'   jsonlite::write_json(
+#'     list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+#'          columns = list(list(variable = "id", r_class = "character"),
+#'                         list(variable = "age", r_class = "numeric"))),
+#'     sub("\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+#'   writeLines("data m; run;", file.path(dir, "bd.sas"))
+#'   cfg_path <- file.path(dir, "master.yml")
+#'   writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+#'                "current: built_demo.sas7bdat",
+#'                paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+#'   cfg <- read_master_config(cfg_path)
+#'   con <- DBI::dbConnect(duckdb::duckdb())
+#'   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+#'   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+#'   propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+#'                      expected_prior = 60, new_value = 61, evidence_type = "chart_review",
+#'                      evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
+#'   DBI::dbDisconnect(con, shutdown = TRUE)
+#' }
+#' }
+#'
 #' @export
 propose_correction <- function(config, con, key_values, variable, expected_prior, new_value,
                                evidence_type, evidence_ref, asserted_by, alt_key = NULL,
@@ -191,9 +264,10 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
   q <- quoter(dialect)
   tabs <- .master_tables(config)
   base <- .current_base(con, config, dialect)
-  meta <- DBI::dbReadTable(con, tabs$meta)
-  types <- table_types(con, base)
+  meta <- run_step("read metadata", DBI::dbReadTable(con, tabs$meta))
+  types <- run_step("read column types", table_types(con, base))
   widths <- .char_widths(types)
+  alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
 
   if (!is.null(alt_key)) {
     cols <- config[["alt_keys"]][[alt_key]]
@@ -209,30 +283,42 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
       )
     }
     where <- paste(sprintf("%s = ?", q(cols)), collapse = " AND ")
-    hits <- DBI::dbGetQuery(con, sprintf(
+    hits <- run_step("alternate key lookup", DBI::dbGetQuery(con, sprintf(
       "SELECT %s FROM %s WHERE %s",
       paste(q(config[["key"]]), collapse = ", "), q(base),
       where
     ),
     params = unname(key_values[cols])
-    )
+    ))
     if (nrow(hits) != 1L) {
       stop("Alternate key '", alt_key, "' matched ", nrow(hits), " rows in ", base,
         "; expected exactly 1.",
         call. = FALSE
       )
     }
-    alt_values <- key_values
     key_values <- as.list(hits[1, config[["key"]], drop = FALSE])
   } else {
-    alt_values <- list()
+    if (!setequal(names(key_values), config[["key"]])) {
+      stop("'key_values' must name exactly the primary key columns: ",
+        paste(config[["key"]], collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
+    if (any(vapply(key_values, function(v) length(v) != 1L || is.na(v), logical(1)))) {
+      stop("'key_values' must name exactly the primary key columns: ",
+        paste(config[["key"]], collapse = ", "), ".",
+        call. = FALSE
+      )
+    }
   }
 
   if (!variable %in% meta$variable) {
     stop("Variable is not in the master's metadata: ", variable, call. = FALSE)
   }
-  if (variable %in% names(key_values)) {
-    stop("A key column cannot be corrected through this path: ", variable, call. = FALSE)
+  if (variable %in% config[["key"]] || variable %in% alt_cols) {
+    stop("A key or alternate-key column cannot be corrected through this path: ", variable,
+      call. = FALSE
+    )
   }
   if (!evidence_type %in% EVIDENCE_TYPES) {
     stop("Unknown evidence type '", evidence_type, "'. Expected one of: ",
@@ -252,16 +338,27 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
   }
 
   where <- paste(sprintf("%s = ?", q(names(key_values))), collapse = " AND ")
-  n <- DBI::dbGetQuery(con, sprintf("SELECT COUNT(*) AS n FROM %s WHERE %s", q(base), where),
+  n <- run_step("key lookup", DBI::dbGetQuery(
+    con, sprintf("SELECT COUNT(*) AS n FROM %s WHERE %s", q(base), where),
     params = unname(key_values)
-  )$n
+  ))$n
   if (!identical(as.integer(n), 1L)) {
     stop("The key matched ", n, " rows in ", base, "; expected exactly 1.", call. = FALSE)
   }
-  seen <- DBI::dbGetQuery(con, sprintf(
+  alt_values <- if (length(alt_cols)) {
+    hit <- run_step("alternate-key column lookup", DBI::dbGetQuery(
+      con, sprintf("SELECT %s FROM %s WHERE %s", paste(q(alt_cols), collapse = ", "),
+                   q(base), where),
+      params = unname(key_values)
+    ))
+    as.list(hit[1, alt_cols, drop = FALSE])
+  } else {
+    list()
+  }
+  seen <- run_step("check existing corrections", DBI::dbGetQuery(con, sprintf(
     "SELECT COUNT(*) AS n FROM %s WHERE master = ? AND variable = ?",
     q(tabs$corrections)
-  ), params = list(config[["name"]], variable))$n
+  ), params = list(config[["name"]], variable)))$n
 
   now <- Sys.time()
   id <- paste0("c", substr(digest::digest(
@@ -271,10 +368,10 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
     ),
     algo = "sha1"
   ), 1, 16))
-  n_id <- DBI::dbGetQuery(con, sprintf(
+  n_id <- run_step("check correction id", DBI::dbGetQuery(con, sprintf(
     "SELECT COUNT(*) AS n FROM %s WHERE correction_id = ?",
     q(tabs$corrections)
-  ), params = list(id))$n
+  ), params = list(id)))$n
   if (as.integer(n_id) > 0L) {
     stop("The generated correction id collides with an existing row; ",
       "retry the proposal.",
@@ -302,7 +399,7 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
       new_variable = new_variable, row = row
     )))
   }
-  DBI::dbAppendTable(con, tabs$corrections, row)
+  run_step("append correction", DBI::dbAppendTable(con, tabs$corrections, row))
   message(
     "Correction ", id, " appended.",
     if (new_variable) " First correction to this variable: regenerate the view."
@@ -339,6 +436,42 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 #'
 #' @seealso [backfill_corrections()], [propose_correction()]
 #'
+#' @examples
+#' \donttest{
+#' if (requireNamespace("duckdb", quietly = TRUE) &&
+#'     requireNamespace("arrow", quietly = TRUE) &&
+#'     requireNamespace("jsonlite", quietly = TRUE) &&
+#'     requireNamespace("tidyselect", quietly = TRUE) &&
+#'     requireNamespace("dplyr", quietly = TRUE) &&
+#'     requireNamespace("withr", quietly = TRUE) &&
+#'     requireNamespace("digest", quietly = TRUE)) {
+#'   dir <- tempfile("decide")
+#'   dir.create(dir)
+#'   pq <- file.path(dir, "built_demo.parquet")
+#'   arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+#'   jsonlite::write_json(
+#'     list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+#'          columns = list(list(variable = "id", r_class = "character"),
+#'                         list(variable = "age", r_class = "numeric"))),
+#'     sub("\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+#'   writeLines("data m; run;", file.path(dir, "bd.sas"))
+#'   cfg_path <- file.path(dir, "master.yml")
+#'   writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+#'                "current: built_demo.sas7bdat",
+#'                paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+#'   cfg <- read_master_config(cfg_path)
+#'   con <- DBI::dbConnect(duckdb::duckdb())
+#'   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+#'   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+#'   prop <- propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+#'                              expected_prior = 60, new_value = 61,
+#'                              evidence_type = "chart_review", evidence_ref = "invented",
+#'                              asserted_by = "tester", dialect = "duckdb")
+#'   decide_correction(cfg, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
+#'   DBI::dbDisconnect(con, shutdown = TRUE)
+#' }
+#' }
+#'
 #' @export
 decide_correction <- function(config, con, correction_id, decision, decided_by,
                               reason = NA_character_, dry_run = FALSE, dialect = "mssql") {
@@ -353,10 +486,10 @@ decide_correction <- function(config, con, correction_id, decision, decided_by,
       call. = FALSE
     )
   }
-  n <- DBI::dbGetQuery(con, sprintf(
+  n <- run_step("check correction exists", DBI::dbGetQuery(con, sprintf(
     "SELECT COUNT(*) AS n FROM %s WHERE correction_id = ?",
     q(tabs$corrections)
-  ), params = list(correction_id))$n
+  ), params = list(correction_id)))$n
   if (as.integer(n) != 1L) {
     stop("There is no correction ", correction_id, ".", call. = FALSE)
   }
@@ -365,10 +498,10 @@ decide_correction <- function(config, con, correction_id, decision, decided_by,
     list(correction_id, decision, decided_by, format(now, "%Y-%m-%d %H:%M:%OS6")),
     algo = "sha1"
   ), 1, 16))
-  n_did <- DBI::dbGetQuery(con, sprintf(
+  n_did <- run_step("check decision id", DBI::dbGetQuery(con, sprintf(
     "SELECT COUNT(*) AS n FROM %s WHERE decision_id = ?",
     q(tabs$decisions)
-  ), params = list(did))$n
+  ), params = list(did)))$n
   if (as.integer(n_did) > 0L) {
     stop("The generated decision id collides with an existing row; ",
       "retry the decision.",
@@ -384,7 +517,7 @@ decide_correction <- function(config, con, correction_id, decision, decided_by,
     message("Decision ", did, " (", decision, ") validated; nothing written.")
     return(invisible(list(verdict = "validated", decision_id = did, row = row)))
   }
-  DBI::dbAppendTable(con, tabs$decisions, row)
+  run_step("append decision", DBI::dbAppendTable(con, tabs$decisions, row))
   message("Decision ", did, " (", decision, ") recorded on ", correction_id, ".")
   invisible(list(verdict = "recorded", decision_id = did, row = row))
 }

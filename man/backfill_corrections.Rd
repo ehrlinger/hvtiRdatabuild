@@ -32,6 +32,39 @@ never recorded.
 Requires a passing parity record from \code{\link[=lift_master]{lift_master()}}. A dry run, the
 default, parses and resolves and writes nothing.
 }
+\examples{
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE) &&
+    requireNamespace("arrow", quietly = TRUE) &&
+    requireNamespace("jsonlite", quietly = TRUE) &&
+    requireNamespace("tidyselect", quietly = TRUE) &&
+    requireNamespace("dplyr", quietly = TRUE) &&
+    requireNamespace("withr", quietly = TRUE) &&
+    requireNamespace("digest", quietly = TRUE)) {
+  dir <- tempfile("backfill")
+  dir.create(dir)
+  pq <- file.path(dir, "built_demo.parquet")
+  arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+  jsonlite::write_json(
+    list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+         columns = list(list(variable = "id", r_class = "character"),
+                        list(variable = "age", r_class = "numeric"))),
+    sub("\\\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+  writeLines(c("data m; set base;", "if id = 'K1' then age = 60;", "run;"),
+             file.path(dir, "bd.sas"))
+  cfg_path <- file.path(dir, "master.yml")
+  writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+               "current: built_demo.sas7bdat",
+               paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+  cfg <- read_master_config(cfg_path)
+  con <- DBI::dbConnect(duckdb::duckdb())
+  lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+  backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+  DBI::dbDisconnect(con, shutdown = TRUE)
+}
+}
+
+}
 \seealso{
 \code{\link[=propose_correction]{propose_correction()}}, \code{\link[=decide_correction]{decide_correction()}}
 }

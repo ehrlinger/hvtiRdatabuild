@@ -27,7 +27,8 @@ propose_correction(
 \item{key_values}{A named list of key values identifying the record: the
 primary key by default, or \code{alt_key}'s columns when \code{alt_key} is given.}
 
-\item{variable}{Character. The column to correct; must not be a key column.}
+\item{variable}{Character. The column to correct; must not be a key or
+alternate-key column.}
 
 \item{expected_prior}{The value the record is expected to currently hold,
 or \code{NA} when it is expected to be missing.}
@@ -66,14 +67,54 @@ value: an unmatched or ambiguous key is reported by count only, and an
 over-width or uncastable value is reported by column and limit only.
 }
 \details{
-When \code{alt_key} is given, \code{key_values} must name exactly that alternate
-key's columns, none may be missing, and it must match exactly one row in
-the master's current base table; the correction is then stored against
-that row's primary key, with the alternate-key columns also carried on the
-row for reference.
+By default, \code{key_values} must name exactly the master's primary key
+columns, each a single non-missing value. When \code{alt_key} is given instead,
+\code{key_values} must name exactly that alternate key's columns, none may be
+missing, and it must match exactly one row in the master's current base
+table; the correction is then stored against that row's primary key.
+Either way, every alternate-key column present in the base table is filled
+from that row and carried on the correction for reference; \code{variable} may
+not be the primary key or any alternate key's column. A failing warehouse
+call is reported by step, with the driver's message withheld, because it
+can quote a data value.
 
 Requires the master's corrections tables, which
 \code{\link[=backfill_corrections]{backfill_corrections()}} creates.
+}
+\examples{
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE) &&
+    requireNamespace("arrow", quietly = TRUE) &&
+    requireNamespace("jsonlite", quietly = TRUE) &&
+    requireNamespace("tidyselect", quietly = TRUE) &&
+    requireNamespace("dplyr", quietly = TRUE) &&
+    requireNamespace("withr", quietly = TRUE) &&
+    requireNamespace("digest", quietly = TRUE)) {
+  dir <- tempfile("propose")
+  dir.create(dir)
+  pq <- file.path(dir, "built_demo.parquet")
+  arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+  jsonlite::write_json(
+    list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+         columns = list(list(variable = "id", r_class = "character"),
+                        list(variable = "age", r_class = "numeric"))),
+    sub("\\\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+  writeLines("data m; run;", file.path(dir, "bd.sas"))
+  cfg_path <- file.path(dir, "master.yml")
+  writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+               "current: built_demo.sas7bdat",
+               paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+  cfg <- read_master_config(cfg_path)
+  con <- DBI::dbConnect(duckdb::duckdb())
+  lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+  backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+  propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+                     expected_prior = 60, new_value = 61, evidence_type = "chart_review",
+                     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
+  DBI::dbDisconnect(con, shutdown = TRUE)
+}
+}
+
 }
 \seealso{
 \code{\link[=backfill_corrections]{backfill_corrections()}}, \code{\link[=decide_correction]{decide_correction()}}

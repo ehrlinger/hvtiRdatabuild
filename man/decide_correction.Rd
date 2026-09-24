@@ -48,6 +48,43 @@ validates and returns the row that would be written, without writing it.
 Requires the master's corrections tables, which
 \code{\link[=backfill_corrections]{backfill_corrections()}} creates.
 }
+\examples{
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE) &&
+    requireNamespace("arrow", quietly = TRUE) &&
+    requireNamespace("jsonlite", quietly = TRUE) &&
+    requireNamespace("tidyselect", quietly = TRUE) &&
+    requireNamespace("dplyr", quietly = TRUE) &&
+    requireNamespace("withr", quietly = TRUE) &&
+    requireNamespace("digest", quietly = TRUE)) {
+  dir <- tempfile("decide")
+  dir.create(dir)
+  pq <- file.path(dir, "built_demo.parquet")
+  arrow::write_parquet(data.frame(id = c("K1", "K2"), age = c(60, 61)), pq)
+  jsonlite::write_json(
+    list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+         columns = list(list(variable = "id", r_class = "character"),
+                        list(variable = "age", r_class = "numeric"))),
+    sub("\\\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
+  writeLines("data m; run;", file.path(dir, "bd.sas"))
+  cfg_path <- file.path(dir, "master.yml")
+  writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
+               "current: built_demo.sas7bdat",
+               paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
+  cfg <- read_master_config(cfg_path)
+  con <- DBI::dbConnect(duckdb::duckdb())
+  lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
+  backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
+  prop <- propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+                             expected_prior = 60, new_value = 61,
+                             evidence_type = "chart_review", evidence_ref = "invented",
+                             asserted_by = "tester", dialect = "duckdb")
+  decide_correction(cfg, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
+  DBI::dbDisconnect(con, shutdown = TRUE)
+}
+}
+
+}
 \seealso{
 \code{\link[=backfill_corrections]{backfill_corrections()}}, \code{\link[=propose_correction]{propose_correction()}}
 }

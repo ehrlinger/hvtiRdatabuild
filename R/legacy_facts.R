@@ -94,15 +94,16 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
   facts <- list()
   unparsed <- integer()
   last_key_if <- FALSE
+  # Returns the fact row, or NULL when it cannot be read; the caller appends
+  # it to `facts` itself, so no closure here ever mutates the caller's state.
   add <- function(line, key_lit, var, val_lit) {
     kv <- .lit_text(key_lit)
     vv <- .lit_text(val_lit)
-    if (is.null(kv) || is.null(vv) || kv$missing == 1L) return(FALSE)
-    facts[[length(facts) + 1L]] <<- data.frame(
+    if (is.null(kv) || is.null(vv) || kv$missing == 1L) return(NULL)
+    data.frame(
       line = line, key_value = kv$text, variable = tolower(var),
       value_text = vv$text, value_missing = vv$missing, stringsAsFactors = FALSE
     )
-    TRUE
   }
 
   i <- 1L
@@ -116,11 +117,14 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
       if (mentions_key || last_key_if) unparsed <- c(unparsed, line)
       last_key_if <- FALSE
     } else if (length(m <- grab(p_simple, s))) {
-      if (!add(line, m[[2]], m[[3]], m[[4]])) unparsed <- c(unparsed, line)
+      r <- add(line, m[[2]], m[[3]], m[[4]])
+      if (is.null(r)) unparsed <- c(unparsed, line) else facts[[length(facts) + 1L]] <- r
       last_key_if <- TRUE
     } else if (length(m <- grab(p_in, s))) {
       keys <- regmatches(m[[2]], gregexpr(.lit_pattern, m[[2]], perl = TRUE))[[1]]
-      ok <- vapply(keys, function(kl) add(line, kl, m[[3]], m[[4]]), logical(1))
+      rows <- lapply(keys, function(kl) add(line, kl, m[[3]], m[[4]]))
+      ok <- !vapply(rows, is.null, logical(1))
+      for (r in rows[ok]) facts[[length(facts) + 1L]] <- r
       if (!all(ok)) unparsed <- c(unparsed, line)
       last_key_if <- TRUE
     } else if (length(m <- grab(p_do, s))) {
@@ -133,7 +137,9 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
         i <- i + 1L
       }
       if (good && length(block)) {
-        ok <- vapply(block, function(a) add(line, m[[2]], a[[2]], a[[3]]), logical(1))
+        rows <- lapply(block, function(a) add(line, m[[2]], a[[2]], a[[3]]))
+        ok <- !vapply(rows, is.null, logical(1))
+        for (r in rows[ok]) facts[[length(facts) + 1L]] <- r
         if (!all(ok)) unparsed <- c(unparsed, line)
       } else {
         unparsed <- c(unparsed, line)
@@ -193,6 +199,7 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
 legacy_rows <- function(facts, base_keys, key, master, meta, source_file,
                         asserted_on = Sys.time()) {
   kt <- .key_text(base_keys[[key[[1]]]])
+  extra_cols <- setdiff(names(base_keys), key)
   out <- list()
   unresolved <- list()
   for (i in seq_len(nrow(facts))) {
@@ -213,7 +220,7 @@ legacy_rows <- function(facts, base_keys, key, master, meta, source_file,
                                             algo = "sha1"), 1, 15))
     out[[length(out) + 1L]] <- cbind(
       data.frame(correction_id = id, master = master, stringsAsFactors = FALSE),
-      base_keys[hits, key, drop = FALSE],
+      base_keys[hits, c(key, extra_cols), drop = FALSE],
       data.frame(variable = v, expected_prior = NA_character_,
                  expected_prior_missing = NA_integer_, new_value = f$value_text,
                  new_value_missing = f$value_missing, evidence_type = "legacy_sas_inline",
