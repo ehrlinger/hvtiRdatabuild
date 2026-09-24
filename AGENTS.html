@@ -124,6 +124,16 @@
 <strong>Repo-governance files do not bump the version.</strong> <code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>.github/</code>, <code>dev/</code>, <code>.lintr</code>, <code>_pkgdown.yml</code> and <code>equivalence_signoff.yaml</code> are all listed in <code>.Rbuildignore</code>, so they never reach an installed package, and a bump would announce a change no user can observe. The test is mechanical, so read <code>.Rbuildignore</code> rather than judging by feel: if the file is excluded there, no bump and no <code>NEWS.md</code> entry. The docs-only commits already on <code>main</code> (<code>6ca1faa</code>, <code>ee28201</code>, <code>1f7d99a</code>) follow this.</li>
 </ul></div>
 <div class="section level2">
+<h2 id="looking-up-a-dependencys-api">Looking up a dependency’s API<a class="anchor" aria-label="anchor" href="#looking-up-a-dependencys-api"></a></h2>
+<p>Read the installed documentation before calling a function from a dependency you have not used in this session. Arguments get renamed, defaults change and functions are deprecated between releases, so recall is not a reliable source. The version that matters is the one installed in the library the gates run against; the minimum in <code>DESCRIPTION</code> is the oldest version the code must still work with.</p>
+<ul><li>Version: <code>Rscript -e 'packageVersion("pkg")'</code>.</li>
+<li>Help page as text: <code>Rscript -e 'tools::Rd2txt(utils:::.getHelpFile(help("fn", package = "pkg")))'</code>.</li>
+<li>Signature and exports: <code>args(pkg::fn)</code>, <code>getNamespaceExports("pkg")</code>.</li>
+<li>What changed between versions: <code>news(package = "pkg")</code> or the package’s <code>NEWS.md</code>.</li>
+<li>The source, when the help page is thin: <code>pkg:::fn</code> prints it.</li>
+</ul><p>pkgdown sites and CRAN pages describe the latest release, which may not be the installed one; confirm the version before relying on them. If the installed docs contradict what you expected, the docs win. If an argument you need does not exist, say so instead of substituting a guess.</p>
+</div>
+<div class="section level2">
 <h2 id="change-discipline">Change discipline<a class="anchor" aria-label="anchor" href="#change-discipline"></a></h2>
 <ol style="list-style-type: decimal"><li>
 <strong>Think before coding.</strong> Do not assume, ask. If the request is ambiguous or a name, path or signature is uncertain, surface the confusion rather than running with a guess.</li>
