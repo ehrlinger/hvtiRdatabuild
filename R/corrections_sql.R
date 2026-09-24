@@ -1,10 +1,70 @@
-# corrections.R
+# corrections_sql.R
 #
-# The corrections contract (spec §5): two append-only tables, an R reference
-# resolver, and the generated SQL that implements the same rules as a view. The
-# SQL uses CTEs, CASE, JOIN, LEFT JOIN, UNION ALL and ROW_NUMBER() only, so the
-# duckdb test proves the logic SQL Server will run.
+# A value's text form in the corrections table, and back, plus the corrections
+# contract (spec Section 5): two append-only tables, an R reference resolver,
+# and the generated SQL that implements the same rules as a view. The SQL uses
+# CTEs, CASE, JOIN, LEFT JOIN, UNION ALL and ROW_NUMBER() only, so the duckdb
+# test proves the logic SQL Server will run.
 
+#' A value's text form in the corrections table
+#'
+#' Doubles are written with 17 significant digits, which is enough for
+#' `CAST(text AS float)` in SQL, or `as.numeric()` in R, to return exactly the
+#' same double.
+#'
+#' @param x A length-one value.
+#'
+#' @return A length-one character, or `NA_character_` when `x` is missing.
+#'
+#' @keywords internal
+#' @noRd
+value_text <- function(x) {
+  stopifnot(length(x) == 1L)
+  if (is.na(x)) return(NA_character_)
+  if (inherits(x, "Date")) return(format(x, "%Y-%m-%d"))
+  if (inherits(x, "POSIXct")) return(format(x, "%Y-%m-%d %H:%M:%OS6", tz = "UTC"))
+  if (is.numeric(unclass(x))) return(sprintf("%.17g", as.numeric(x)))
+  as.character(x)
+}
+
+#' Parse a corrections table's text form back into an R value
+#'
+#' @param text Character. The stored text form, or `NA` for missing.
+#' @param r_class Character. The target R class (`"numeric"`, `"integer"`,
+#'   `"haven_labelled"`, `"Date"`, `"POSIXct"` or `"character"`).
+#'
+#' @return A length-one value of class `r_class`, or an error for an
+#'   unsupported class.
+#'
+#' @keywords internal
+#' @noRd
+parse_value <- function(text, r_class) {
+  if (is.na(text)) {
+    return(switch(r_class, Date = as.Date(NA), POSIXct = as.POSIXct(NA),
+                  character = NA_character_, NA_real_))
+  }
+  switch(r_class,
+         numeric = , integer = , haven_labelled = suppressWarnings(as.numeric(text)),
+         Date = as.Date(text, format = "%Y-%m-%d"),
+         POSIXct = as.POSIXct(text, tz = "UTC"),
+         character = text,
+         stop("No text form for class '", r_class, "'.", call. = FALSE))
+}
+
+#' DDL for the corrections and decisions tables
+#'
+#' @param corrections_table Character. The corrections table's name.
+#' @param decisions_table Character. The decisions table's name.
+#' @param key_types A named character vector of the base key columns' SQL types.
+#' @param alt_key_types A named character vector of alternate key columns' SQL
+#'   types, or `NULL` when there are none.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A named character vector of length two (`corrections`, `decisions`)
+#'   with each table's `CREATE TABLE` statement.
+#'
+#' @keywords internal
+#' @noRd
 corrections_ddl <- function(corrections_table, decisions_table, key_types,
                             alt_key_types = NULL, dialect = "mssql") {
   q <- quoter(dialect)
@@ -36,16 +96,34 @@ corrections_ddl <- function(corrections_table, decisions_table, key_types,
                           paste(dec, collapse = ",\n")))
 }
 
-# The R reference. Rules, in order: a correction's latest decision (by
-# decided_on, then decision_id) must be 'accept'; among accepted corrections to
-# one cell the latest (by asserted_on, then correction_id) wins; the winner is
-# stale if its variable is not a correctable column, its key matches no row, its
-# prior is unknown, either text fails to cast, or the base no longer holds its
-# prior. Otherwise it applies.
-#
-# `as_of`, when non-NULL, freezes the correction state: only decisions with
-# decided_on <= as_of and corrections with asserted_on <= as_of count, so the
-# same view can be reproduced at a point in time via the freeze record.
+#' Resolve corrections against a base data frame
+#'
+#' The R reference. Rules, in order: a correction's latest decision (by
+#' `decided_on`, then `decision_id`) must be `"accept"`; among accepted
+#' corrections to one cell the latest (by `asserted_on`, then
+#' `correction_id`) wins; the winner is stale if its variable is not a
+#' correctable column, its key matches no row, its prior is unknown, either
+#' text fails to cast, or the base no longer holds its prior. Otherwise it
+#' applies.
+#'
+#' `as_of`, when non-`NULL`, freezes the correction state: only decisions
+#' with `decided_on <= as_of` and corrections with `asserted_on <= as_of`
+#' count, so the same view can be reproduced at a point in time via the
+#' freeze record.
+#'
+#' @param base A data frame of the base rows.
+#' @param corrections A data frame of the corrections table's rows.
+#' @param decisions A data frame of the decisions table's rows.
+#' @param key Character. The base key columns.
+#' @param master Character. The master whose corrections apply.
+#' @param as_of A `POSIXct` timestamp to freeze the correction state at, or
+#'   `NULL` for the current state.
+#'
+#' @return A list with `data` (the corrected base) and `stale` (a data frame
+#'   of `correction_id`, `variable`, `reason` for winners that did not apply).
+#'
+#' @keywords internal
+#' @noRd
 resolve_corrections <- function(base, corrections, decisions, key, master, as_of = NULL) {
   if (!is.null(as_of)) decisions <- decisions[decisions$decided_on <= as_of, ]
   dec <- decisions[order(decisions$correction_id, -xtfrm(decisions$decided_on),
@@ -105,9 +183,21 @@ resolve_corrections <- function(base, corrections, decisions, key, master, as_of
   list(data = out, stale = stale)
 }
 
-# SQL Server's default collation compares strings case- and trailing-space-
-# insensitively; a binary collation with an explicit length check compares the
-# stored characters exactly, as R and the other dialects do.
+#' A SQL equality expression, collation-aware for `mssql` character types
+#'
+#' SQL Server's default collation compares strings case- and trailing-space-
+#' insensitively; a binary collation with an explicit length check compares
+#' the stored characters exactly, as R and the other dialects do.
+#'
+#' @param a Character. The left-hand SQL expression.
+#' @param b Character. The right-hand SQL expression.
+#' @param type Character. The column's SQL type.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A length-one character: a SQL equality expression.
+#'
+#' @keywords internal
+#' @noRd
 .string_eq_sql <- function(a, b, type, dialect) {
   is_string <- dialect == "mssql" && grepl("^n?(var)?char\\b", type, ignore.case = TRUE)
   if (is_string) {
@@ -118,6 +208,21 @@ resolve_corrections <- function(base, corrections, decisions, key, master, as_of
   }
 }
 
+#' The shared `winners` CTE for the corrections and stale views
+#'
+#' @param q A quoting function from `quoter()`.
+#' @param corrections_table Character. The corrections table's name.
+#' @param decisions_table Character. The decisions table's name.
+#' @param master Character. The master whose corrections apply.
+#' @param key Character. The base key columns.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#' @param as_of A `POSIXct` timestamp to freeze the correction state at, or
+#'   `NULL` for the current state.
+#'
+#' @return A length-one character: the `WITH ... w AS (...)` CTE text.
+#'
+#' @keywords internal
+#' @noRd
 .winners_cte <- function(q, corrections_table, decisions_table, master, key, dialect,
                          as_of = NULL) {
   dec_filter <- if (!is.null(as_of)) {
@@ -148,11 +253,33 @@ resolve_corrections <- function(base, corrections, decisions, key, master, as_of
     "  FROM accepted a\n",
     "), w AS (\n",
     "  SELECT * FROM ranked WHERE rn = 1\n",
-    ")\n")
+    ")\n"
+  )
 }
 
-# Only variables in `corrected` get a join and a CASE; the rest pass through.
-# Regenerate the view when a variable receives its first correction.
+#' The corrections view's SQL
+#'
+#' Only variables in `corrected` get a join and a `CASE`; the rest pass
+#' through. Regenerate the view when a variable receives its first
+#' correction.
+#'
+#' @param view Character. The view's name.
+#' @param base_table Character. The base table's name.
+#' @param corrections_table Character. The corrections table's name.
+#' @param decisions_table Character. The decisions table's name.
+#' @param master Character. The master whose corrections apply.
+#' @param key Character. The base key columns.
+#' @param columns Character. Every column the view selects, in order.
+#' @param corrected Character. The columns with at least one correction.
+#' @param types A named character vector of `corrected` columns' SQL types.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#' @param as_of A `POSIXct` timestamp to freeze the correction state at, or
+#'   `NULL` for the current state.
+#'
+#' @return A length-one character: the `CREATE ... VIEW` statement.
+#'
+#' @keywords internal
+#' @noRd
 corrections_view_sql <- function(view, base_table, corrections_table, decisions_table,
                                  master, key, columns, corrected, types,
                                  dialect = "mssql", as_of = NULL) {
@@ -173,7 +300,8 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
       "(", a, ".expected_prior_missing = 1 AND ", b, " IS NULL) OR ",
       "(", a, ".expected_prior_missing = 0 AND ", prior_cast, " IS NOT NULL AND ",
       prior_eq, "))",
-      " AND (", a, ".new_value_missing = 1 OR ", new_cast, " IS NOT NULL)")
+      " AND (", a, ".new_value_missing = 1 OR ", new_cast, " IS NOT NULL)"
+    )
     sprintf(paste("CASE WHEN %s THEN CASE WHEN %s.new_value_missing = 1 THEN NULL",
                   "ELSE %s END ELSE %s END AS %s"),
             cond, a, new_cast, b, q(v))
@@ -191,6 +319,15 @@ corrections_view_sql <- function(view, base_table, corrections_table, decisions_
          ";")
 }
 
+#' The stale-corrections view's SQL
+#'
+#' @inheritParams corrections_view_sql
+#'
+#' @return A length-one character: the `CREATE ... VIEW` statement for the
+#'   view of `correction_id`, `variable`, `reason` rows that would not apply.
+#'
+#' @keywords internal
+#' @noRd
 stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
                            master, key, columns, corrected, types, dialect = "mssql",
                            as_of = NULL) {
@@ -232,7 +369,8 @@ stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
                     "(w.expected_prior_missing = 1 AND %s IS NOT NULL) OR",
                     "(w.expected_prior_missing = 0 AND (%s IS NULL OR NOT (%s))))"),
               q(base_table), on, sql_string(v), prior_cast, new_cast, b, b, prior_eq)
-    }, character(1)))
+    }, character(1))
+  )
   paste0(view_header(dialect), " ", q(view), " AS\n",
          .winners_cte(q, corrections_table, decisions_table, master, key, dialect, as_of),
          "SELECT correction_id, variable, reason FROM (\n",
@@ -240,6 +378,17 @@ stale_view_sql <- function(view, base_table, corrections_table, decisions_table,
          "\n) s;")
 }
 
+#' The variables a master has any correction for
+#'
+#' @param con A DBI connection.
+#' @param corrections_table Character. The corrections table's name.
+#' @param master Character. The master to filter on.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A character vector of distinct `variable` values.
+#'
+#' @keywords internal
+#' @noRd
 corrected_variables <- function(con, corrections_table, master, dialect = "mssql") {
   q <- quoter(dialect)
   DBI::dbGetQuery(con, sprintf("SELECT DISTINCT variable FROM %s WHERE master = ?",

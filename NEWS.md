@@ -1,5 +1,16 @@
 # hvtiRdatabuild (unreleased)
 
+* **The cardiac master-build scripts move from `dev/masters/cardiac/` into the
+  package, internal and unexported.** `R/sql_dialect.R`, `R/corrections_sql.R`,
+  `R/master_steps.R` and `R/legacy_facts.R` carry the dialect quoting, the
+  corrections contract and its generated SQL, the key/DDL/load/parity steps,
+  and the legacy-SAS-fact parser, respectively; each function keeps its
+  existing name and signature. Their standalone `dev/` tests become
+  `testthat` files (`test-master-sql.R`, `test-master-steps.R`,
+  `test-master-legacy.R`) with the same 101 checks. `duckdb` and `tidyselect`
+  join `Suggests`. Behaviour is unchanged; this is a relocation, not a
+  rewrite.
+
 * **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
   study registration endpoint-neutral: `register_data()` no longer takes
   `event` or `time`, and `study_config()` no longer carries a study-wide

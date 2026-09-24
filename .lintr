@@ -2,5 +2,6 @@ linters: linters_with_defaults(
     line_length_linter(100)
   )
 exclusions: list(
-    "tests/testthat/test-integration-real-study.R" = list(object_usage_linter = Inf)
+    "tests/testthat/test-integration-real-study.R" = list(object_usage_linter = Inf),
+    "R/legacy_facts.R" = list(assignment_linter = Inf)
   )

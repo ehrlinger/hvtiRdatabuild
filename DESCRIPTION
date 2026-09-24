@@ -35,6 +35,7 @@ Remotes:
 Suggests:
     arrow,
     dplyr,
+    duckdb,
     hvtiPlotR,
     jsonlite,
     keyring,
@@ -42,6 +43,7 @@ Suggests:
     odbc,
     quarto,
     testthat (>= 3.0.0),
+    tidyselect,
     withr
 VignetteBuilder: quarto
 Config/testthat/edition: 3

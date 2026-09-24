@@ -1,15 +1,23 @@
-# legacy.R
+# legacy_facts.R
 #
 # The inline patient-level fixes in a master's SAS build, read at run time and
 # recorded as corrections with an unknown prior and a 'bake' decision: present
-# in the snapshot, activated by the phase 3 port (spec §5.4). Nothing here
-# writes a key or a value to a file or to the console.
+# in the snapshot, activated by the phase 3 port (spec Section 5.4). Nothing
+# here writes a key or a value to a file or to the console.
 
-.LIT <- paste0("('(?:[^']|'')*'d?|\"(?:[^\"]|\"\")*\"d?|",
-               "-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?|\\.)")
-.VAR <- "([a-z_][a-z0-9_]*)"
+.lit_pattern <- paste0("('(?:[^']|'')*'d?|\"(?:[^\"]|\"\")*\"d?|",
+                       "-?(?:\\d+\\.?\\d*|\\.\\d+)(?:e[+-]?\\d+)?|\\.)")
+.var_pattern <- "([a-z_][a-z0-9_]*)"
 
-# A SAS literal as text, with a missing flag; NULL when it cannot be read.
+#' A SAS literal as text, with a missing flag
+#'
+#' @param lit Character. A single SAS literal token.
+#'
+#' @return A list with `text` and `missing`, or `NULL` when `lit` cannot be
+#'   read.
+#'
+#' @keywords internal
+#' @noRd
 .lit_text <- function(lit) {
   if (lit == ".") return(list(text = NA_character_, missing = 1L))
   if (grepl("^['\"].*['\"]d$", lit, ignore.case = TRUE)) {
@@ -30,6 +38,15 @@
   list(text = value_text(as.numeric(lit)), missing = 0L)
 }
 
+#' Split SAS source lines into statements, quote- and comment-aware
+#'
+#' @param lines Character. The SAS source lines.
+#'
+#' @return A data frame of `line` (the statement's starting line) and `stmt`
+#'   (its normalised text), comments and blanks dropped.
+#'
+#' @keywords internal
+#' @noRd
 .statements <- function(lines) {
   text <- paste(lines, collapse = "\n")
   m <- gregexpr("/\\*[\\s\\S]*?\\*/", text, perl = TRUE)
@@ -48,16 +65,28 @@
   data.frame(line = as.integer(line[keep]), stmt = stmt[keep], stringsAsFactors = FALSE)
 }
 
+#' Parse a master's inline SAS fixes into legacy facts
+#'
+#' @param lines Character. The SAS source lines.
+#' @param key_var Character. The SAS variable name of the base key used in the
+#'   inline `if` conditions.
+#'
+#' @return A list with `facts` (a data frame of `line`, `key_value`,
+#'   `variable`, `value_text`, `value_missing`) and `unparsed` (the line
+#'   numbers of statements that mention the key but could not be parsed).
+#'
+#' @keywords internal
+#' @noRd
 parse_legacy_facts <- function(lines, key_var = "ccfid") {
   st <- .statements(lines)
   grab <- function(p, s) regmatches(s, regexec(p, s, perl = TRUE, ignore.case = TRUE))[[1]]
   k <- key_var
-  p_simple <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .LIT,
-                     "\\s*\\)?\\s*then\\s+", .VAR, "\\s*=\\s*", .LIT, "$")
+  p_simple <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .lit_pattern,
+                     "\\s*\\)?\\s*then\\s+", .var_pattern, "\\s*=\\s*", .lit_pattern, "$")
   p_in <- paste0("^if\\s*\\(?\\s*", k, "\\s+in\\s*\\(([^)]*)\\)\\s*\\)?\\s*then\\s+",
-                 .VAR, "\\s*=\\s*", .LIT, "$")
-  p_do <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .LIT, "\\s*\\)?\\s*then\\s+do$")
-  p_assign <- paste0("^", .VAR, "\\s*=\\s*", .LIT, "$")
+                 .var_pattern, "\\s*=\\s*", .lit_pattern, "$")
+  p_do <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .lit_pattern, "\\s*\\)?\\s*then\\s+do$")
+  p_assign <- paste0("^", .var_pattern, "\\s*=\\s*", .lit_pattern, "$")
   p_mentions <- paste0("^if\\b.*\\b", k, "\\b")
   p_else <- "^else\\b"
   p_mentions_key <- paste0("\\b", k, "\\b")
@@ -71,7 +100,8 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
     if (is.null(kv) || is.null(vv) || kv$missing == 1L) return(FALSE)
     facts[[length(facts) + 1L]] <<- data.frame(
       line = line, key_value = kv$text, variable = tolower(var),
-      value_text = vv$text, value_missing = vv$missing, stringsAsFactors = FALSE)
+      value_text = vv$text, value_missing = vv$missing, stringsAsFactors = FALSE
+    )
     TRUE
   }
 
@@ -89,7 +119,7 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
       if (!add(line, m[[2]], m[[3]], m[[4]])) unparsed <- c(unparsed, line)
       last_key_if <- TRUE
     } else if (length(m <- grab(p_in, s))) {
-      keys <- regmatches(m[[2]], gregexpr(.LIT, m[[2]], perl = TRUE))[[1]]
+      keys <- regmatches(m[[2]], gregexpr(.lit_pattern, m[[2]], perl = TRUE))[[1]]
       ok <- vapply(keys, function(kl) add(line, kl, m[[3]], m[[4]]), logical(1))
       if (!all(ok)) unparsed <- c(unparsed, line)
       last_key_if <- TRUE
@@ -123,8 +153,18 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
   list(facts = facts, unparsed = unique(unparsed))
 }
 
+#' A key value's text form, element by element
+#'
+#' `format()` on a vector would pad to a common width; this formats each
+#' element on its own.
+#'
+#' @param x A vector of key values.
+#'
+#' @return A character vector, one text form per element of `x`.
+#'
+#' @keywords internal
+#' @noRd
 .key_text <- function(x) {
-  # Element by element: format() on a vector would pad to a common width.
   if (is.numeric(x)) {
     vapply(x, format, character(1), scientific = FALSE, trim = TRUE, digits = 15)
   } else {
@@ -132,6 +172,24 @@ parse_legacy_facts <- function(lines, key_var = "ccfid") {
   }
 }
 
+#' Turn parsed legacy facts into corrections and decisions rows
+#'
+#' @param facts A data frame as returned by `parse_legacy_facts()`'s `facts`.
+#' @param base_keys A data frame of the base rows' key columns.
+#' @param key Character. The base key columns.
+#' @param master Character. The master the facts belong to.
+#' @param meta A data frame of `variable`, `r_class` for the base's columns.
+#' @param source_file Character. The SAS source file's name, for the evidence
+#'   reference.
+#' @param asserted_on A `POSIXct` timestamp to record as `asserted_on` and
+#'   `decided_on`.
+#'
+#' @return A list with `corrections`, `decisions` (data frames, or `NULL`
+#'   when no fact resolved) and `unresolved` (a data frame of `line`,
+#'   `reason`).
+#'
+#' @keywords internal
+#' @noRd
 legacy_rows <- function(facts, base_keys, key, master, meta, source_file,
                         asserted_on = Sys.time()) {
   kt <- .key_text(base_keys[[key[[1]]]])
@@ -161,7 +219,8 @@ legacy_rows <- function(facts, base_keys, key, master, meta, source_file,
                  new_value_missing = f$value_missing, evidence_type = "legacy_sas_inline",
                  evidence_ref = paste0(source_file, ":", f$line),
                  asserted_by = "unknown (legacy)", asserted_on = asserted_on,
-                 stringsAsFactors = FALSE))
+                 stringsAsFactors = FALSE)
+    )
   }
   corrections <- if (length(out)) do.call(rbind, out) else NULL
   if (!is.null(corrections)) rownames(corrections) <- NULL
@@ -171,19 +230,33 @@ legacy_rows <- function(facts, base_keys, key, master, meta, source_file,
     correction_id = corrections$correction_id, decision = "bake",
     decided_by = "legacy backfill", decided_on = asserted_on,
     reason = "Present in the snapshot; activated by the phase 3 port.",
-    stringsAsFactors = FALSE)
+    stringsAsFactors = FALSE
+  )
   unresolved <- if (length(unresolved)) do.call(rbind, unresolved) else
     data.frame(line = integer(), reason = character())
   list(corrections = corrections, decisions = decisions, unresolved = unresolved)
 }
 
+#' Record legacy facts as corrections and decisions, idempotently
+#'
+#' @param con A DBI connection.
+#' @param rows A list as returned by `legacy_rows()`.
+#' @param corrections_table Character. The corrections table's name.
+#' @param decisions_table Character. The decisions table's name.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A list with `appended` and `already_present` counts.
+#'
+#' @keywords internal
+#' @noRd
 record_legacy_facts <- function(con, rows, corrections_table, decisions_table,
                                 dialect = "mssql") {
   q <- quoter(dialect)
   if (is.null(rows$corrections)) return(list(appended = 0L, already_present = 0L))
   have <- DBI::dbGetQuery(con, sprintf(
     "SELECT correction_id FROM %s WHERE evidence_type = 'legacy_sas_inline'",
-    q(corrections_table)))$correction_id
+    q(corrections_table)
+  ))$correction_id
   new <- !rows$corrections$correction_id %in% have
   if (any(new)) {
     DBI::dbWithTransaction(con, {
