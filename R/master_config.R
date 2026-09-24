@@ -35,7 +35,7 @@ read_master_config <- function(path) {
   raw <- yaml::read_yaml(path)
   required <- c("name", "key", "snapshots", "current", "build_program")
   missing <- required[!vapply(required, function(f) !is.null(raw[[f]]),
-                               logical(1))]
+                              logical(1))]
   if (length(missing)) {
     stop("Master configuration is missing required field(s): ",
          paste(missing, collapse = ", "), ".", call. = FALSE)
@@ -80,7 +80,7 @@ read_master_config <- function(path) {
            call. = FALSE)
     }
     absent <- c("master", "libref")[!c(!is.null(parent[["master"]]),
-                                        !is.null(parent[["libref"]]))]
+                                       !is.null(parent[["libref"]]))]
     if (length(absent)) {
       stop("'parent' must name both master and libref; missing: ",
            paste(absent, collapse = ", "), ".", call. = FALSE)
@@ -129,7 +129,7 @@ read_master_config <- function(path) {
 #' @keywords internal
 #' @noRd
 .master_tables <- function(config) {
-  n <- config$name
+  n <- config[["name"]]
   list(corrections = paste0(n, "_corrections"),
        decisions   = paste0(n, "_correction_decisions"),
        stale       = paste0(n, "_corrections_stale"),
