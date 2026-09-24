@@ -42,7 +42,7 @@ corr_fixture <- function(env = parent.frame()) {
 
 skip_corr <- function() {
   for (p in c("arrow", "duckdb", "jsonlite", "dplyr", "withr", "tidyselect", "digest")) {
-    skip_if_not_installed(p)
+    testthat::skip_if_not_installed(p)
   }
 }
 
