@@ -152,6 +152,9 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' that row's primary key, with the alternate-key columns also carried on the
 #' row for reference.
 #'
+#' @details Requires the master's corrections tables, which
+#'   [backfill_corrections()] creates.
+#'
 #' @param config A `master_config` from [read_master_config()].
 #' @param con A DBI connection.
 #' @param key_values A named list of key values identifying the record: the
@@ -315,6 +318,9 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 #' Records the decision in the master's decisions table; the correction
 #' applies only when its latest decision is `"accept"`. `dry_run = TRUE`
 #' validates and returns the row that would be written, without writing it.
+#'
+#' @details Requires the master's corrections tables, which
+#'   [backfill_corrections()] creates.
 #'
 #' @param config A `master_config` from [read_master_config()].
 #' @param con A DBI connection.

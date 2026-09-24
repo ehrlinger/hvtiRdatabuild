@@ -44,6 +44,10 @@ Records the decision in the master's decisions table; the correction
 applies only when its latest decision is \code{"accept"}. \code{dry_run = TRUE}
 validates and returns the row that would be written, without writing it.
 }
+\details{
+Requires the master's corrections tables, which
+\code{\link[=backfill_corrections]{backfill_corrections()}} creates.
+}
 \seealso{
 \code{\link[=backfill_corrections]{backfill_corrections()}}, \code{\link[=propose_correction]{propose_correction()}}
 }

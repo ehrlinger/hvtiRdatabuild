@@ -71,6 +71,9 @@ key's columns, none may be missing, and it must match exactly one row in
 the master's current base table; the correction is then stored against
 that row's primary key, with the alternate-key columns also carried on the
 row for reference.
+
+Requires the master's corrections tables, which
+\code{\link[=backfill_corrections]{backfill_corrections()}} creates.
 }
 \seealso{
 \code{\link[=backfill_corrections]{backfill_corrections()}}, \code{\link[=decide_correction]{decide_correction()}}

@@ -1,59 +1,15 @@
 # hvtiRdatabuild (unreleased)
 
-* **The corrections API completes the six-export master machinery:**
-  `backfill_corrections()`, `propose_correction()` and `decide_correction()`.
-  `backfill_corrections()` reads a master's inline SAS fixes, records each one
-  that resolves to exactly one record as a correction with an unknown prior
-  and a `bake` decision, and regenerates the master's view and its stale
-  view; fixes that touch a key column, match no record, match several, or
-  cannot be read are reported by reason and line number and never recorded.
-  `propose_correction()` and `decide_correction()` let a person append a
-  single correction, or a decision on one, by hand, validating first and
-  writing by default; `dry_run = TRUE` validates and returns the row without
-  writing it. `propose_correction()` accepts an `alt_key` to match a record
-  by an alternate key instead of the primary key, storing the correction
-  against the primary key with the alternate-key columns carried for
-  reference. No message from any of the three ever carries a key or a value.
-
-* **`lift_master()` is the third export of the master machinery.** It checks a
-  master's primary key, creates a base table named for the snapshot's release,
-  loads the parquet snapshot a row group at a time, and proves it equal to the
-  snapshot with `parity_check()` and then `parity_full()` before recording the
-  parity result and creating the master's view. A dry run, the default, writes
-  the table's DDL next to the snapshot and touches nothing else. If the
-  master already has a corrections table, the view is created with
-  corrections applied instead of a plain `SELECT *`. Internal helpers
-  `.base_table_name()`, `.current_base()` and `.publish_views()` support it
-  and the next export in the series.
-
-* **The cardiac master-build scripts move from `dev/masters/cardiac/` into the
-  package, internal and unexported.** `R/sql_dialect.R`, `R/corrections_sql.R`,
-  `R/master_steps.R` and `R/legacy_facts.R` carry the dialect quoting, the
-  corrections contract and its generated SQL, the key/DDL/load/parity steps,
-  and the legacy-SAS-fact parser, respectively; each function keeps its
-  existing name and signature. Their standalone `dev/` tests become
-  `testthat` files (`test-master-sql.R`, `test-master-steps.R`,
-  `test-master-legacy.R`) with the same 101 checks. `duckdb` and `tidyselect`
-  join `Suggests`. Behaviour is unchanged; this is a relocation, not a
-  rewrite.
-
-* **A new master-dataset API begins with `read_master_config()`.** This is the
-  first export of a six-export master machinery (`read_master_config()`,
-  `snapshot_master()`, `lift_master()`, `backfill_corrections()`,
-  `propose_correction()`, `decide_correction()`). The function reads a `master.yml`
-  file, validates it, and returns a `master_config` object holding the
-  master's name, keys, parent and snapshots. An internal `.master_tables()`
-  helper derives the names of tables that the corrections workflow creates.
-
-* **`snapshot_master()` freezes a master's current or historical SAS builds as
-  parquet and records their lineage.** It calls `snapshot_oracle()` per
-  dataset, checks the primary and alternate keys, and decides which release of
-  the parent master each build read from evidence of what ran: first the
-  bracketing SAS log, then (for the current build only) the build program's
-  `set` statements, then a declared `parent_release`. A current build whose
-  parent cannot be decided stops; a historical one is recorded `"unknown"`.
-  Each sidecar gains a `lineage` and a `keys` object. Nothing printed carries
-  a key or a value.
+* **Master datasets.** Six new functions snapshot, lift and correct the master
+  datasets that study builds read. `read_master_config()` reads a `master.yml`
+  declaring a master's key, alternate keys and parent. `snapshot_master()`
+  freezes its SAS builds as parquet and records which parent release each was
+  built from, read from the run's log first. `lift_master()` loads a snapshot
+  into the warehouse behind key and full-parity gates and creates the master's
+  view. `backfill_corrections()`, `propose_correction()` and
+  `decide_correction()` keep an append-only record of corrections the view
+  applies. The bulk functions dry-run by default. See
+  `vignette("master-datasets")`. `duckdb` and `tidyselect` join `Suggests`.
 
 * **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
   study registration endpoint-neutral: `register_data()` no longer takes
