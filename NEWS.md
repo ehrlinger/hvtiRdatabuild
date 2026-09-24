@@ -1,5 +1,20 @@
 # hvtiRdatabuild (unreleased)
 
+* **The corrections API completes the six-export master machinery:**
+  `backfill_corrections()`, `propose_correction()` and `decide_correction()`.
+  `backfill_corrections()` reads a master's inline SAS fixes, records each one
+  that resolves to exactly one record as a correction with an unknown prior
+  and a `bake` decision, and regenerates the master's view and its stale
+  view; fixes that touch a key column, match no record, match several, or
+  cannot be read are reported by reason and line number and never recorded.
+  `propose_correction()` and `decide_correction()` let a person append a
+  single correction, or a decision on one, by hand, validating first and
+  writing by default; `dry_run = TRUE` validates and returns the row without
+  writing it. `propose_correction()` accepts an `alt_key` to match a record
+  by an alternate key instead of the primary key, storing the correction
+  against the primary key with the alternate-key columns carried for
+  reference. No message from any of the three ever carries a key or a value.
+
 * **`lift_master()` is the third export of the master machinery.** It checks a
   master's primary key, creates a base table named for the snapshot's release,
   loads the parquet snapshot a row group at a time, and proves it equal to the
