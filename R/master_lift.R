@@ -104,8 +104,10 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   if (!DBI::dbExistsTable(con, base)) {
     run_step("create base table", {
       if (dialect == "mssql") {
-        exec_ddl <- master_ddl(parquet, base, schema_name = NULL)
-        DBI::dbExecute(con, exec_ddl$sql)
+        # The hand-off DDL names dbo; executed, the table belongs in the login's
+        # default schema. Reuse it rather than re-measure every text column.
+        DBI::dbExecute(con, sub("CREATE TABLE [dbo].", "CREATE TABLE ", ddl$sql,
+                                fixed = TRUE))
       } else {
         proto <- as.data.frame(arrow::ParquetFileReader$create(parquet)$ReadRowGroup(0L))
         DBI::dbCreateTable(con, base, .zap_all(proto)[0, , drop = FALSE])
