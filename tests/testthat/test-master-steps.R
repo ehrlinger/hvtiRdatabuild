@@ -140,6 +140,57 @@ test_that("load_parquet loads row groups and resumes after a partial load", {
               == 5, label = "resume ends with every row once")
 })
 
+test_that("load_parquet refuses a table that has rows but no load log", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("haven")
+  d <- data.frame(id = paste0("K", 1:3), age = c(60, 61, 62),
+                  dt_surg = as.Date("2020-01-01") + 0:2, stringsAsFactors = FALSE)
+  pq <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(d, pq)
+
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  DBI::dbExecute(con, "CREATE TABLE base (id VARCHAR, age DOUBLE, dt_surg DATE)")
+  DBI::dbExecute(con, "INSERT INTO base VALUES ('K9', 99, '2020-01-01')")
+
+  msg <- tryCatch(load_parquet(con, pq, "base"), error = conditionMessage)
+  expect_match(msg, "has rows but no load log")
+  expect_false(grepl("K9|99", msg), label = "the message carries no value")
+  expect_false(DBI::dbExistsTable(con, "base__load_log"),
+               label = "no log table is created when the check fails")
+})
+
+test_that("load_parquet creates the log for an empty table with no log, as before", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("haven")
+  d <- data.frame(id = "K1", age = 60, dt_surg = as.Date("2020-01-01"),
+                  stringsAsFactors = FALSE)
+  pq <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(d, pq)
+
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  DBI::dbExecute(con, "CREATE TABLE base (id VARCHAR, age DOUBLE, dt_surg DATE)")
+
+  r <- load_parquet(con, pq, "base")
+  expect_true(r$loaded == 1L, label = "an empty target with no log loads as usual")
+})
+
+test_that(".parity_join_on adds a BIN2/DATALENGTH comparison for mssql character keys", {
+  on <- .parity_join_on(quoter("mssql"), c("id", "dt_surg"),
+                        c(id = "nvarchar(10)", dt_surg = "date"), "mssql")
+  expect_match(on, "Latin1_General_BIN2")
+  expect_match(on, "DATALENGTH")
+
+  on_duck <- .parity_join_on(quoter("duckdb"), c("id", "dt_surg"),
+                             c(id = "VARCHAR", dt_surg = "DATE"), "duckdb")
+  expect_false(grepl("BIN2|DATALENGTH", on_duck), label = "duckdb is unaffected")
+})
+
 test_that("parity_check catches a changed value and a missing row, aggregates only", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("duckdb")

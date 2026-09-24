@@ -195,6 +195,12 @@ load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_
     stop("Target table does not exist: ", table, ". Run the DDL first.", call. = FALSE)
   }
   if (!DBI::dbExistsTable(con, log_table)) {
+    n_existing <- DBI::dbGetQuery(con, paste("SELECT COUNT(*) AS n FROM",
+                                             DBI::dbQuoteIdentifier(con, table)))$n
+    if (as.numeric(n_existing) > 0) {
+      stop("Target table ", table, " has rows but no load log; drop it or ",
+           "reconcile it before loading.", call. = FALSE)
+    }
     DBI::dbCreateTable(con, log_table,
                        data.frame(row_group = integer(), n_rows = integer(),
                                   loaded_at = character()))
@@ -266,6 +272,24 @@ parity_sql <- function(table, column, is_numeric, is_character, dialect) {
   haven::zap_widths(haven::zap_formats(haven::zap_labels(haven::zap_label(d))))
 }
 
+#' The ON clause for a key join, collation-aware for `mssql` character keys
+#'
+#' @param q A quoting function from `quoter()`.
+#' @param key Character. The key columns.
+#' @param types A named character vector of the key columns' SQL types, as
+#'   from `table_types()`.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A length-one character: the join's `ON` predicate.
+#'
+#' @keywords internal
+#' @noRd
+.parity_join_on <- function(q, key, types, dialect) {
+  paste(vapply(key, function(k) {
+    .string_eq_sql(paste0("t.", q(k)), paste0("s.", q(k)), types[[k]], dialect)
+  }, character(1)), collapse = " AND ")
+}
+
 #' Is the loaded table the parquet snapshot?
 #'
 #' Row count; per column, non-null count, distinct count and numeric sum on
@@ -317,7 +341,8 @@ parity_check <- function(con, table, parquet, key, sample_n = 1000L, seed = 1L,
   tmp <- if (dialect == "mssql") "#parity_sample_keys" else "parity_sample_keys"
   DBI::dbWriteTable(con, tmp, picked, temporary = TRUE, overwrite = TRUE)
   on.exit(DBI::dbRemoveTable(con, tmp), add = TRUE)
-  on <- paste(sprintf("t.%s = s.%s", q(key), q(key)), collapse = " AND ")
+  key_types <- table_types(con, table)[key]
+  on <- .parity_join_on(q, key, key_types, dialect)
   db_rows <- DBI::dbGetQuery(con, sprintf("SELECT t.* FROM %s t JOIN %s s ON %s",
                                           q(table), q(tmp), on))
   pq_rows <- .zap_all(as.data.frame(dplyr::collect(
