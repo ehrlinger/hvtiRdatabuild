@@ -20,7 +20,8 @@
 #' @param config A `master_config` from [read_master_config()].
 #' @param con A DBI connection, such as one from [dw_connect()].
 #' @param parquet Path to a snapshot written by [snapshot_master()]; its
-#'   `.meta.json` sidecar must sit beside it.
+#'   `.meta.json` sidecar must sit beside it, and its checksum must match the
+#'   sidecar's `parquet_sha256`.
 #' @param dry_run If `TRUE`, the default, write the DDL and nothing else.
 #' @param dialect `"mssql"` for the warehouse, or `"duckdb"`, used in tests.
 #'
@@ -33,11 +34,17 @@
 #' \donttest{
 #' if (requireNamespace("duckdb", quietly = TRUE) &&
 #'     requireNamespace("arrow", quietly = TRUE) &&
+#'     requireNamespace("jsonlite", quietly = TRUE) &&
 #'     requireNamespace("tidyselect", quietly = TRUE)) {
 #'   dir <- tempfile("lift")
 #'   dir.create(dir)
 #'   pq <- file.path(dir, "built_demo.parquet")
 #'   arrow::write_parquet(data.frame(id = c("K1", "K2"), x = c(1, 2)), pq)
+#'   jsonlite::write_json(
+#'     list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+#'          columns = list(list(variable = "id", r_class = "character"),
+#'                         list(variable = "x", r_class = "numeric"))),
+#'     sub("\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
 #'   cfg_path <- file.path(dir, "master.yml")
 #'   writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
 #'                "current: built_demo.sas7bdat",
@@ -50,7 +57,7 @@
 #'
 #' @export
 lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql") {
-  for (p in c("arrow", "tidyselect")) {
+  for (p in c("arrow", "tidyselect", "jsonlite")) {
     if (!requireNamespace(p, quietly = TRUE)) {
       stop("Package '", p, "' is required to lift a master. ",
            "Install it with install.packages('", p, "').", call. = FALSE)
@@ -58,6 +65,16 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   }
   if (!inherits(config, "master_config")) {
     stop("'config' must come from read_master_config().", call. = FALSE)
+  }
+  meta_path <- .snapshot_meta_path(parquet)
+  if (!file.exists(meta_path)) {
+    stop("The parquet's metadata sidecar is missing: ", meta_path,
+         ". Re-run snapshot_master().", call. = FALSE)
+  }
+  meta <- jsonlite::read_json(meta_path, simplifyVector = TRUE)
+  if (!identical(.file_sha256(parquet), as.character(meta$parquet_sha256))) {
+    stop("The parquet does not match its sidecar checksum; re-run snapshot_master().",
+         call. = FALSE)
   }
   base <- .base_table_name(config, parquet)
 
@@ -76,16 +93,19 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
     return(invisible(list(dry_run = TRUE, base_table = base, ddl_path = ddl_path,
                           verdict = NA_character_)))
   }
-  if (!requireNamespace("jsonlite", quietly = TRUE)) {
-    stop("Package 'jsonlite' is required to lift a master. ",
-         "Install it with install.packages('jsonlite').", call. = FALSE)
+  for (p in c("dplyr", "withr")) {
+    if (!requireNamespace(p, quietly = TRUE)) {
+      stop("Package '", p, "' is required to lift a master. ",
+           "Install it with install.packages('", p, "').", call. = FALSE)
+    }
   }
 
   tabs <- .master_tables(config)
   if (!DBI::dbExistsTable(con, base)) {
     run_step("create base table", {
       if (dialect == "mssql") {
-        DBI::dbExecute(con, ddl$sql)
+        exec_ddl <- master_ddl(parquet, base, schema_name = NULL)
+        DBI::dbExecute(con, exec_ddl$sql)
       } else {
         proto <- as.data.frame(arrow::ParquetFileReader$create(parquet)$ReadRowGroup(0L))
         DBI::dbCreateTable(con, base, .zap_all(proto)[0, , drop = FALSE])
@@ -109,10 +129,9 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
     stop("Parity failed; the view was not created.", call. = FALSE)
   }
 
-  meta_path <- sub("\\.parquet$", ".meta.json", parquet)
-  meta <- jsonlite::read_json(meta_path, simplifyVector = TRUE)
   parity_row <- data.frame(base_table = base, parquet_sha256 = as.character(meta$parquet_sha256),
-                           verdict = "pass", checked_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3"))
+                           verdict = "pass",
+                           checked_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%OS3", tz = "UTC"))
   # dbWriteTable(append = TRUE) creates the parity table on the first lift.
   run_step("record parity",
            DBI::dbWriteTable(con, tabs$parity, parity_row, append = TRUE))

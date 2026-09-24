@@ -130,7 +130,9 @@ ddl_preflight <- function(types, max_row = 8060L, max_cols = 1024L) {
 #'
 #' @param parquet Character. Path to the parquet snapshot.
 #' @param table Character. The target table's name.
-#' @param schema_name Character. The target schema's name.
+#' @param schema_name Character, or `NULL`. The target schema's name; `NULL`
+#'   leaves the table unqualified, so it lands in the connection's default
+#'   schema.
 #'
 #' @return A list with `sql` (the `CREATE TABLE` statement), `types` (a named
 #'   character vector of SQL types), `row_bytes` and `n_cols`.
@@ -168,8 +170,8 @@ master_ddl <- function(parquet, table, schema_name = "dbo") {
   q <- function(x) paste0("[", gsub("]", "]]", x, fixed = TRUE), "]")
   sql_types <- vapply(types, `[[`, character(1), "sql")
   body <- paste(sprintf("  %s %s NULL", q(cols), sql_types), collapse = ",\n")
-  list(sql = sprintf("CREATE TABLE %s.%s (\n%s\n);",
-                     q(schema_name), q(table), body),
+  table_ref <- if (is.null(schema_name)) q(table) else paste0(q(schema_name), ".", q(table))
+  list(sql = sprintf("CREATE TABLE %s (\n%s\n);", table_ref, body),
        types = stats::setNames(sql_types, cols),
        row_bytes = pre$row_bytes, n_cols = length(cols))
 }

@@ -12,7 +12,8 @@ lift_master(config, con, parquet, dry_run = TRUE, dialect = "mssql")
 \item{con}{A DBI connection, such as one from \code{\link[=dw_connect]{dw_connect()}}.}
 
 \item{parquet}{Path to a snapshot written by \code{\link[=snapshot_master]{snapshot_master()}}; its
-\code{.meta.json} sidecar must sit beside it.}
+\code{.meta.json} sidecar must sit beside it, and its checksum must match the
+sidecar's \code{parquet_sha256}.}
 
 \item{dry_run}{If \code{TRUE}, the default, write the DDL and nothing else.}
 
@@ -39,11 +40,17 @@ with the driver's message withheld, because it can carry a data value.
 \donttest{
 if (requireNamespace("duckdb", quietly = TRUE) &&
     requireNamespace("arrow", quietly = TRUE) &&
+    requireNamespace("jsonlite", quietly = TRUE) &&
     requireNamespace("tidyselect", quietly = TRUE)) {
   dir <- tempfile("lift")
   dir.create(dir)
   pq <- file.path(dir, "built_demo.parquet")
   arrow::write_parquet(data.frame(id = c("K1", "K2"), x = c(1, 2)), pq)
+  jsonlite::write_json(
+    list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+         columns = list(list(variable = "id", r_class = "character"),
+                        list(variable = "x", r_class = "numeric"))),
+    sub("\\\\.parquet$", ".meta.json", pq), auto_unbox = TRUE)
   cfg_path <- file.path(dir, "master.yml")
   writeLines(c("name: master_demo", "key: [id]", paste0("snapshots: ", dir),
                "current: built_demo.sas7bdat",

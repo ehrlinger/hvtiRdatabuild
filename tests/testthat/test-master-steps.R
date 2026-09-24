@@ -82,6 +82,19 @@ test_that("master_ddl measures character widths and preflights row size and colu
   p <- ddl_preflight(many)
   expect_true(!p$ok && grepl("1024", p$message),
               label = "1,100 columns exceed the column limit")
+})
+
+test_that("master_ddl(schema_name = NULL) leaves the table unqualified", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("tidyselect")
+  pq <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(data.frame(id = c("K1", "K2"), x = c(1, 2)), pq)
+
+  d <- master_ddl(pq, "master_x_base_test", schema_name = NULL)
+  expect_false(grepl("[dbo].", d$sql, fixed = TRUE),
+               label = "the executed-path DDL has no schema prefix")
+  expect_true(grepl("CREATE TABLE [master_x_base_test]", d$sql, fixed = TRUE),
+              label = "the table name alone is quoted")
 
   expect_true(ddl_preflight(rep(list(mssql_type("double")), 10L))$ok,
               label = "a narrow table passes")
