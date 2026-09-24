@@ -85,6 +85,14 @@ test_that("an empty key is refused", {
                "at least one")
 })
 
+test_that("an alternate key with zero columns or an empty column name is refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys:", "  epic: []"))),
+               "Alternate key 'epic' must name at least one column")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys:",
+                                              "  epic: [emrn, \"\"]"))),
+               "Alternate key 'epic' must name at least one column")
+})
+
 test_that("an unnamed alt_keys sequence is refused", {
   expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys: [a, b]"))),
                "mapping of names")

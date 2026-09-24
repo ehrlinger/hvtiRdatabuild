@@ -58,8 +58,17 @@ read_master_config <- function(path) {
            call. = FALSE)
     }
     for (i in seq_along(alt_keys)) {
-      if (!is.character(alt_keys[[i]])) {
+      cols_i <- alt_keys[[i]]
+      if (length(cols_i) < 1L) {
+        stop("Alternate key '", names(alt_keys)[[i]], "' must name at least one column.",
+             call. = FALSE)
+      }
+      if (!is.character(cols_i)) {
         stop("'key' and 'alt_keys' columns must be names, not numbers.",
+             call. = FALSE)
+      }
+      if (anyNA(cols_i) || !all(nzchar(cols_i))) {
+        stop("Alternate key '", names(alt_keys)[[i]], "' must name at least one column.",
              call. = FALSE)
       }
     }
