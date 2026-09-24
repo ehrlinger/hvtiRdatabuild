@@ -85,7 +85,11 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
                       source_sha256 = NA_character_, parent_release = NA_character_,
                       parent_source = NA_character_, key_verdict = NA_character_,
                       stringsAsFactors = FALSE)
-    if (file.exists(out)) return(row)
+    if (file.exists(out)) {
+      if (.snapshot_complete(out)) return(row)
+      message(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
+      .clean_partial(out)
+    }
 
     if (is_current) return(.snapshot_one(sas, config, out, is_current, chunk_rows, expect, row))
     tryCatch(
@@ -146,6 +150,26 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
                   basename(sas), info$n_rows, info$n_cols, verdicts[["key"]],
                   lineage$release, lineage$source))
   row
+}
+
+#' Is a snapshot's parquet complete, with a sidecar carrying lineage and keys?
+#'
+#' A target is complete only when both the parquet and its `.snapshot_meta_path()`
+#' sidecar exist, and the sidecar has a `lineage` and a `keys` object. A parquet
+#' left behind without a complete sidecar (for example, after a crash between
+#' writing the parquet and the sidecar) is not a finished snapshot.
+#'
+#' @param out Path to the parquet file.
+#'
+#' @return `TRUE` if the snapshot is complete, `FALSE` otherwise.
+#'
+#' @keywords internal
+#' @noRd
+.snapshot_complete <- function(out) {
+  meta_path <- .snapshot_meta_path(out)
+  if (!file.exists(meta_path)) return(FALSE)
+  meta <- tryCatch(jsonlite::read_json(meta_path), error = function(e) NULL)
+  !is.null(meta) && !is.null(meta$lineage) && !is.null(meta$keys)
 }
 
 #' Remove a snapshot's parquet and sidecar, if either was partially written

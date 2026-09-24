@@ -127,6 +127,36 @@ test_that("a second run skips what is already written", {
   expect_equal(res$status, "skipped")
 })
 
+test_that("a parquet left behind with no sidecar is rebuilt, not skipped", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  out <- withr::local_tempdir()
+  # Simulate a crash between writing the parquet and its sidecar.
+  arrow::write_parquet(data.frame(ccfidu = "z"), file.path(out, "built.parquet"))
+  expect_false(file.exists(file.path(out, "built.meta.json")))
+  res <- suppressMessages(snapshot_master(m$cfg, out, which = "current"))
+  expect_equal(res$status, "written")
+  expect_true(file.exists(file.path(out, "built.meta.json")))
+})
+
+test_that("a parquet with an incomplete sidecar (no lineage/keys) is rebuilt, not skipped", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  out <- withr::local_tempdir()
+  arrow::write_parquet(data.frame(ccfidu = "z"), file.path(out, "built.parquet"))
+  jsonlite::write_json(list(parquet_sha256 = "deadbeef"),
+                       file.path(out, "built.meta.json"), auto_unbox = TRUE)
+  res <- suppressMessages(snapshot_master(m$cfg, out, which = "current"))
+  expect_equal(res$status, "written")
+  meta <- jsonlite::read_json(file.path(out, "built.meta.json"), simplifyVector = TRUE)
+  expect_false(is.null(meta$lineage))
+  expect_false(is.null(meta$keys))
+})
+
 test_that("a master with no parent records no lineage", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("jsonlite")
