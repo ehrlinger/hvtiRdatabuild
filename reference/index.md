@@ -63,3 +63,21 @@ release without changing its bytes.
   : Publish an immutable dataset release
 - [`withdraw_dataset_release()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/withdraw_dataset_release.md)
   : Withdraw a published dataset release
+
+## Master datasets
+
+Snapshot, lift and correct the master datasets studies read.
+
+- [`read_master_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.md)
+  : Read a master dataset's configuration
+- [`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md)
+  : Snapshot a master dataset to parquet, with its lineage
+- [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
+  : Lift a master's parquet snapshot into the warehouse as a view
+- [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md)
+  : Backfill a master's corrections from its SAS build, and regenerate
+  its view
+- [`propose_correction()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/propose_correction.md)
+  : Propose a correction to a single cell of a master
+- [`decide_correction()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/decide_correction.md)
+  : Decide a correction: accept, reject, supersede or bake it
