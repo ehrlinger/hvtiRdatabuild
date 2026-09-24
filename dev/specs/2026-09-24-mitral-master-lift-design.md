@@ -66,6 +66,7 @@ alt_keys:                        # zero or more, named
 parent:                          # optional; master_cardiac has none
   master: master_cardiac
   libref: master                 # the libref the SAS build reads the parent through
+parent_release: built_2026mar27 # optional; only when detection cannot decide (§4)
 snapshots: <share>/…/mitral/DATASETS
 current: built_all.sas7bdat
 history: "^built_all_.*\\.sas7bdat$"   # searched in snapshots/ and its immediate subfolders
@@ -80,7 +81,9 @@ the field the build-layer capture found missing exists upstream.
 
 **Validation** stops on:
 - a missing `name`, `key`, `snapshots`, `current` or `build_program`;
-- a `parent` without `libref`;
+- a `parent` missing either `master` or `libref`: without both, the lineage target cannot be
+  identified;
+- a `parent_release` that is not a single string, or that is set without a `parent`;
 - a column named twice across `key` and `alt_keys`;
 - a `history` pattern that does not compile.
 
@@ -113,6 +116,11 @@ lines.
   `master` column would allow one shared table, but the key columns differ between masters, so
   a shared table cannot hold both.
 - **Alternate-key columns** are the union across `alt_keys`, all nullable.
+- **Finding a row by an alternate key.** `propose_correction()` accepts the values of one named
+  alternate key in place of the primary key. They are resolved to the primary key before
+  anything is written: a null part never matches, and anything other than exactly one
+  matching row stops the call, printing the key's name and the match count, never a value.
+  The correction is stored against the primary key, with the alternate-key columns filled.
 - **Legacy facts.** The 21 inline fixes are recorded as `bake`, except the **`ccfid` remaps**.
   Those change the key itself, so they are reported unresolved as `key_variable` with their line
   numbers and never recorded as cell corrections. **Identity corrections are designed in the
@@ -133,10 +141,12 @@ lines.
 | `snapshot_master(config, out_dir, which = c("current", "history"), chunk_rows =)` | snapshots via `snapshot_oracle()`, checks the key and alternate keys, records the parent release |
 | `lift_master(config, con, parquet, dry_run = TRUE)` | DDL, key gate, load, parity (aggregates, sample, full), parity record, view. The dry run writes the DDL for a hand-off and touches nothing |
 | `backfill_corrections(config, con, dry_run = TRUE)` | corrections tables, legacy facts as `bake`, view and stale-view regeneration |
-| `propose_correction(config, con, ...)` / `decide_correction(config, con, ...)` | the everyday correction workflow |
+| `propose_correction(config, con, ..., dry_run = FALSE)` / `decide_correction(config, con, ..., dry_run = FALSE)` | the everyday correction workflow. `dry_run = TRUE` validates and returns the row without writing |
 
-A dry run is the default wherever a function writes to the warehouse. That keeps the default
-the cardiac runbooks had.
+A dry run is the default for the bulk phases, `lift_master()` and `backfill_corrections()`,
+which create tables, load data and regenerate views. The two correction writers default to
+writing, because a single proposal or decision is a deliberate act; their `dry_run = TRUE`
+validates without writing.
 
 ### 6.2 Files
 
@@ -182,6 +192,11 @@ New cases:
 - **Config validation**, one test per stop listed in §3.
 - **Parent detection:** from a synthetic log NOTE, from a program when there is no log, a stop
   when the candidate is ambiguous, and `parent_source` recorded each time.
+- **The log beats a conflicting program:** a synthetic log naming one parent release and a
+  program naming another records the log's, with `parent_source: log`.
+- **Finding a row by an alternate key:** resolves to exactly one row; a null part never
+  matches; zero or several matches stop the call with a message carrying no value.
+- **Writer dry runs:** `dry_run = TRUE` returns the row and leaves both tables unchanged.
 - **History search** across subfolders.
 - **A verdict per named alternate key.**
 - **An end-to-end `lift_master()` on duckdb** from a parent config and a child config to both
@@ -250,5 +265,10 @@ function belongs in the `bd` spec, not here, and is recorded so it is not lost.
 ## 11. Out of scope
 
 - Porting either master's derivations (phase 3), and identity corrections.
+- **The mapping from a child's key to its parent's.** Mitral joins on `ccfid` + `dtn_inst`,
+  cardiac on `ccfid` + surgery date. The lifted state never joins a child to its parent,
+  because the child's base is its own snapshot, so the mapping is needed only when the port
+  builds `master_mitral` over `master_cardiac`. The port spec adds it to `master.yml` as
+  `parent.join`.
 - The `bd` and `vars` templates, including the master read function (§9).
 - Masters with no warehouse source, and REDCap-held registries.
