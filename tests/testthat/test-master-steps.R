@@ -263,3 +263,32 @@ test_that("parity_full catches a compensating swap that parity_check's aggregate
   expect_true(!grepl("K5|K6|64|65", full_summary(res_full2)),
               label = "the full summary carries no key or value")
 })
+
+test_that("parity_full catches a key value changed in the table that aggregates would not", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("withr")
+  skip_if_not_installed("tidyselect")
+
+  d3 <- data.frame(id = paste0("K", 1:6), dt_surg = as.Date("2020-01-01") + 0:5,
+                   age = c(60, 61, 62, 63, 64, 65), stringsAsFactors = FALSE)
+  pq3 <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(d3, pq3)
+  con3 <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con3, shutdown = TRUE))
+  DBI::dbWriteTable(con3, "base3", d3)
+
+  res <- parity_full(con3, "base3", pq3, c("id", "dt_surg"), dialect = "duckdb")
+  expect_true(all(res$verdict == "match"), label = "full parity, including keys, passes at first")
+  expect_true("id+dt_surg" %in% res$variable, label = "the key row is labeled key columns joined")
+
+  # Swap a key value without changing any non-key aggregate: same set of ages,
+  # so the per-column aggregates and even a full column compare on 'id' alone
+  # could be fooled, but the (id, dt_surg) tuple set itself changes.
+  DBI::dbExecute(con3, "UPDATE base3 SET id = 'K7' WHERE id = 'K6'")
+  res2 <- parity_full(con3, "base3", pq3, c("id", "dt_surg"), dialect = "duckdb")
+  key_row <- res2[res2$variable == "id+dt_surg", ]
+  expect_equal(key_row$verdict, "mismatch")
+})

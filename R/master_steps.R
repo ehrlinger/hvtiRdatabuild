@@ -415,7 +415,14 @@ parity_full <- function(con, table, parquet, key, dialect = "mssql") {
     ok <- isTRUE(cmp$verdict %in% c("identical", "within_tolerance")) && rows_complete
     data.frame(variable = v, verdict = if (ok) "match" else "mismatch", stringsAsFactors = FALSE)
   })
-  do.call(rbind, rows)
+  pq_keys <- as.data.frame(arrow::read_parquet(parquet, col_select = tidyselect::all_of(key)))
+  db_keys <- DBI::dbGetQuery(con, sprintf("SELECT %s FROM %s",
+                                          paste(q(key), collapse = ", "), q(table)))
+  keys_match <- identical(sort(make_id(pq_keys)), sort(make_id(db_keys)))
+  key_row <- data.frame(variable = paste(key, collapse = "+"),
+                        verdict = if (keys_match) "match" else "mismatch",
+                        stringsAsFactors = FALSE)
+  do.call(rbind, c(rows, list(key_row)))
 }
 
 #' Format a `parity_full()` result for a report
