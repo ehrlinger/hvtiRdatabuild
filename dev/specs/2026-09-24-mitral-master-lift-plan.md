@@ -1423,8 +1423,9 @@ Expected: PASS for every `test-master-*` file.
 
 ```r
 # Gated: runs only against a scratch warehouse schema, with invented data. No PHI.
-# Set HVTI_MASTER_TEST_DSN (an ODBC DSN) and HVTI_MASTER_TEST_SCHEMA (a scratch schema
-# the DSN's login may create and drop tables in).
+# Set HVTI_MASTER_TEST_DSN (an ODBC DSN whose login already defaults to a scratch schema)
+# and HVTI_MASTER_TEST_SCHEMA (that schema's name). The test never changes the login: it
+# skips unless the login's default schema is the scratch one.
 
 test_that("lift and corrections behave on SQL Server as on duckdb", {
   dsn <- Sys.getenv("HVTI_MASTER_TEST_DSN")
@@ -1435,7 +1436,8 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   }
   con <- DBI::dbConnect(odbc::odbc(), dsn = dsn)
   withr::defer(DBI::dbDisconnect(con))
-  DBI::dbExecute(con, paste0("ALTER USER CURRENT_USER WITH DEFAULT_SCHEMA = [", schema, "]"))
+  current <- DBI::dbGetQuery(con, "SELECT SCHEMA_NAME() AS s")$s
+  skip_if(!identical(current, schema), "the DSN's default schema is not the scratch schema")
   dir <- withr::local_tempdir()
   d <- data.frame(ccfid = c("K1", "K2"), dt_surg = as.Date("2020-01-01") + 0:1,
                   age = c(65.5, 1 / 3), surgeon = c("s1", "S1 "), stringsAsFactors = FALSE)
