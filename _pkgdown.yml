@@ -50,10 +50,21 @@ reference:
   - publish_dataset
   - withdraw_dataset_release
 
+- title: Master datasets
+  desc: Snapshot, lift and correct the master datasets studies read.
+  contents:
+  - read_master_config
+  - snapshot_master
+  - lift_master
+  - backfill_corrections
+  - propose_correction
+  - decide_correction
+
 articles:
 - title: "Getting Started"
   contents:
   - coming-from-sas
+  - master-datasets
 
 footer:
   structure:

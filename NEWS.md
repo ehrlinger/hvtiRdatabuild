@@ -1,5 +1,16 @@
 # hvtiRdatabuild (unreleased)
 
+* **Master datasets.** Six new functions snapshot, lift and correct the master
+  datasets that study builds read. `read_master_config()` reads a `master.yml`
+  declaring a master's key, alternate keys and parent. `snapshot_master()`
+  freezes its SAS builds as parquet and records which parent release each was
+  built from, read from the run's log first. `lift_master()` loads a snapshot
+  into the warehouse behind key and full-parity gates and creates the master's
+  view. `backfill_corrections()`, `propose_correction()` and
+  `decide_correction()` keep an append-only record of corrections the view
+  applies. The bulk functions dry-run by default. See
+  `vignette("master-datasets")`. `duckdb` and `tidyselect` join `Suggests`.
+
 * **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
   study registration endpoint-neutral: `register_data()` no longer takes
   `event` or `time`, and `study_config()` no longer carries a study-wide
