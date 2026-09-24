@@ -1,5 +1,16 @@
 # hvtiRdatabuild (unreleased)
 
+* **`lift_master()` is the third export of the master machinery.** It checks a
+  master's primary key, creates a base table named for the snapshot's release,
+  loads the parquet snapshot a row group at a time, and proves it equal to the
+  snapshot with `parity_check()` and then `parity_full()` before recording the
+  parity result and creating the master's view. A dry run, the default, writes
+  the table's DDL next to the snapshot and touches nothing else. If the
+  master already has a corrections table, the view is created with
+  corrections applied instead of a plain `SELECT *`. Internal helpers
+  `.base_table_name()`, `.current_base()` and `.publish_views()` support it
+  and the next export in the series.
+
 * **The cardiac master-build scripts move from `dev/masters/cardiac/` into the
   package, internal and unexported.** `R/sql_dialect.R`, `R/corrections_sql.R`,
   `R/master_steps.R` and `R/legacy_facts.R` carry the dialect quoting, the
