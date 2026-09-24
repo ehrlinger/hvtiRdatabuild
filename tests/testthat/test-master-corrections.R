@@ -464,6 +464,34 @@ test_that("an unknown decision is an error", {
                ), "decision")
 })
 
+test_that("a backfill with only the corrections table present still creates decisions", {
+  skip_corr()
+  f <- corr_fixture()
+  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  expect_true(DBI::dbExistsTable(f$con, "master_c_corrections"))
+  expect_true(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
+  DBI::dbExecute(f$con, "DROP TABLE master_c_correction_decisions")
+  expect_false(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
+  r <- suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  expect_true(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
+  expect_true(r$appended >= 0L)
+})
+
+test_that("a failing metadata read during backfill is reported by step, without a value", {
+  skip_corr()
+  f <- corr_fixture()
+  testthat::local_mocked_bindings(
+    dbReadTable = function(conn, name, ...) stop("mock failure quoting SECRET_VALUE"),
+    .package = "DBI"
+  )
+  msg <- tryCatch(
+    suppressMessages(backfill_corrections(f$cfg, f$con, dialect = "duckdb")),
+    error = conditionMessage
+  )
+  expect_match(msg, "Step 'read metadata' failed")
+  expect_false(grepl("SECRET_VALUE", msg))
+})
+
 test_that("a decision on an unknown correction is an error", {
   skip_corr()
   f <- corr_fixture()

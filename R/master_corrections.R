@@ -108,17 +108,17 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
   tabs <- .master_tables(config)
   base <- .current_base(con, config, dialect)
   q <- quoter(dialect)
-  meta <- DBI::dbReadTable(con, tabs$meta)
-  types <- table_types(con, base)
+  meta <- run_step("read metadata", DBI::dbReadTable(con, tabs$meta))
+  types <- run_step("read column types", table_types(con, base))
 
   parsed <- parse_legacy_facts(readLines(config[["build_program"]], warn = FALSE),
     key_var = config[["key"]][[1]]
   )
   alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
-  base_keys <- DBI::dbGetQuery(con, sprintf(
+  base_keys <- run_step("read base keys", DBI::dbGetQuery(con, sprintf(
     "SELECT %s FROM %s",
     paste(q(c(config[["key"]], alt_cols)), collapse = ", "), q(base)
-  ))
+  )))
   rows <- legacy_rows(
     parsed$facts, base_keys, config[["key"]], config[["name"]], meta,
     basename(config[["build_program"]])
@@ -145,15 +145,21 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
     return(invisible(out))
   }
 
-  if (!DBI::dbExistsTable(con, tabs$corrections)) {
+  corrections_absent <- !DBI::dbExistsTable(con, tabs$corrections)
+  decisions_absent <- !DBI::dbExistsTable(con, tabs$decisions)
+  if (corrections_absent || decisions_absent) {
     alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
     ddl <- corrections_ddl(tabs$corrections, tabs$decisions,
       key_types = types[config[["key"]]],
       alt_key_types = if (length(alt_cols)) types[alt_cols] else NULL,
       dialect = dialect
     )
-    run_step("create corrections table", DBI::dbExecute(con, ddl[["corrections"]]))
-    run_step("create decisions table", DBI::dbExecute(con, ddl[["decisions"]]))
+    if (corrections_absent) {
+      run_step("create corrections table", DBI::dbExecute(con, ddl[["corrections"]]))
+    }
+    if (decisions_absent) {
+      run_step("create decisions table", DBI::dbExecute(con, ddl[["decisions"]]))
+    }
   }
   r <- run_step(
     "record legacy facts",
@@ -161,10 +167,10 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
   )
   .publish_views(config, con, base, dialect)
   out$appended <- as.integer(r$appended)
-  out$stale <- as.integer(DBI::dbGetQuery(con, sprintf(
+  out$stale <- as.integer(run_step("read stale count", DBI::dbGetQuery(con, sprintf(
     "SELECT COUNT(*) AS n FROM %s",
     q(tabs$stale)
-  ))$n)
+  )))$n)
   message("recorded ", out$appended, "; ", out$stale, " stale corrections")
   invisible(out)
 }
