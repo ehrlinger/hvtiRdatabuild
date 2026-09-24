@@ -139,3 +139,34 @@ test_that(".current_base stops when no parity has passed", {
   withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
   expect_error(.current_base(con, f$cfg, "duckdb"), "no passing parity")
 })
+
+test_that(".current_base's own stop messages are unwrapped, but its DB calls are run_step'd", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("withr")
+  skip_if_not_installed("tidyselect")
+  f <- lift_fixture()
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  suppressMessages(lift_master(f$cfg, con, f$pq, dry_run = FALSE, dialect = "duckdb"))
+
+  # The "no passing parity" message is the function's own and stays unwrapped.
+  msg_none <- tryCatch(
+    .current_base(con, structure(list(name = "master_none"), class = "master_config"),
+                  "duckdb"),
+    error = conditionMessage
+  )
+  expect_match(msg_none, "no passing parity")
+  expect_false(grepl("^Step '", msg_none))
+
+  # A failing DB call is wrapped by run_step and withholds the driver's message.
+  testthat::local_mocked_bindings(
+    dbExistsTable = function(conn, name, ...) stop("mock failure quoting SECRET_VALUE"),
+    .package = "DBI"
+  )
+  msg <- tryCatch(.current_base(con, f$cfg, "duckdb"), error = conditionMessage)
+  expect_match(msg, "Step 'check parity table exists' failed")
+  expect_false(grepl("SECRET_VALUE", msg))
+})

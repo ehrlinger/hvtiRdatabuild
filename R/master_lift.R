@@ -171,13 +171,14 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
 #' @noRd
 .current_base <- function(con, config, dialect) {
   tab <- .master_tables(config)$parity
-  if (!DBI::dbExistsTable(con, tab)) {
+  exists <- run_step("check parity table exists", DBI::dbExistsTable(con, tab))
+  if (!exists) {
     stop("Master ", config[["name"]], " has no passing parity record; run lift_master() first.",
          call. = FALSE)
   }
   q <- quoter(dialect)
   sql <- sprintf("SELECT base_table, checked_at FROM %s WHERE verdict = 'pass'", q(tab))
-  rec <- DBI::dbGetQuery(con, sql)
+  rec <- run_step("read passing parity record", DBI::dbGetQuery(con, sql))
   if (!nrow(rec)) {
     stop("Master ", config[["name"]], " has no passing parity record; run lift_master() first.",
          call. = FALSE)
