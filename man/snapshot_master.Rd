@@ -43,7 +43,11 @@ six hours after the dataset's), where SAS records every dataset it read;
 then, for the current build only, the build program's \code{set} statements; then
 \code{parent_release} in the configuration. The log comes first because a
 program can be edited after the run. A current build whose parent cannot be
-decided stops; a historical one records \code{"unknown"}.
+decided stops; a historical one with no detected parent records \code{"unknown"}.
+\code{parent_release} in the configuration, and the disagreement check against a
+detected parent, apply only to the current build: a declared release
+describes the build as configured today, not necessarily what an older
+historical dataset actually read.
 
 Only \verb{NOTE:} lines naming datasets are read from a log, never data lines.
 Nothing printed carries a key or a value.
