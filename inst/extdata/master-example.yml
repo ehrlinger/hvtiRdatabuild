@@ -1,0 +1,12 @@
+# A synthetic master configuration, for examples and tests. No real paths.
+name: master_example
+key: [ccfid, dt_surg]
+alt_keys:
+  epic: [emrn, encounter_date]
+parent:
+  master: master_parent
+  libref: master
+snapshots: /tmp/master-example
+current: built.sas7bdat
+history: "^built_.*\\.sas7bdat$"
+build_program: /tmp/master-example/bd.data.sas

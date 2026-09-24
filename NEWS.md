@@ -11,6 +11,14 @@
   join `Suggests`. Behaviour is unchanged; this is a relocation, not a
   rewrite.
 
+* **A new master-dataset API begins with `read_master_config()`.** This is the
+  first export of a six-export master machinery (`read_master_config()`,
+  `snapshot_master()`, `lift_master()`, `backfill_corrections()`,
+  `propose_correction()`, `decide_correction()`). The function reads a `master.yml`
+  file, validates it, and returns a `master_config` object holding the
+  master's name, keys, parent and snapshots. An internal `.master_tables()`
+  helper derives the names of tables that the corrections workflow creates.
+
 * **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
   study registration endpoint-neutral: `register_data()` no longer takes
   `event` or `time`, and `study_config()` no longer carries a study-wide
