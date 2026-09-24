@@ -83,37 +83,79 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
                       stringsAsFactors = FALSE)
     if (file.exists(out)) return(row)
 
-    lineage <- .resolve_parent(sas, config, is_current)
-    info <- snapshot_oracle(sas, out, expect = if (is_current) expect else NULL,
-                            chunk_rows = chunk_rows)
-    verdicts <- c(key = key_verdict(out, config[["key"]])$verdict,
-                  vapply(config[["alt_keys"]], function(cols) {
-                    key_verdict(out, cols, nonnull_only = TRUE)$verdict
-                  }, character(1)))
-    meta <- jsonlite::read_json(info$meta_path)
-    meta$lineage <- list(parent_master = if (is.null(config[["parent"]])) NULL else
-                           config[["parent"]][["master"]],
-                         parent_release = if (is.na(lineage$release)) NULL else
-                           lineage$release,
-                         parent_source = lineage$source)
-    meta$keys <- as.list(verdicts)
-    jsonlite::write_json(meta, info$meta_path, auto_unbox = TRUE, null = "null",
-                         pretty = TRUE)
-
-    row$status <- "written"
-    row$n_rows <- info$n_rows
-    row$n_cols <- info$n_cols
-    row$sha256 <- info$sha256
-    row$source_sha256 <- info$source_sha256
-    row$parent_release <- lineage$release
-    row$parent_source <- lineage$source
-    row$key_verdict <- verdicts[["key"]]
-    message(sprintf("%-40s %s rows x %s columns; key %s; parent %s (%s)",
-                    basename(sas), info$n_rows, info$n_cols, verdicts[["key"]],
-                    lineage$release, lineage$source))
-    row
+    if (is_current) return(.snapshot_one(sas, config, out, is_current, chunk_rows, expect, row))
+    tryCatch(
+      .snapshot_one(sas, config, out, is_current, chunk_rows, expect, row),
+      error = function(e) {
+        .clean_partial(out)
+        message(sprintf("FAILED  %s: %s", basename(sas), class(e)[[1]]))
+        row$status <- "failed"
+        row
+      }
+    )
   })
   invisible(do.call(rbind, rows))
+}
+
+#' Snapshot one dataset and record its lineage and key verdicts
+#'
+#' @param sas Path to the SAS dataset.
+#' @param config A `master_config`.
+#' @param out Path to write the parquet snapshot.
+#' @param is_current Whether this is the current build.
+#' @param chunk_rows Rows per chunk, passed to [snapshot_oracle()].
+#' @param expect Optional validation, passed to [snapshot_oracle()] for the
+#'   current build only.
+#' @param row The dataset's starting result row, to be filled in.
+#'
+#' @return The result row, with `status` `"written"`.
+#'
+#' @keywords internal
+#' @noRd
+.snapshot_one <- function(sas, config, out, is_current, chunk_rows, expect, row) {
+  lineage <- .resolve_parent(sas, config, is_current)
+  info <- snapshot_oracle(sas, out, expect = if (is_current) expect else NULL,
+                          chunk_rows = chunk_rows)
+  verdicts <- c(key = key_verdict(out, config[["key"]])$verdict,
+                vapply(config[["alt_keys"]], function(cols) {
+                  key_verdict(out, cols, nonnull_only = TRUE)$verdict
+                }, character(1)))
+  meta <- jsonlite::read_json(info$meta_path)
+  meta$lineage <- list(parent_master = if (is.null(config[["parent"]])) NULL else
+                         config[["parent"]][["master"]],
+                       parent_release = if (is.na(lineage$release)) NULL else
+                         lineage$release,
+                       parent_source = lineage$source)
+  meta$keys <- as.list(verdicts)
+  jsonlite::write_json(meta, info$meta_path, auto_unbox = TRUE, null = "null",
+                       pretty = TRUE)
+
+  row$status <- "written"
+  row$n_rows <- info$n_rows
+  row$n_cols <- info$n_cols
+  row$sha256 <- info$sha256
+  row$source_sha256 <- info$source_sha256
+  row$parent_release <- lineage$release
+  row$parent_source <- lineage$source
+  row$key_verdict <- verdicts[["key"]]
+  message(sprintf("%-40s %s rows x %s columns; key %s; parent %s (%s)",
+                  basename(sas), info$n_rows, info$n_cols, verdicts[["key"]],
+                  lineage$release, lineage$source))
+  row
+}
+
+#' Remove a snapshot's parquet and sidecar, if either was partially written
+#'
+#' @param out Path to the parquet file.
+#'
+#' @return `NULL`, invisibly.
+#'
+#' @keywords internal
+#' @noRd
+.clean_partial <- function(out) {
+  unlink(out)
+  unlink(.snapshot_meta_path(out))
+  invisible(NULL)
 }
 
 #' Historical builds matching the configuration's pattern
@@ -202,7 +244,8 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
 .resolve_parent <- function(sas, config, is_current) {
   if (is.null(config[["parent"]])) return(list(release = NA_character_, source = "none"))
   libref <- config[["parent"]][["libref"]]
-  log <- .bracketing_log(sas, c(dirname(sas), dirname(config[["build_program"]])))
+  log_dirs <- if (is_current) c(dirname(sas), dirname(config[["build_program"]])) else dirname(sas)
+  log <- .bracketing_log(sas, log_dirs)
   found <- if (!is.na(log)) .parent_from_log(log, libref) else character()
   source <- "log"
   if (!length(found) && is_current) {

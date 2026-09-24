@@ -110,3 +110,31 @@ test_that("a master with no parent records no lineage", {
   expect_true(is.na(res$parent_release))
   expect_equal(res$parent_source, "none")
 })
+
+test_that("a history dataset that fails to snapshot is recorded failed, and others continue", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  writeLines("not sas", file.path(m$dir, "2023", "built_2023bad.sas7bdat"))
+  out <- withr::local_tempdir()
+  res <- snapshot_master(m$cfg, out, which = "history")
+  bad <- res[res$file == "built_2023bad.sas7bdat", ]
+  good <- res[res$file == "built_2023jan.sas7bdat", ]
+  expect_equal(bad$status, "failed")
+  expect_equal(good$status, "written")
+  expect_false(file.exists(file.path(out, "built_2023bad.parquet")))
+  expect_false(file.exists(file.path(out, "built_2023bad.meta.json")))
+})
+
+test_that("history lineage does not pick up the current build's log", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  hist_file <- file.path(m$dir, "2023", "built_2023jan.sas7bdat")
+  log_time <- file.mtime(file.path(m$dir, "bd.data.log"))
+  Sys.setFileTime(hist_file, log_time - 60)
+  res <- snapshot_master(m$cfg, withr::local_tempdir(), which = "history")
+  expect_equal(res$parent_source, "unknown")
+})
