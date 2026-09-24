@@ -12,6 +12,12 @@ format: html
 #| include: false
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 library(hvtiRdatabuild)
+.master_deps <- requireNamespace("duckdb", quietly = TRUE) &&
+  requireNamespace("arrow", quietly = TRUE) &&
+  requireNamespace("jsonlite", quietly = TRUE) &&
+  requireNamespace("tidyselect", quietly = TRUE) &&
+  requireNamespace("dplyr", quietly = TRUE) &&
+  requireNamespace("withr", quietly = TRUE)
 ```
 
 ## What a master is, and why a view
@@ -83,7 +89,7 @@ recorded `"unknown"`. Only those `NOTE:` lines are ever read, never a data line,
 printed here can carry a key or a value.
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 dir <- tempfile("master")
 dir.create(dir)
 file.copy(system.file("extdata", "oracle_small.sas7bdat", package = "hvtiRdatabuild"),
@@ -113,14 +119,14 @@ next to the snapshot, so a hand-off to whoever holds warehouse write rights cost
 to try:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 pq <- file.path(dir, "built_demo.parquet")
 arrow::write_parquet(data.frame(id = c("K1", "K2"), x = c(1, 2)), pq)
 jsonlite::write_json(
-  list(parquet_sha256 = "invented",
-       columns = list(list(variable = "id", r_class = "character"),
-                      list(variable = "x", r_class = "numeric"))),
-  file.path(dir, "built_demo.meta.json"), auto_unbox = TRUE)
+                     list(parquet_sha256 = digest::digest(pq, algo = "sha256", file = TRUE),
+                          columns = list(list(variable = "id", r_class = "character"),
+                                         list(variable = "x", r_class = "numeric"))),
+                     file.path(dir, "built_demo.meta.json"), auto_unbox = TRUE)
 cfg_path <- file.path(dir, "master.yml")
 writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              "current: built_demo.sas7bdat",
@@ -134,9 +140,9 @@ Once the DDL is right, the same call with `dry_run = FALSE` creates the base tab
 it, checks parity, and publishes the view:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 lifted <- lift_master(read_master_config(cfg_path), con, pq, dry_run = FALSE,
-                       dialect = "duckdb")
+                      dialect = "duckdb")
 lifted$verdict
 DBI::dbGetQuery(con, "SELECT * FROM master_demo2 ORDER BY id")
 ```
@@ -152,14 +158,14 @@ reason and line number, never recorded. It also requires a passing parity record
 only runs after `lift_master()` has succeeded once. Dry run first, as with `lift_master()`:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 d <- data.frame(ccfid = c("K1", "K2", "K3"), dt_surg = as.Date("2020-01-01") + 0:2,
                 emrn = c("E1", NA, "E3"), age = c(65.5, NA, 70),
                 surgeon = c("S1", "S2", "S3"), stringsAsFactors = FALSE)
 pq2 <- file.path(dir, "built_t.parquet")
 arrow::write_parquet(d, pq2)
 jsonlite::write_json(
-  list(parquet_sha256 = "invented", columns = list(
+  list(parquet_sha256 = digest::digest(pq2, algo = "sha256", file = TRUE), columns = list(
     list(variable = "ccfid", r_class = "character"),
     list(variable = "dt_surg", r_class = "Date"),
     list(variable = "emrn", r_class = "character"),
@@ -188,7 +194,7 @@ section). Run it for real and the correction and its `bake` decision land in the
 and the master's view is regenerated:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 backfill_corrections(cfg2, con, dry_run = FALSE, dialect = "duckdb")
 DBI::dbGetQuery(con, "SELECT decision FROM master_c_correction_decisions")
 ```
@@ -200,11 +206,11 @@ all. They come from an investigator's chart review, one cell at a time, and
 `propose_correction()` is how that reaches the table:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 prop <- propose_correction(cfg2, con,
-  key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
-  expected_prior = 70, new_value = 71, evidence_type = "chart_review",
-  evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
+                           key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
+                           expected_prior = 70, new_value = 71, evidence_type = "chart_review",
+                           evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
 prop$verdict
 ```
 
@@ -214,7 +220,7 @@ the primary key, with `emrn` filled in for reference. A proposal writes no decis
 does not apply until someone accepts it:
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 ```
@@ -228,12 +234,12 @@ view alongside the master's own, naming exactly which corrections did not apply 
 so a stale correction is a thing you can query, not a thing you have to notice went quiet.
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 DBI::dbGetQuery(con, "SELECT * FROM master_c_corrections_stale")
 ```
 
 ```{r}
-#| eval: !expr requireNamespace("duckdb", quietly = TRUE) && requireNamespace("arrow", quietly = TRUE) && requireNamespace("jsonlite", quietly = TRUE) && requireNamespace("tidyselect", quietly = TRUE)
+#| eval: !expr .master_deps
 #| include: false
 DBI::dbDisconnect(con, shutdown = TRUE)
 ```
