@@ -10,7 +10,11 @@
 #' then, for the current build only, the build program's `set` statements; then
 #' `parent_release` in the configuration. The log comes first because a
 #' program can be edited after the run. A current build whose parent cannot be
-#' decided stops; a historical one records `"unknown"`.
+#' decided stops; a historical one with no detected parent records `"unknown"`.
+#' `parent_release` in the configuration, and the disagreement check against a
+#' detected parent, apply only to the current build: a declared release
+#' describes the build as configured today, not necessarily what an older
+#' historical dataset actually read.
 #'
 #' Only `NOTE:` lines naming datasets are read from a log, never data lines.
 #' Nothing printed carries a key or a value.
@@ -254,17 +258,15 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
   }
   declared <- config[["parent_release"]]
   if (length(found) == 1L) {
-    if (!is.null(declared) && !identical(tolower(declared), found)) {
+    if (is_current && !is.null(declared) && !identical(tolower(declared), found)) {
       stop("The declared parent_release disagrees with the ", source,
            ", which names ", found, ".", call. = FALSE)
     }
     return(list(release = found, source = source))
   }
+  if (!is_current) return(list(release = NA_character_, source = "unknown"))
   if (!is.null(declared)) return(list(release = tolower(declared), source = "declared"))
-  if (is_current) {
-    stop("Could not decide which release of ", config[["parent"]][["master"]], " ",
-         basename(sas), " was built from (", length(found), " candidates). ",
-         "Set 'parent_release' in ", basename(config[["file"]]), ".", call. = FALSE)
-  }
-  list(release = NA_character_, source = "unknown")
+  stop("Could not decide which release of ", config[["parent"]][["master"]], " ",
+       basename(sas), " was built from (", length(found), " candidates). ",
+       "Set 'parent_release' in ", basename(config[["file"]]), ".", call. = FALSE)
 }

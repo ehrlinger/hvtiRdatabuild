@@ -89,6 +89,33 @@ test_that("history is found in subfolders, and its unknown parent does not stop"
   expect_equal(res$parent_source, "unknown")
 })
 
+test_that("history with no log ignores a declared parent_release and records unknown", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  m$cfg$parent_release <- "built_a"
+  res <- snapshot_master(m$cfg, withr::local_tempdir(), which = "history")
+  expect_equal(res$parent_source, "unknown")
+  expect_true(is.na(res$parent_release))
+})
+
+test_that("a historical log's release wins over a disagreeing declared parent_release", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  hist <- file.path(m$dir, "2023", "built_2023jan.sas7bdat")
+  log <- file.path(m$dir, "2023", "bd.log")
+  writeLines("NOTE: There were 4 observations read from the data set MASTER.BUILT_2023DEC01.",
+             log)
+  Sys.setFileTime(log, file.mtime(hist) + 60)
+  m$cfg$parent_release <- "built_2099other"
+  res <- snapshot_master(m$cfg, withr::local_tempdir(), which = "history")
+  expect_equal(res$parent_source, "log")
+  expect_equal(res$parent_release, "built_2023dec01")
+})
+
 test_that("a second run skips what is already written", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("jsonlite")
