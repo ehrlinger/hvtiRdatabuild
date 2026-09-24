@@ -163,9 +163,12 @@ test_that("a master with no parent records no lineage", {
   skip_if_not_installed("tidyselect")
   m <- make_master()
   m$cfg$parent <- NULL
-  res <- snapshot_master(m$cfg, withr::local_tempdir(), which = "current")
+  out <- withr::local_tempdir()
+  res <- snapshot_master(m$cfg, out, which = "current")
   expect_true(is.na(res$parent_release))
   expect_equal(res$parent_source, "none")
+  # Its sidecar is complete, so a second run skips rather than rebuilding it.
+  expect_equal(snapshot_master(m$cfg, out, which = "current")$status, "skipped")
 })
 
 test_that("a history dataset that fails to snapshot is recorded failed, and others continue", {

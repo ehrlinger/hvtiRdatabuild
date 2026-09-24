@@ -145,8 +145,10 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
     return(invisible(out))
   }
 
-  corrections_absent <- !DBI::dbExistsTable(con, tabs$corrections)
-  decisions_absent <- !DBI::dbExistsTable(con, tabs$decisions)
+  corrections_absent <- !run_step("check corrections table",
+                                  DBI::dbExistsTable(con, tabs$corrections))
+  decisions_absent <- !run_step("check decisions table",
+                                DBI::dbExistsTable(con, tabs$decisions))
   if (corrections_absent || decisions_absent) {
     alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
     ddl <- corrections_ddl(tabs$corrections, tabs$decisions,
