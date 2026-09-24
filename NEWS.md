@@ -19,6 +19,16 @@
   master's name, keys, parent and snapshots. An internal `.master_tables()`
   helper derives the names of tables that the corrections workflow creates.
 
+* **`snapshot_master()` freezes a master's current or historical SAS builds as
+  parquet and records their lineage.** It calls `snapshot_oracle()` per
+  dataset, checks the primary and alternate keys, and decides which release of
+  the parent master each build read from evidence of what ran: first the
+  bracketing SAS log, then (for the current build only) the build program's
+  `set` statements, then a declared `parent_release`. A current build whose
+  parent cannot be decided stops; a historical one is recorded `"unknown"`.
+  Each sidecar gains a `lineage` and a `keys` object. Nothing printed carries
+  a key or a value.
+
 * **An analysis set names its own `event` column.** hvtiRutilities 1.4.0 made
   study registration endpoint-neutral: `register_data()` no longer takes
   `event` or `time`, and `study_config()` no longer carries a study-wide
