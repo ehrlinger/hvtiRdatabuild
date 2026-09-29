@@ -1,4 +1,4 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.2.4
 
 * **Master datasets.** Six new functions snapshot, lift and correct the master
   datasets that study builds read. `read_master_config()` reads a `master.yml`
