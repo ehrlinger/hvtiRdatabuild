@@ -1,5 +1,55 @@
 # Changelog
 
+## hvtiRdatabuild 0.2.4
+
+- **Master datasets.** Six new functions snapshot, lift and correct the
+  master datasets that study builds read.
+  [`read_master_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.md)
+  reads a `master.yml` declaring a master’s key, alternate keys and
+  parent.
+  [`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md)
+  freezes its SAS builds as parquet and records which parent release
+  each was built from, read from the run’s log first.
+  [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
+  loads a snapshot into the warehouse behind key and full-parity gates
+  and creates the master’s view.
+  [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md),
+  [`propose_correction()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/propose_correction.md)
+  and
+  [`decide_correction()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/decide_correction.md)
+  keep an append-only record of corrections the view applies. The bulk
+  functions dry-run by default. See
+  [`vignette("master-datasets")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/master-datasets.md).
+  `duckdb` and `tidyselect` join `Suggests`.
+
+- **An analysis set names its own `event` column.** hvtiRutilities 1.4.0
+  made study registration endpoint-neutral: `register_data()` no longer
+  takes `event` or `time`, and `study_config()` no longer carries a
+  study-wide `cohort`.
+  [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+  had counted `n_events` and `n_censored` from that cohort, so under
+  1.4.0 every write failed. A set now declares `event:` (one of its
+  `vars`) to get both counts, and an `expect` on either count without
+  one stops with a message naming the missing key. A set with no `event`
+  records `n` alone. A set that relied on the study-wide cohort needs
+  the one-line `event:` added, which also changes its declaration hash,
+  so
+  [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+  asks for one rewrite. hvtiRdatabuild now requires hvtiRutilities 1.4.0
+  or later, since its tests and registration fixture use the
+  endpoint-neutral `register_data()`.
+
+- **[`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
+  can snapshot a dataset too large for memory.** The new `chunk_rows`
+  argument reads the SAS dataset a chunk at a time and writes the chunks
+  as row groups of one parquet file. It also records a SHA-256 of the
+  SAS source beside the parquet checksum, and writes a `.meta.json`
+  sidecar holding each column’s label, SAS format and type, so that
+  metadata survives into systems that cannot read R attributes.
+  `jsonlite` joins `Suggests`. The source checksum now brackets the
+  read, taken before and after; a mismatch removes the parquet and stops
+  rather than write a snapshot of a file that changed underneath it.
+
 ## hvtiRdatabuild 0.2.3
 
 - **New
