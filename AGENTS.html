@@ -55,6 +55,12 @@
 <li>No real data, and no patient value, has entered the repository or a test message.</li>
 </ul></div>
 <div class="section level2">
+<h2 id="the-standard-of-care">The standard of care<a class="anchor" aria-label="anchor" href="#the-standard-of-care"></a></h2>
+<p><strong>This package is not headed to CRAN, and it is held to the CRAN standard anyway.</strong> The hvtiR packages are distributed internally to get feedback faster than a public release allows, not to lower the bar.</p>
+<ul><li>Before a release, audit against every chapter of the <a href="https://contributor.r-project.org/cran-cookbook/" class="external-link">CRAN Cookbook</a>, run <code>R CMD check --as-cran</code> with the manual and vignettes built, check reverse dependencies within the hvtiR family and check URLs.</li>
+<li>Every Cookbook or <code>--as-cran</code> finding is real work to do. Order findings by effort and risk, never by “would CRAN care”, and never offer “skip it, it’s internal” as an option.</li>
+</ul></div>
+<div class="section level2">
 <h2 id="the-automated-gates">The automated gates<a class="anchor" aria-label="anchor" href="#the-automated-gates"></a></h2>
 <table class="table"><thead><tr><th>workflow</th>
 <th>fails on</th>
