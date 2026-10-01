@@ -312,6 +312,20 @@ check("reports its fingerprint", grepl(paste0('"fingerprint": "', want_fp, '"'),
   fixed = TRUE
 ))
 
+# ⚠️ An empty census must fail, not report zero. The first real run met an
+# unmounted share and printed "candidate files: 0" with exit status 0.
+exit_of <- function(r) {
+  s <- suppressWarnings(system2(rscript, c(scan_script, "--root", r, "--count-only"),
+    stdout = FALSE, stderr = FALSE
+  ))
+  if (is.null(s)) 0L else as.integer(s)
+}
+empty_root <- file.path(tempdir(), paste0("dwpull-empty-", Sys.getpid()))
+dir.create(empty_root)
+check("missing root exits nonzero", exit_of(file.path(empty_root, "absent")) != 0L)
+check("root with no dwpull programs exits nonzero", exit_of(empty_root) != 0L)
+unlink(empty_root, recursive = TRUE)
+
 unlink(root, recursive = TRUE)
 if (fail) {
   message("\n", fail, " failure(s)")

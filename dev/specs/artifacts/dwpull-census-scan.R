@@ -75,6 +75,14 @@ getarg <- function(flag, default = NULL) {
   if (is.na(i) || i == length(args)) default else args[[i + 1L]]
 }
 root <- normalise_root(getarg("--root", "/studies"))
+# ⚠️ FAIL LOUD ON AN EMPTY ROOT. list.files() returns character(0) for a root
+# that does not exist or cannot be read, and the first real run of this scan
+# reported "candidate files: 0" as a clean result after the share had dropped
+# its mount. A census of nothing is not a finding.
+if (!dir.exists(root)) {
+  stop("--root does not exist or cannot be read: ", root,
+       "\n  If it is a network share, check that it is mounted.", call. = FALSE)
+}
 outfile <- getarg("--out", "dwpull-census.json")
 min_studies <- as.integer(getarg("--min-studies", "3"))
 top_n <- as.integer(getarg("--top", "30"))
@@ -97,6 +105,10 @@ message(
   "candidate files: ", length(files), "  (template copies: ", sum(is_tp),
   ", study instances: ", sum(!is_tp), ")"
 )
+if (!length(files)) {
+  stop("no dwpull programs under ", root, ": refusing to report an empty census.",
+       call. = FALSE)
+}
 if (count_only) {
   message("\n--count-only: nothing was read.")
   quit(save = "no", status = 0)
