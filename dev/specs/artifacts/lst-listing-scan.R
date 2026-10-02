@@ -107,7 +107,16 @@ inspect <- function(path) {
     # case-insensitive WITHOUT the cost of ignore.case: "Procedure" and
     # "procedure" both contain "rocedure", "Estimates" and "estimates" both
     # contain "stimates".
-    keep <- grepl("rocedure|stimates|ariance|^ *[Oo]bs ", lines)
+    # 🔴 ...but NOT for ALL CAPS, which those fragments miss: "PROCEDURE" does
+    # not contain "rocedure", and `[Oo]bs` does not match `OBS`. Every run
+    # before 2026-10-02 dropped an upper-case `OBS` header (the shape PROC
+    # PRINT's LISTING output takes) and an upper-case banner before any pattern
+    # saw them. The upper-case literal is added beside each fragment, which
+    # keeps the prefilter as cheap as it was.
+    keep <- grepl(
+      "rocedure|ROCEDURE|stimates|STIMATES|ariance|ARIANCE|^ *[Oo][Bb][Ss] ",
+      lines
+    )
     if (!any(keep)) { rm(lines, keep); next }
     lines <- tolower(lines[keep])
     if (!has[["model"]] && any(grepl(RE_MODEL, lines))) has[["model"]] <- TRUE
