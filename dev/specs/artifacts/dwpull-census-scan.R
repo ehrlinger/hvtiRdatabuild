@@ -54,11 +54,15 @@
 #   - The one numeric literal it keeps is a parsed `datediff` bound, which is a
 #     day offset. Every other number is replaced before any further parsing, and
 #     every `in (...)` list is collapsed.
-#   - It emits no path, file name, study identifier, directory name or source
-#     line. View, table, column and rename NAMES are schema metadata and are
-#     emitted, but only when seen in at least `--min-studies` studies (default
-#     3) or present in the canonical template, and never when they carry a study
-#     identifier's shape. Everything below the floor is counted, not named.
+#   - It emits no file name, study identifier, directory name or source line,
+#     and one path only: `_provenance.root` is "/studies" when that was the
+#     root, as in every committed result, and "(non-default root)" otherwise,
+#     so a run over any other mount never records where it ran.
+#   - View, table, column and rename NAMES are schema metadata, and they are
+#     emitted only under `--emit-names` (see below). Even then, a name appears
+#     only when seen in at least `--min-studies` studies (default 3) or present
+#     in the canonical template, and never when it carries a study identifier's
+#     shape. Everything below the floor is counted, not named.
 #   - Template variants are labelled by rank (1 = canonical), never by path.
 #
 # THE CONSOLE echoes the --root you passed, and counts.
