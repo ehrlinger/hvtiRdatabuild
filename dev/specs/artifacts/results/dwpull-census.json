@@ -1,0 +1,688 @@
+{
+  "_provenance": {
+    "script": "dwpull-census-scan.R",
+    "question": "what do study instances of tp.stXXXX_dwpull.sas change from the template?",
+    "issue": "ehrlinger/hvtiRdatabuild#72",
+    "run_at": "2026-10-02T14:31:55-0400",
+    "root": "/studies",
+    "file_pattern": "dw_?pull[^/]*\\.sas$",
+    "fingerprint": "md5",
+    "emits_names": false,
+    "template_source": "most common byte-identical tp.* copy",
+    "hvtiRutilities_version": "1.4.3",
+    "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
+    "min_studies": 3,
+    "top": 30,
+    "files_considered": 326,
+    "files_read": 326,
+    "files_unreadable": 0,
+    "files_parse_error": 0
+  },
+  "corpus": {
+    "study_instance_files": 113,
+    "template_files": 213,
+    "studies": 92,
+    "unplaced_instance_files": 10,
+    "studies_with_include": 91,
+    "studies_connecting": 90
+  },
+  "unedited": {
+    "studies_byte_identical_to_canonical": 2,
+    "studies_structurally_identical_to_canonical": 3
+  },
+  "views": {
+    "distinct": 70,
+    "below_floor": 50,
+    "withheld_as_identifying": 0,
+    "top": [
+      {
+        "studies": 84
+      },
+      {
+        "studies": 81
+      },
+      {
+        "studies": 80
+      },
+      {
+        "studies": 73
+      },
+      {
+        "studies": 69
+      },
+      {
+        "studies": 61
+      },
+      {
+        "studies": 52
+      },
+      {
+        "studies": 43
+      },
+      {
+        "studies": 33
+      },
+      {
+        "studies": 32
+      },
+      {
+        "studies": 16
+      },
+      {
+        "studies": 15
+      },
+      {
+        "studies": 13
+      },
+      {
+        "studies": 10
+      },
+      {
+        "studies": 6
+      },
+      {
+        "studies": 4
+      },
+      {
+        "studies": 4
+      },
+      {
+        "studies": 4
+      },
+      {
+        "studies": 4
+      },
+      {
+        "studies": 3
+      }
+    ],
+    "template_views": 8,
+    "beyond_template_distinct": 62
+  },
+  "connections": {
+    "connect_to_odbc_db": {
+      "hvi_dm": 88,
+      "warehouse": 19
+    }
+  },
+  "columns": {
+    "items": {
+      "alias_star": 748,
+      "bare_star": 223,
+      "explicit": 4110,
+      "expression": 3
+    },
+    "studies_selecting_star": 90,
+    "studies_selecting_explicit": 88,
+    "names": {
+      "distinct": 154,
+      "below_floor": 64,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 87
+        },
+        {
+          "studies": 87
+        },
+        {
+          "studies": 77
+        },
+        {
+          "studies": 77
+        },
+        {
+          "studies": 75
+        },
+        {
+          "studies": 73
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 64
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        }
+      ]
+    },
+    "renames": {
+      "distinct": 90,
+      "below_floor": 46,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 77
+        },
+        {
+          "studies": 77
+        },
+        {
+          "studies": 77
+        },
+        {
+          "studies": 73
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 72
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 71
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 61
+        },
+        {
+          "studies": 29
+        },
+        {
+          "studies": 17
+        },
+        {
+          "studies": 14
+        },
+        {
+          "studies": 11
+        },
+        {
+          "studies": 8
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 4
+        }
+      ]
+    },
+    "rename_patterns": {
+      "distinct": 3,
+      "below_floor": 2,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 77
+        }
+      ]
+    }
+  },
+  "joins": {
+    "joins_by_type": {
+      "inner": 939,
+      "left": 4
+    },
+    "studies_by_type": {
+      "inner": 89,
+      "left": 3
+    },
+    "studies_by_key_class": {
+      "patid": 87,
+      "other": 79,
+      "masterid": 58
+    },
+    "other_keys": {
+      "distinct": 18,
+      "below_floor": 5,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 65
+        },
+        {
+          "studies": 40
+        },
+        {
+          "studies": 26
+        },
+        {
+          "studies": 15
+        },
+        {
+          "studies": 7
+        },
+        {
+          "studies": 7
+        },
+        {
+          "studies": 7
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 5
+        },
+        {
+          "studies": 5
+        },
+        {
+          "studies": 5
+        },
+        {
+          "studies": 3
+        }
+      ]
+    },
+    "implicit_joins": 0,
+    "studies_with_extra_join_condition": 79,
+    "studies_left_join_valve_or_cabg": 0,
+    "studies_outer_join_valve_or_cabg": 0,
+    "studies_retyping_a_template_join": 1
+  },
+  "windows": {
+    "datediff_clauses": 354,
+    "unparsed_datediff": 0,
+    "studies_with_any": 83,
+    "studies_lopsided": 82,
+    "canonical_is_lopsided": true,
+    "signatures": {
+      "after >= 0": 82,
+      "before <= 180": 79,
+      "before <= 60": 61,
+      "before >= 18 year": 5,
+      "unknown-index <= 180": 3,
+      "unknown-index >= 0": 3
+    },
+    "index_columns": {
+      "distinct": 5,
+      "below_floor": 2,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 81
+        },
+        {
+          "studies": 56
+        },
+        {
+          "studies": 5
+        }
+      ]
+    }
+  },
+  "pulls": {
+    "canonical_pulls": 8,
+    "per_instance_min": 0,
+    "per_instance_median": 8,
+    "per_instance_max": 23,
+    "studies_dropping_a_template_pull": 57,
+    "studies_with_pull_beyond_template": 56,
+    "adhoc_views": {
+      "distinct": 18,
+      "below_floor": 5,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 38
+        },
+        {
+          "studies": 33
+        },
+        {
+          "studies": 32
+        },
+        {
+          "studies": 30
+        },
+        {
+          "studies": 27
+        },
+        {
+          "studies": 15
+        },
+        {
+          "studies": 7
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 3
+        }
+      ]
+    },
+    "adhoc_event_views": {
+      "distinct": 8,
+      "below_floor": 3,
+      "withheld_as_identifying": 0,
+      "top": [
+        {
+          "studies": 32
+        },
+        {
+          "studies": 15
+        },
+        {
+          "studies": 6
+        },
+        {
+          "studies": 4
+        },
+        {
+          "studies": 4
+        }
+      ]
+    }
+  },
+  "upload": {
+    "studies_with_odbc_libname": 76,
+    "odbc_libname_db": {
+      "hvi_dm": 76
+    },
+    "studies_writing_via_odbc_libref": 75,
+    "studies_reading_via_odbc_libref": 64,
+    "studies_execute_write": 0,
+    "studies_any_write": 75
+  },
+  "templates": {
+    "files": 213,
+    "byte_variants": 8,
+    "structural_variants": 6,
+    "canonical_files": 192,
+    "variants": [
+      {
+        "rank": 1,
+        "files": 192,
+        "first_seen": "2022-08",
+        "last_seen": "2026-09",
+        "structurally_canonical": true,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 2,
+        "files": 12,
+        "first_seen": "2022-02",
+        "last_seen": "2022-03",
+        "structurally_canonical": false,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 3,
+        "files": 2,
+        "first_seen": "2022-05",
+        "last_seen": "2022-05",
+        "structurally_canonical": false,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 1
+        },
+        "removed": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 4,
+        "files": 2,
+        "first_seen": "2022-07",
+        "last_seen": "2022-07",
+        "structurally_canonical": true,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 5,
+        "files": 2,
+        "first_seen": "2022-04",
+        "last_seen": "2022-04",
+        "structurally_canonical": false,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 6,
+        "files": 1,
+        "first_seen": "2022-04",
+        "last_seen": "2022-04",
+        "structurally_canonical": false,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 7,
+        "files": 1,
+        "first_seen": "2024-03",
+        "last_seen": "2024-03",
+        "structurally_canonical": false,
+        "pulls": 7,
+        "added": {
+          "named": {},
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "named_count": 3,
+          "below_floor": 0
+        }
+      },
+      {
+        "rank": 8,
+        "files": 1,
+        "first_seen": "2021-12",
+        "last_seen": "2021-12",
+        "structurally_canonical": false,
+        "pulls": 8,
+        "added": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        },
+        "removed": {
+          "named": {},
+          "named_count": 2,
+          "below_floor": 0
+        }
+      }
+    ],
+    "instances_nearest_canonical": 62,
+    "instances_nearest_drifted": 51,
+    "instances_nearest_by_rank": [
+      {
+        "rank": 1,
+        "instances": 62
+      },
+      {
+        "rank": 2,
+        "instances": 19
+      },
+      {
+        "rank": 3,
+        "instances": 2
+      },
+      {
+        "rank": 4,
+        "instances": 0
+      },
+      {
+        "rank": 5,
+        "instances": 0
+      },
+      {
+        "rank": 6,
+        "instances": 0
+      },
+      {
+        "rank": 7,
+        "instances": 30
+      },
+      {
+        "rank": 8,
+        "instances": 0
+      }
+    ]
+  }
+}

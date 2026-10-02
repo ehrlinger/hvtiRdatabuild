@@ -30,6 +30,20 @@ match. All fourteen below used 1.1.9 over `/studies`.
 | `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
 | `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
 | `direct-procmi.json` | ⭐ does anyone run `PROC MI` without the macro | 2026-09-06 19:35 |
+| `dwpull-census.json` | ⭐ what studies change from the warehouse-pull template (#72) | 2026-10-02 14:31 |
+
+## `dwpull-census.json` is counts only, and why it says so
+
+This scan *can* name warehouse views, columns and join keys, under `--emit-names`.
+This repository is public, so the committed file was run without it, and its
+`_provenance.emits_names` is `false`. A named run exists and is held internally;
+`../../2026-10-02-dwpull-census.md` cites counts only.
+
+It also differs from the files above in two ways. It ran under `hvtiRutilities`
+1.4.3, not 1.1.9, so its study counts are not comparable with theirs. And it was
+the first scan to emit a backslash (its file pattern), which exposed that the shared
+`to_json()` did not escape one. That writer is fixed, and every file above still
+parses.
 
 ## `nimpute-scan.json` has been rerun twice, and this is the third file
 
