@@ -196,7 +196,7 @@ outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
 res <- system2(rscript, c(
   shQuote(normalizePath(scan_script)),
-  "--root", shQuote(root), "--out", shQuote(outfile)
+  "--root", shQuote(root), "--out", shQuote(outfile), "--emit-names"
 ),
 stdout = TRUE, stderr = TRUE
 )
@@ -323,6 +323,20 @@ if (requireNamespace("jsonlite", quietly = TRUE)) {
 } else {
   message("SKIP output parses as JSON: jsonlite is not installed")
 }
+
+# ⚠️ THE DEFAULT IS COUNTS ONLY. The repository is public, so a run without
+# --emit-names must name no view, column or join key, while keeping the counts.
+plain_out <- file.path(root, "plain.json")
+invisible(system2(rscript, c(
+  shQuote(normalizePath(scan_script)),
+  "--root", shQuote(root), "--out", shQuote(plain_out)
+), stdout = FALSE, stderr = FALSE))
+pj <- if (file.exists(plain_out)) paste(readLines(plain_out), collapse = " ") else ""
+check("default run records emits_names false", grepl("\"emits_names\": false", pj, fixed = TRUE))
+for (nm in c("warehouse.dbo.vw_sts_extra", "newcol_common", "vw_cardsurg_base", "rp_")) {
+  check(paste("default run does not name", nm), nzchar(pj) && !grepl(nm, tolower(pj), fixed = TRUE))
+}
+check("default run keeps the counts", grepl("\"beyond_template_distinct\":", pj, fixed = TRUE))
 
 # ⚠️ An empty census must fail, not report zero. The first real run met an
 # unmounted share and printed "candidate files: 0" with exit status 0.

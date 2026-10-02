@@ -87,6 +87,12 @@ outfile <- getarg("--out", "dwpull-census.json")
 min_studies <- as.integer(getarg("--min-studies", "3"))
 top_n <- as.integer(getarg("--top", "30"))
 count_only <- "--count-only" %in% args
+# ⚠️ NAMES ARE OPT-IN, as in `build-structure-scan.R`. View, column and join-key
+# names are schema, not patient data, but this repository is public and a
+# floor cannot judge what an institution's warehouse schema should disclose.
+# The default is counts only, so forgetting the flag yields a safe artifact.
+# `--emit-names` is for an internal copy that someone reads before sharing.
+emit_names <- "--emit-names" %in% args
 
 .folders <- taxonomy_folders()
 study_of <- study_of_factory(root, .folders)
@@ -806,11 +812,17 @@ top_names <- function(cat, always = character(0), extra = NULL) {
     distinct = length(n),
     below_floor = sum(!keep & !ident),
     withheld_as_identifying = sum(ident),
-    top = lapply(utils::head(seq_along(kn), top_n), function(k) {
-      r <- list(name = names(kn)[[k]], studies = kn[[k]])
-      if (!is.null(extra)) r[[extra]] <- names(kn)[[k]] %in% always
-      r
-    })
+    top = if (emit_names) {
+      lapply(utils::head(seq_along(kn), top_n), function(k) {
+        r <- list(name = names(kn)[[k]], studies = kn[[k]])
+        if (!is.null(extra)) r[[extra]] <- names(kn)[[k]] %in% always
+        r
+      })
+    } else {
+      # Counts in rank order, with no name: how concentrated the usage is
+      # survives, and which view or column it is does not.
+      lapply(utils::head(unname(kn), top_n), function(k) list(studies = k))
+    }
   )
 }
 counts_of <- function(cat) {
@@ -838,7 +850,10 @@ render_diff <- function(feats) {
     return(list(named = list(), below_floor = 0L))
   }
   ok <- vapply(feats, feature_nameable, logical(1))
-  list(named = as.list(sort(feats[ok])), below_floor = sum(!ok))
+  list(
+    named = if (emit_names) as.list(sort(feats[ok])) else list(),
+    named_count = sum(ok), below_floor = sum(!ok)
+  )
 }
 
 # ---- template variants --------------------------------------------------------
@@ -884,6 +899,7 @@ out <- list(
     root = if (identical(root, "/studies")) "/studies" else "(non-default root)",
     file_pattern = dwpull_re,
     fingerprint = fingerprint_method,
+    emits_names = emit_names,
     template_source = template_source,
     hvtiRutilities_version = as.character(utils::packageVersion("hvtiRutilities")),
     taxonomy_folders = paste(sort(.folders), collapse = ","),
@@ -909,7 +925,7 @@ out <- list(
   views = c(
     top_names("view", tmpl_views, "in_template"),
     list(
-      template_views = as.list(sort(tmpl_views)),
+      template_views = if (emit_names) as.list(sort(tmpl_views)) else length(tmpl_views),
       beyond_template_distinct = sum(!names(view_n) %in% tmpl_views)
     )
   ),
