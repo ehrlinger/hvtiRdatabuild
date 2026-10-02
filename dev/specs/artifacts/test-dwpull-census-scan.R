@@ -312,6 +312,18 @@ check("reports its fingerprint", grepl(paste0('"fingerprint": "', want_fp, '"'),
   fixed = TRUE
 ))
 
+# ⚠️ PARSE the output; do not only match its text. The first server run wrote
+# `"file_pattern": "...\.sas$"`, which reads fine and is not legal JSON.
+if (requireNamespace("jsonlite", quietly = TRUE)) {
+  parsed_ok <- tryCatch({
+    jsonlite::fromJSON(outfile, simplifyVector = FALSE)
+    TRUE
+  }, error = function(e) FALSE)
+  check("output parses as JSON", parsed_ok)
+} else {
+  message("SKIP output parses as JSON: jsonlite is not installed")
+}
+
 # ⚠️ An empty census must fail, not report zero. The first real run met an
 # unmounted share and printed "candidate files: 0" with exit status 0.
 exit_of <- function(r) {

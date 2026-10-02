@@ -273,6 +273,12 @@ resolve <- function(expr, lookups, depth = 0L) {
 
 # ---- output -----------------------------------------------------------------
 # Minimal JSON writer so the scans need no packages.
+#
+# ⚠️ BACKSLASHES MUST BE ESCAPED. The dwpull census was the first scan to emit
+# one (its own file pattern, `dw_?pull[^/]*\\.sas$`), and `\.` is not a legal
+# JSON escape, so the whole file failed to parse while still reading fine by
+# eye. Escape the backslash before anything else is substituted.
+json_esc <- function(x) gsub("\\", "\\\\", x, fixed = TRUE)
 to_json <- function(x, ind = 0) {
   pad <- strrep(" ", ind)
   if (is.null(x) || (length(x) == 1 && is.na(x) && !is.character(x))) return("null")
@@ -290,11 +296,11 @@ to_json <- function(x, ind = 0) {
     }
     nm <- names(x)
     items <- vapply(seq_along(x), function(i) {
-      paste0(pad, "  \"", nm[i], "\": ", to_json(x[[i]], ind + 2))
+      paste0(pad, "  \"", json_esc(nm[i]), "\": ", to_json(x[[i]], ind + 2))
     }, character(1))
     return(paste0("{\n", paste(items, collapse = ",\n"), "\n", pad, "}"))
   }
-  if (is.character(x)) return(paste0("\"", gsub("\"", "'", x), "\""))
+  if (is.character(x)) return(paste0("\"", gsub("\"", "'", json_esc(x)), "\""))
   if (is.logical(x))   return(if (isTRUE(x)) "true" else "false")
   if (is.na(x))        return("null")
   format(x, scientific = FALSE)
