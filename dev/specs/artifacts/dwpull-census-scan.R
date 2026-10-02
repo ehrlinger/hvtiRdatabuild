@@ -406,7 +406,10 @@ parse_query <- function(q, dd) {
       extra = extra
     )
   }
-  coh <- names(alias)[startsWith(unlist(alias), "hvi_dm.")]
+  # vapply, not unlist: a query whose FROM names no recognisable table (a
+  # subquery, say) leaves `alias` empty, and unlist(list()) is NULL, which
+  # startsWith() rejects. The first real run stopped here at file ~170 of 326.
+  coh <- names(alias)[startsWith(vapply(alias, identity, character(1)), "hvi_dm.")]
   cohort_alias <- if (length(coh)) {
     coh[[1]]
   } else if (length(base_tbls)) {
@@ -605,8 +608,21 @@ features_of <- function(p) {
 
 # ---- walk ---------------------------------------------------------------------
 parsed <- vector("list", length(files))
+# ⚠️ One program this reader cannot follow must not halt the census. A parse
+# error is COUNTED (`files_parse_error`) and its condition class is tallied; the
+# message is not printed, because it can quote a fragment of the source.
+n_parse_error <- 0L
+parse_error_class <- character(0)
 for (i in seq_along(files)) {
-  parsed[i] <- list(parse_file(files[[i]]))
+  parsed[i] <- list(tryCatch(parse_file(files[[i]]), error = function(e) {
+    n_parse_error <<- n_parse_error + 1L
+    parse_error_class <<- c(parse_error_class, class(e)[[1]])
+    structure(list(), class = "parse_error")
+  }))
+  if (inherits(parsed[[i]], "parse_error")) {
+    parsed[i] <- list(NULL)
+    next
+  }
   if (is.null(parsed[[i]])) .scan_unreadable$n <- .scan_unreadable$n + 1L
   if (i %% 50 == 0) message("  ", i, " / ", length(files))
 }
@@ -875,7 +891,8 @@ out <- list(
     top = top_n,
     files_considered = length(files),
     files_read = sum(ok),
-    files_unreadable = unreadable_count()
+    files_unreadable = unreadable_count(),
+    files_parse_error = n_parse_error
   ),
   corpus = list(
     study_instance_files = length(inst),
@@ -997,4 +1014,6 @@ message("pull beyond template:       ", out$pulls$studies_with_pull_beyond_templ
 message("cohort upload (any write):  ", out$upload$studies_any_write)
 message("nearest drifted variant:    ", out$templates$instances_nearest_drifted)
 message("files unreadable:           ", unreadable_count())
+message("files with a parse error:   ", n_parse_error,
+        if (n_parse_error) paste0("  (", paste(unique(parse_error_class), collapse = ", "), ")"))
 message("\nwrote ", outfile)

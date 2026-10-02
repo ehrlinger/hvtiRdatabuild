@@ -326,6 +326,30 @@ check("missing root exits nonzero", exit_of(file.path(empty_root, "absent")) != 
 check("root with no dwpull programs exits nonzero", exit_of(empty_root) != 0L)
 unlink(empty_root, recursive = TRUE)
 
+# ⚠️ A subquery in FROM leaves the reader no table alias. The first real run
+# stopped on exactly this with `startsWith(unlist(alias), ...)`: unlist() of an
+# empty list is NULL. It must complete, and report no parse error.
+subq_root <- file.path(tempdir(), paste0("dwpull-subq-", Sys.getpid()))
+d <- file.path(subq_root, "cardiac", "synth", folder)
+dir.create(d, recursive = TRUE)
+writeLines(c(
+  "proc sql;",
+  "  connect to odbc (noprompt=\"driver=x; database=HVI_DM; uid=&dbuid; pwd=&dbpwd;\");",
+  "  create table work.a as select * from connection to odbc",
+  "    (select x.* from (select b.masterid from warehouse.dbo.vw_CardSurg_Base b) x);",
+  "  disconnect from odbc;",
+  "quit;"
+), file.path(d, "st0001_dwpull.sas"))
+subq_out <- file.path(subq_root, "out.json")
+subq_status <- suppressWarnings(system2(rscript, c(
+  scan_script, "--root", subq_root, "--out", subq_out
+), stdout = FALSE, stderr = FALSE))
+check("subquery in FROM does not halt the scan", is.null(subq_status) || subq_status == 0L)
+subq_json <- if (file.exists(subq_out)) paste(readLines(subq_out), collapse = "\n") else ""
+check("subquery in FROM is not a parse error",
+      grepl("\"files_parse_error\": 0", subq_json, fixed = TRUE))
+unlink(subq_root, recursive = TRUE)
+
 unlink(root, recursive = TRUE)
 if (fail) {
   message("\n", fail, " failure(s)")
