@@ -23,6 +23,7 @@ Depends:
 Imports:
     DBI,
     digest,
+    dplyr,
     filelock,
     haven,
     hvtiRutilities (>= 1.5.1),
@@ -34,7 +35,6 @@ Remotes:
     ehrlinger/hvtiRutilities
 Suggests:
     arrow,
-    dplyr,
     duckdb,
     hvtiPlotR,
     jsonlite,
