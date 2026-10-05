@@ -6,3 +6,6 @@
   exclusions.
 - Document the synthetic build, study-code, and attrition workflow in the SAS
   migration vignette.
+- Preserve duplicate source identifier columns for audit, keep patient
+  identifiers stable across joins, and redact callback diagnostics and
+  structural inspection.

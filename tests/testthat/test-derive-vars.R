@@ -13,12 +13,14 @@
   config <- read_study_config(path)
   base <- data.frame(
     masterid = c("SYN101", "SYN102"), value = c(2, 4),
-    eligible = c(TRUE, FALSE), stringsAsFactors = FALSE
+    eligible = c(TRUE, FALSE),
+    clinical_value = c("SYNTHETIC-CLINICAL-A", "SYNTHETIC-CLINICAL-B"),
+    stringsAsFactors = FALSE
   )
   raw <- structure(list(
     tables = list(bdbase = base),
     manifest = data.frame(
-      module = "base", output = "bdbase", n_rows = 2L, n_cols = 3L,
+      module = "base", output = "bdbase", n_rows = 2L, n_cols = 4L,
       pulled_at = as.POSIXct("2026-10-01", tz = "UTC")
     )
   ), class = "pull_result")
@@ -183,4 +185,68 @@ test_that("derived results print shape and counts without patient values", {
 
   expect_match(printed, "Derived dataset: 2 row")
   expect_false(grepl("SYN10", printed, fixed = TRUE))
+})
+
+test_that("str on derive results omits patient and clinical values", {
+  fixture <- .derive_build_fixture()
+  callback <- function(data, cohort, config) list(data = data, cohort = cohort)
+  result <- derive_vars(fixture$build, fixture$config, callback)
+  printed <- paste(capture.output(utils::str(result)), collapse = "\n")
+
+  expect_match(printed, "derive_result")
+  expect_false(grepl("SYN101|SYNTHETIC-CLINICAL", printed))
+})
+
+test_that("callback warning and message text is redacted on success", {
+  fixture <- .derive_build_fixture()
+  warnings <- character()
+  messages <- character()
+  callback <- function(data, cohort, config) {
+    warning("warning contains SYN101", call. = FALSE)
+    message("message contains SYN101")
+    list(data = data, cohort = cohort)
+  }
+  withCallingHandlers(
+    derive_vars(fixture$build, fixture$config, callback),
+    warning = function(condition) {
+      warnings <<- c(warnings, conditionMessage(condition))
+      invokeRestart("muffleWarning")
+    },
+    message = function(condition) {
+      messages <<- c(messages, conditionMessage(condition))
+      invokeRestart("muffleMessage")
+    }
+  )
+
+  expect_match(warnings, "callback warning.*suppressed")
+  expect_match(messages, "callback message.*suppressed")
+  expect_false(grepl("SYN101", paste(warnings, messages), fixed = TRUE))
+})
+
+test_that("callback warning and message text is redacted on failure", {
+  fixture <- .derive_build_fixture()
+  warnings <- character()
+  messages <- character()
+  callback <- function(data, cohort, config) {
+    warning("warning contains SYN101", call. = FALSE)
+    message("message contains SYN101")
+    stop("error contains SYN101")
+  }
+  err <- withCallingHandlers(
+    tryCatch(derive_vars(fixture$build, fixture$config, callback), error = identity),
+    warning = function(condition) {
+      warnings <<- c(warnings, conditionMessage(condition))
+      invokeRestart("muffleWarning")
+    },
+    message = function(condition) {
+      messages <<- c(messages, conditionMessage(condition))
+      invokeRestart("muffleMessage")
+    }
+  )
+
+  expect_match(conditionMessage(err), "callback failed")
+  expect_match(warnings, "callback warning.*suppressed")
+  expect_match(messages, "callback message.*suppressed")
+  expect_false(grepl("SYN101", paste(conditionMessage(err), warnings, messages),
+                     fixed = TRUE))
 })

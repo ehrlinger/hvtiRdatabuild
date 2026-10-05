@@ -26,13 +26,28 @@ derive_vars <- function(build, config, study_derive) {
     stop("'study_derive' must be a function.", call. = FALSE)
   }
 
+  diagnostics <- new.env(parent = emptyenv())
+  diagnostics$warning <- FALSE
+  diagnostics$message <- FALSE
   callback_result <- tryCatch(
-    study_derive(build$data, build$cohort, config),
+    withCallingHandlers(
+      study_derive(build$data, build$cohort, config),
+      warning = function(condition) {
+        diagnostics$warning <- TRUE
+        invokeRestart("muffleWarning")
+      },
+      message = function(condition) {
+        diagnostics$message <- TRUE
+        invokeRestart("muffleMessage")
+      }
+    ),
     error = function(error) {
+      .report_derive_diagnostics(diagnostics)
       stop("Study derivation callback failed; error details were suppressed.",
            call. = FALSE)
     }
   )
+  .report_derive_diagnostics(diagnostics)
   if (!is.list(callback_result) || is.null(names(callback_result)) ||
         anyDuplicated(names(callback_result)) ||
         !all(c("data", "cohort") %in% names(callback_result))) {
@@ -96,6 +111,29 @@ print.derive_result <- function(x, ...) {
   print(cohort_summary(x$cohort)$stages,
         row.names = FALSE)
   invisible(x)
+}
+
+#' Safely inspect a derived dataset result
+#'
+#' @param object A `derive_result`.
+#' @param ... Ignored.
+#'
+#' @return `NULL`, invisibly.
+#' @export
+str.derive_result <- function(object, ...) {
+  cat("Structure of derive_result\n")
+  print.derive_result(object, ...)
+  invisible(NULL)
+}
+
+.report_derive_diagnostics <- function(diagnostics) {
+  if (diagnostics$warning) {
+    warning("Study derivation callback warning(s) occurred; details suppressed.",
+            call. = FALSE)
+  }
+  if (diagnostics$message) {
+    message("Study derivation callback message(s) occurred; details suppressed.")
+  }
 }
 
 .validate_derived_cohort <- function(original, updated) {

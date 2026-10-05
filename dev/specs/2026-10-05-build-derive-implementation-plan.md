@@ -36,6 +36,7 @@ repositories, and its transfer format remains a separate decision.
 - Missing or unknown stage metadata must fail instead of being interpreted as an empty history.
 - One-to-many source modules must not silently duplicate the primary built cohort.
 - Missing values in study exclusion predicates must follow an explicit rule and be tested.
+- Default `str()` inspection and summary row names must not reveal patient or clinical values.
 
 ---
 
@@ -62,12 +63,16 @@ These signatures make the conceptual contract executable and are review points f
   `n_remaining`) and `$reasons` (`stage_id`, `reason`, `n_excluded`) tables. It never returns
   patient identifiers.
 - Printed record and result objects show dimensions and cohort counts only.
+- Duplicate source column names are normalized in build copies after repeated identifier
+  columns are verified; the `pull_result` tables remain unchanged for oracle comparison.
+- Study callback warnings, messages, and errors are replaced with generic diagnostics so
+  callback condition text cannot accidentally expose patient values.
 
 ## File structure
 
-- `R/cohort_record.R`: constructor, validation, stage append helper, summary, and safe print.
-- `R/build_dataset.R`: primary patient-level module assembly and `build_result` creation.
-- `R/derive_vars.R`: validated study-code runner and `derive_result` creation.
+- `R/cohort_record.R`: constructor, validation, stage append helper, summary, and safe print/str.
+- `R/build_dataset.R`: primary patient-level module assembly and safe `build_result` inspection.
+- `R/derive_vars.R`: validated study-code runner and safe `derive_result` inspection.
 - `R/study_config.R`: no executable expressions; existing `derive` flags select named shared
   steps, while study-specific code is supplied as an R function.
 - `tests/testthat/test-cohort-record.R`: schema, order, summary, and privacy behavior.
@@ -148,9 +153,10 @@ Expected: all cohort-record tests pass. Run `devtools::document()` and review ge
 
 - [x] **Step 1: Write synthetic assembly tests**
 
-Cover primary-table preservation, joins by declared module keys, missing-key errors,
-one-to-many event tables remaining separate from the one-row-per-patient built data, and
-ID-set disagreement with the cohort record. Assert only synthetic shapes, counts, and verdicts.
+Cover primary-table preservation, joins by declared module keys, overlapping identifiers,
+duplicated source column names, missing-key errors, one-to-many event tables remaining
+separate from the one-row-per-patient built data, and ID-set disagreement with the cohort
+record. Assert only synthetic shapes, counts, and verdicts.
 
 - [x] **Step 2: Run the focused test file and confirm failures**
 
@@ -193,7 +199,7 @@ Expected: all builder tests pass. Run `devtools::document()` and review generate
 
 Cover successful derived columns, ordered local exclusions, explicit handling of missing
 predicate values, empty/no-op derivation, malformed return values, dropped IDs, duplicated
-IDs, and error messages that do not reveal test IDs.
+IDs, warning/message/error redaction, and `str()` output that does not reveal synthetic values.
 
 - [x] **Step 2: Run the focused test file and confirm failures**
 
@@ -239,6 +245,6 @@ Run: `Rscript -e 'devtools::check()'`
 Expected: 0 errors, 0 warnings, 0 notes; inspect testthat skip counts as well as the check
 summary.
 
-- [ ] **Step 4: Review the final diff**
+- [x] **Step 4: Review the final diff**
 
 Review only the files in this plan and keep existing unrelated worktree changes untouched.

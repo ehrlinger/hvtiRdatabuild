@@ -142,3 +142,23 @@ test_that("a cohort history must contain an initial stage", {
   expect_error(new_cohort_record(members, stages, "patient_id"),
                "at least one stage")
 })
+
+test_that("summary output omits patient-valued row names", {
+  record <- .cohort_fixture()
+  rownames(record$members) <- c(
+    "SYN001", "SYN002", "SYN001-at-build", "SYN002-at-build",
+    "SYN001-at-derive"
+  )
+  reasons <- cohort_summary(record)$reasons
+  printed <- paste(capture.output(print(reasons)), collapse = "\n")
+
+  expect_false(any(grepl("SYN", rownames(reasons), fixed = TRUE)))
+  expect_false(grepl("SYN", printed, fixed = TRUE))
+})
+
+test_that("str on cohort records reports counts without member values", {
+  printed <- paste(capture.output(utils::str(.cohort_fixture())), collapse = "\n")
+
+  expect_match(printed, "cohort_record")
+  expect_false(grepl("SYN001|SYN002", printed))
+})

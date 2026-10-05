@@ -37,12 +37,13 @@ new_cohort_record <- function(members, stages, patient_id_col) {
   .validate_cohort_outcomes(members)
   .validate_cohort_sequence(members, stages)
 
+  member_data <- members[c("patient_id", "stage_id", "included", "reason")]
+  stage_data <- stages[c("stage_id", "order", "label", "source", "provenance")]
+  row.names(member_data) <- NULL
+  row.names(stage_data) <- NULL
   structure(
-    list(
-      members = members[c("patient_id", "stage_id", "included", "reason")],
-      stages = stages[c("stage_id", "order", "label", "source", "provenance")],
-      patient_id_col = patient_id_col
-    ),
+    list(members = member_data, stages = stage_data,
+         patient_id_col = patient_id_col),
     class = "cohort_record"
   )
 }
@@ -126,6 +127,7 @@ cohort_summary <- function(cohort) {
   excluded <- cohort$members[!cohort$members$included, , drop = FALSE]
   if (nrow(excluded)) {
     reason_keys <- unique(excluded[c("stage_id", "reason")])
+    row.names(reason_keys) <- NULL
     reason_keys$n_excluded <- vapply(seq_len(nrow(reason_keys)), function(i) {
       sum(excluded$stage_id == reason_keys$stage_id[i] &
             excluded$reason == reason_keys$reason[i])
@@ -149,6 +151,19 @@ print.cohort_record <- function(x, ...) {
   print(summary$stages[c("label", "n_in", "n_excluded", "n_remaining")],
         row.names = FALSE)
   invisible(x)
+}
+
+#' Safely inspect a cohort record
+#'
+#' @param object A `cohort_record`.
+#' @param ... Ignored.
+#'
+#' @return `NULL`, invisibly.
+#' @export
+str.cohort_record <- function(object, ...) {
+  cat("Structure of cohort_record\n")
+  print.cohort_record(object, ...)
+  invisible(NULL)
 }
 
 .validate_cohort_tables <- function(members, stages, outcomes_only = FALSE) {

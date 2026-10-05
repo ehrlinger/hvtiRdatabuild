@@ -44,7 +44,10 @@ build_dataset <- function(raw, config, cohort) {
   }
 
   base_spec <- specs$base
-  data <- raw$tables[[base_spec$output]]
+  data <- .normalize_module_table(
+    raw$tables[[base_spec$output]], base_spec$module,
+    c(base_spec$join_key, cohort$patient_id_col)
+  )
   base_keys <- .validate_module_key(data, base_spec$module, base_spec$join_key)
   patient_id_col <- cohort$patient_id_col
   if (!patient_id_col %in% names(data)) {
@@ -76,7 +79,10 @@ build_dataset <- function(raw, config, cohort) {
   }
   if ("vitalstatus" %in% config$modules) {
     status_spec <- specs$vitalstatus
-    status <- raw$tables[[status_spec$output]]
+    status <- .normalize_module_table(
+      raw$tables[[status_spec$output]], status_spec$module,
+      c(status_spec$join_key, patient_id_col)
+    )
     status_keys <- .validate_module_key(
       status, status_spec$module, status_spec$join_key
     )
@@ -88,7 +94,7 @@ build_dataset <- function(raw, config, cohort) {
       data,
       status,
       by = status_spec$join_key,
-      suffix = c(".base", ".bdstat")
+      suffix = c("", ".bdstat")
     )
     data <- as.data.frame(data)
     tables[[status_spec$output]] <- NULL
@@ -131,6 +137,19 @@ print.build_result <- function(x, ...) {
   invisible(x)
 }
 
+#' Safely inspect a built dataset result
+#'
+#' @param object A `build_result`.
+#' @param ... Ignored.
+#'
+#' @return `NULL`, invisibly.
+#' @export
+str.build_result <- function(object, ...) {
+  cat("Structure of build_result\n")
+  print.build_result(object, ...)
+  invisible(NULL)
+}
+
 .validate_module_key <- function(data, module, key, unique = TRUE) {
   if (!is.data.frame(data)) {
     stop("Module '", module, "' did not return a data frame.", call. = FALSE)
@@ -139,6 +158,7 @@ print.build_result <- function(x, ...) {
     stop("Module '", module, "' is missing its declared join key.",
          call. = FALSE)
   }
+  .check_duplicate_ids(data, module, key)
   values <- data[[key]]
   if (!is.atomic(values) || anyNA(values)) {
     stop("Module '", module, "' has missing or invalid join-key values.",
@@ -154,4 +174,31 @@ print.build_result <- function(x, ...) {
          call. = FALSE)
   }
   values
+}
+
+.normalize_module_table <- function(data, module, identifier_columns) {
+  if (!is.data.frame(data)) {
+    stop("Module '", module, "' did not return a data frame.", call. = FALSE)
+  }
+  .check_duplicate_ids(data, module, identifier_columns)
+  names(data) <- make.unique(names(data), sep = ".dup")
+  data
+}
+
+.check_duplicate_ids <- function(data, module, columns) {
+  for (column in unique(columns)) {
+    positions <- which(names(data) == column)
+    if (length(positions) > 1L) {
+      first <- data[[positions[1L]]]
+      matches <- vapply(positions[-1L], function(i) {
+        isTRUE(all.equal(first, data[[i]], check.attributes = FALSE))
+      }, logical(1))
+      if (!all(matches)) {
+        stop("Module '", module,
+             "' contains conflicting copies of an identifier column.",
+             call. = FALSE)
+      }
+    }
+  }
+  invisible(NULL)
 }

@@ -15,10 +15,12 @@
     masterid = c("M001", "M002"),
     patid = c("P001", "P002"),
     base_value = c(10L, 20L),
+    clinical_note = c("SYNTHETIC-CLINICAL-A", "SYNTHETIC-CLINICAL-B"),
     stringsAsFactors = FALSE
   )
   status <- data.frame(
     masterid = c("M001", "M002"),
+    patid = c("P001", "P002"),
     status_value = c("alive", "deceased"),
     stringsAsFactors = FALSE
   )
@@ -30,7 +32,8 @@
     ),
     fup = data.frame(patid = c("P001", "P002", "P002"), fup_value = 4:6),
     bdevents = data.frame(
-      patid = c("P001", "P001"), event_value = c("A", "B")
+      patid = c("P001", "P001"),
+      event_value = c("SYNTHETIC-EVENT-A", "SYNTHETIC-EVENT-B")
     )
   )
   outputs <- vapply(config$modules, function(module) {
@@ -162,4 +165,53 @@ test_that("a base-only build returns no supporting event tables", {
 
   expect_equal(nrow(result$data), 2L)
   expect_length(result$tables, 0L)
+})
+
+test_that("the declared patient identifier survives overlapping joins", {
+  fixture <- .build_fixture()
+  cohort <- .build_cohort(c("P001", "P002"))
+  cohort$patient_id_col <- "patid"
+  result <- build_dataset(fixture$raw, fixture$config, cohort)
+  no_op <- function(data, cohort, config) list(data = data, cohort = cohort)
+  derived <- derive_vars(result, fixture$config, no_op)
+
+  expect_identical(result$data$patid, c("P001", "P002"))
+  expect_identical(derived$data$patid, c("P001", "P002"))
+})
+
+test_that("duplicate raw identifier columns are verified and normalized", {
+  fixture <- .build_fixture()
+  status <- fixture$raw$tables$bdstat
+  status$redundant_masterid <- status$masterid
+  names(status)[4] <- "masterid"
+  fixture$raw$tables$bdstat <- status
+  result <- build_dataset(fixture$raw, fixture$config, .build_cohort())
+
+  expect_identical(result$data$masterid.dup1, c("M001", "M002"))
+  expect_identical(sum(names(fixture$raw$tables$bdstat) == "masterid"), 2L)
+})
+
+test_that("conflicting duplicate identifier columns fail without values", {
+  fixture <- .build_fixture()
+  status <- fixture$raw$tables$bdstat
+  status$redundant_masterid <- c("M001", "M999")
+  names(status)[4] <- "masterid"
+  fixture$raw$tables$bdstat <- status
+  err <- tryCatch(
+    build_dataset(fixture$raw, fixture$config, .build_cohort()),
+    error = identity
+  )
+
+  expect_s3_class(err, "error")
+  expect_match(conditionMessage(err), "conflicting copies")
+  expect_false(grepl("M999", conditionMessage(err), fixed = TRUE))
+})
+
+test_that("str on build results omits primary and event table values", {
+  fixture <- .build_fixture()
+  result <- build_dataset(fixture$raw, fixture$config, .build_cohort())
+  printed <- paste(capture.output(utils::str(result)), collapse = "\n")
+
+  expect_match(printed, "build_result")
+  expect_false(grepl("M001|P001|SYNTHETIC-CLINICAL|SYNTHETIC-EVENT", printed))
 })
