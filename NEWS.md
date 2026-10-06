@@ -1,3 +1,10 @@
+# hvtiRdatabuild (unreleased)
+
+* Now requires R 4.4.0 or newer, up from 4.1.0, to match the rest of the
+  HVTI family. `hvtiR::install()` installs the members together, and several
+  already required 4.4.0, so on an older R the install failed whatever this
+  package declared.
+
 # hvtiRdatabuild 0.2.4
 
 * **Master datasets.** Six new functions snapshot, lift and correct the master

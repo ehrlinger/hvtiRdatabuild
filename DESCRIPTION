@@ -19,7 +19,7 @@ Description: Builds analysis-ready clinical datasets for the clinical
   the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets
   they replace.
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.4.0)
 Imports:
     DBI,
     digest,
