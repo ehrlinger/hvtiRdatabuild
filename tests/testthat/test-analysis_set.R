@@ -313,14 +313,25 @@ test_that("an unwritten set says how to write it", {
   expect_error(read_analysis_set("eda", cfg), 'write_analysis_set\\("eda"\\)')
 })
 
-test_that("a rewritten built dataset makes the set stale", {
+test_that("a newly registered built dataset makes the set stale", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
   write_analysis_set("eda", cfg)
-  f <- hvtiRutilities::built_path(cfg)
-  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
-  expect_error(read_analysis_set("eda", cfg), "built dataset has changed")
+  cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
+  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
+  expect_error(read_analysis_set("eda", hvtiRutilities::study_config(cfg$root)), "built dataset has changed")
+})
+
+test_that("rebuilding the source without registering it does not make a set stale", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE) # a rebuild nobody registered
+
+  expect_no_error(read_analysis_set("eda", cfg))
+  expect_match(.built_state(cfg)$file, "[.]parquet$")
 })
 
 test_that("an edited rule makes the set stale", {
