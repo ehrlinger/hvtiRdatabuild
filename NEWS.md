@@ -11,6 +11,10 @@
   already required 4.4.0, so on an older R the install failed whatever this
   package declared.
 
+* `DESCRIPTION` now declares the Quarto command line tool in
+  `SystemRequirements`. The vignettes have always needed it to build; the
+  field makes that visible to installers and to `R CMD check`.
+
 # hvtiRdatabuild 0.2.4
 
 * **Master datasets.** Six new functions snapshot, lift and correct the master
