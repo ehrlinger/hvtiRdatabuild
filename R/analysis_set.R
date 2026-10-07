@@ -209,9 +209,12 @@
   invisible(target)
 }
 
-# The built dataset's identity: its sha256 as the manifest records it (kept
-# current by read_built()'s cache, so it is never re-hashed here), plus a stat,
-# which catches a rewrite that no read_built() call has recorded yet.
+# The built dataset's identity: its sha256 as the manifest records it, plus a
+# stat. For a dataset registered as a dated parquet (hvtiRutilities 2026-10),
+# the identity is that registered version, so rebuilding the source without
+# registering it does not make a set stale; jobs read nothing new. Otherwise it
+# is the source, whose stat catches a rewrite no read_built() call has recorded.
+# The parquet sits beside the source, which is where hvtiRutilities resolves it.
 .built_state <- function(cfg) {
   m <- yaml::read_yaml(file.path(cfg$root, "manifest.yaml"))
   e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
@@ -219,9 +222,13 @@
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
          "hvtiRutilities::register_data() or read_built() first.",
          call. = FALSE)
-  p <- hvtiRutilities::built_path(cfg)
+  e <- e[[1L]]
+  versioned <- is.character(e$parquet) && length(e$parquet) == 1L &&
+    !is.na(e$parquet) && nzchar(e$parquet)
+  src <- hvtiRutilities::built_path(cfg)
+  p <- if (versioned) file.path(dirname(src), e$parquet) else src
   info <- file.info(p)
-  list(file = cfg$built, sha256 = e[[1L]]$sha256,
+  list(file = if (versioned) e$parquet else cfg$built, sha256 = e$sha256,
        size = if (file.exists(p)) format(info$size, scientific = FALSE) else NA_character_,
        mtime = if (file.exists(p)) {
          format(info$mtime, "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")

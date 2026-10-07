@@ -268,7 +268,7 @@ test_that("the parent checkpoint uses a canonical UTC timestamp", {
   expect_match(.built_state(cfg)$mtime, "Z$")
 })
 
-test_that("a built rewrite during materialization writes nothing", {
+test_that("a registration during materialization writes nothing", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
@@ -276,7 +276,9 @@ test_that("a built rewrite during materialization writes nothing", {
   testthat::local_mocked_bindings(
     read_built = function(cfg) {
       out <- original_read(cfg)
+      # A rebuild alone no longer changes the parent; registering it does.
       cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
+      withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
       out
     },
     .package = "hvtiRutilities"
@@ -355,4 +357,23 @@ test_that("a corrupted parquet fails the integrity check", {
   writeBin(as.raw(0), con)
   close(con)
   expect_error(read_analysis_set("eda", cfg), "does not match its manifest")
+})
+
+test_that("a dataset registered before dated versions is identified by its source", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  # Rewrite the entry in the pre-2026-10 shape: the source's own hash, no `parquet`.
+  f <- hvtiRutilities::built_path(cfg)
+  mf <- file.path(cfg$root, "manifest.yaml")
+  m <- yaml::read_yaml(mf)
+  i <- which(vapply(m$datasets, function(x) identical(x$file, cfg$built), logical(1)))
+  m$datasets[[i]] <- list(file = cfg$built, sha256 = digest::digest(f, algo = "sha256", file = TRUE))
+  yaml::write_yaml(m, mf)
+
+  expect_identical(.built_state(cfg)$file, cfg$built)
+  expect_identical(.built_state(cfg)$size, format(file.size(f), scientific = FALSE))
+  write_analysis_set("eda", cfg)
+  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
+  expect_error(read_analysis_set("eda", cfg), "built dataset has changed")
 })
