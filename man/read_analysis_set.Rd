@@ -22,6 +22,11 @@ that fixes it, when the built dataset has changed since the set was written,
 when the set's declaration in \verb{_study.yml} has changed, or when the parquet no
 longer matches its manifest entry. A stale set is never rebuilt silently:
 its exclusions are decisions, and a changed attrition should be looked at.
+
+When the built dataset is registered as a dated parquet, "changed" means a
+newer version has been registered with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}}.
+Rebuilding the source alone does not make a set stale, because nothing reads
+the rebuild until it is registered.
 }
 \seealso{
 \code{\link[=write_analysis_set]{write_analysis_set()}}

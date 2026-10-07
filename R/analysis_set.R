@@ -347,6 +347,11 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #' longer matches its manifest entry. A stale set is never rebuilt silently:
 #' its exclusions are decisions, and a changed attrition should be looked at.
 #'
+#' When the built dataset is registered as a dated parquet, "changed" means a
+#' newer version has been registered with [hvtiRutilities::update_manifest()].
+#' Rebuilding the source alone does not make a set stale, because nothing reads
+#' the rebuild until it is registered.
+#'
 #' @param name Character(1). The set's name in `_study.yml`.
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
 #'
