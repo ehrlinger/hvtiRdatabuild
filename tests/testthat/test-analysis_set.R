@@ -322,7 +322,10 @@ test_that("a newly registered built dataset makes the set stale", {
   write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
   withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
-  expect_error(read_analysis_set("eda", hvtiRutilities::study_config(cfg$root)), "built dataset has changed")
+  expect_error(
+    read_analysis_set("eda", hvtiRutilities::study_config(cfg$root)),
+    "built dataset has changed"
+  )
 })
 
 test_that("rebuilding the source without registering it does not make a set stale", {
@@ -330,7 +333,8 @@ test_that("rebuilding the source without registering it does not make a set stal
   skip_if_not_installed("hvtiPlotR")
   cfg <- local_study(list(eda = eda_set()))
   write_analysis_set("eda", cfg)
-  cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE) # a rebuild nobody registered
+  # A rebuild nobody registered.
+  cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
 
   expect_no_error(read_analysis_set("eda", cfg))
   expect_match(.built_state(cfg)$file, "[.]parquet$")
@@ -368,7 +372,10 @@ test_that("a dataset registered before dated versions is identified by its sourc
   mf <- file.path(cfg$root, "manifest.yaml")
   m <- yaml::read_yaml(mf)
   i <- which(vapply(m$datasets, function(x) identical(x$file, cfg$built), logical(1)))
-  m$datasets[[i]] <- list(file = cfg$built, sha256 = digest::digest(f, algo = "sha256", file = TRUE))
+  m$datasets[[i]] <- list(
+    file = cfg$built,
+    sha256 = digest::digest(f, algo = "sha256", file = TRUE)
+  )
   yaml::write_yaml(m, mf)
 
   expect_identical(.built_state(cfg)$file, cfg$built)
