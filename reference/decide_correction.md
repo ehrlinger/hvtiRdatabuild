@@ -109,7 +109,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpL7zKx5/duckdb
+#> ℹ /tmp/Rtmp7IME3W/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -123,7 +123,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> view master_demo -> master_demo_base_built_demo
 #> legacy: 0 facts parsed; 0 resolved; 0 unresolved
 #> recorded 0; 0 stale corrections
-#> Correction c46cfebbcb8951e41 appended. First correction to this variable: regenerate the view.
-#> Decision daad4c593c938a1d7 (accept) recorded on c46cfebbcb8951e41.
+#> Correction c71d6f87bcb0c9987 appended. First correction to this variable: regenerate the view.
+#> Decision db6dbfbb291d842d7 (accept) recorded on c71d6f87bcb0c9987.
 # }
 ```
