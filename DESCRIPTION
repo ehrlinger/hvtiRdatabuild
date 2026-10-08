@@ -25,7 +25,7 @@ Imports:
     digest,
     filelock,
     haven,
-    hvtiRutilities (>= 1.4.0),
+    hvtiRutilities (>= 1.5.0),
     tools,
     utils,
     yaml
@@ -46,6 +46,8 @@ Suggests:
     tidyselect,
     withr
 VignetteBuilder: quarto
+SystemRequirements: Quarto command line tool
+    (<https://github.com/quarto-dev/quarto-cli>)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0
 Roxygen: list(markdown = TRUE)

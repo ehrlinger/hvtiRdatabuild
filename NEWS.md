@@ -1,5 +1,15 @@
 # hvtiRdatabuild (unreleased)
 
+* An analysis set's parent is now the registered version of the built dataset
+  when hvtiRutilities registered it as a dated parquet. Rebuilding
+  `built.sas7bdat` without registering it no longer makes every set stale,
+  because jobs read nothing new until `hvtiRutilities::update_manifest()`
+  registers it. Sets written before this change name the SAS file as their
+  parent, so each is stale once after the study's first `update_manifest()`;
+  `write_analysis_set()` refreshes it. A dataset still registered the old way
+  is identified by its source, as before. Requires the hvtiRutilities release
+  that added dated versions.
+
 * Articles on the pkgdown site put the table of contents on the left and use
   the full width of the window, through `pkgdown/extra.css`. The installed
   vignettes are unchanged: the Quarto vignette engine renders them in its own
@@ -9,6 +19,10 @@
   HVTI family. `hvtiR::install()` installs the members together, and several
   already required 4.4.0, so on an older R the install failed whatever this
   package declared.
+
+* `DESCRIPTION` now declares the Quarto command line tool in
+  `SystemRequirements`. The vignettes have always needed it to build; the
+  field makes that visible to installers and to `R CMD check`.
 
 # hvtiRdatabuild 0.2.4
 
