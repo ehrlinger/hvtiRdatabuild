@@ -2,13 +2,17 @@
 
 Reads the analysis set `name` written by
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md),
-after checking that it is current. It stops, naming the
+after checking that it is current. A set is stale when the built dataset
+has a newer registered version than the one it was cut from, or when its
+declaration in `_study.yml` has changed. A stale set is never rebuilt
+silently: its exclusions are decisions, and a changed attrition should
+be looked at. In a draft render it is read, with a message of class
+`hvtiRutilities_stale_analysis_set` giving the
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
-call that fixes it, when the built dataset has changed since the set was
-written, when the set's declaration in `_study.yml` has changed, or when
-the parquet no longer matches its manifest entry. A stale set is never
-rebuilt silently: its exclusions are decisions, and a changed attrition
-should be looked at.
+call that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
+`hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the
+same text. A parquet that no longer matches its manifest entry always
+stops.
 
 When the built dataset is registered as a dated parquet, "changed" means
 a newer version has been registered with
