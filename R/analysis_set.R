@@ -337,15 +337,46 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   invisible(side)
 }
 
+# The templates' rule for a final render: HVTI_TEMPLATE_STRICT unset, 0, false
+# or no is a draft; anything else is final, so a mistyped value fails safe.
+.final_render <- function() {
+  !tolower(Sys.getenv("HVTI_TEMPLATE_STRICT")) %in% c("", "0", "false", "no")
+}
+
+# A stale set is never rebuilt silently. A draft may read the old cut, with a
+# message that says what changed and gives the commands; a final render stops
+# with the same text, because an accepted result is not built on exclusions
+# decided against older data.
+.stale_set <- function(name, why) {
+  fix <- paste0('To update it, run write_analysis_set("', name,
+                '", hvtiRutilities::study_config()), ',
+                "review the attrition it prints, then render again.")
+  if (.final_render()) {
+    stop("analysis set `", name, "`: ", why, " ", fix,
+         " A final render does not use a stale cut.", call. = FALSE)
+  }
+  message(structure(
+    class = c("hvtiRutilities_stale_analysis_set", "hvtiRutilities_out_of_date",
+              "message", "condition"),
+    list(message = paste0("analysis set `", name, "`: ", why,
+                          " This draft used the older cut. ", fix, "\n"),
+         call = NULL)
+  ))
+}
+
 #' Read an analysis set
 #'
 #' @description
 #' Reads the analysis set `name` written by [write_analysis_set()], after
-#' checking that it is current. It stops, naming the `write_analysis_set()` call
-#' that fixes it, when the built dataset has changed since the set was written,
-#' when the set's declaration in `_study.yml` has changed, or when the parquet no
-#' longer matches its manifest entry. A stale set is never rebuilt silently:
-#' its exclusions are decisions, and a changed attrition should be looked at.
+#' checking that it is current. A set is stale when the built dataset has a
+#' newer registered version than the one it was cut from, or when its
+#' declaration in `_study.yml` has changed. A stale set is never rebuilt
+#' silently: its exclusions are decisions, and a changed attrition should be
+#' looked at. In a draft render it is read, with a message of class
+#' `hvtiRutilities_stale_analysis_set` giving the [write_analysis_set()] call
+#' that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
+#' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
+#' text. A parquet that no longer matches its manifest entry always stops.
 #'
 #' When the built dataset is registered as a dated parquet, "changed" means a
 #' newer version has been registered with [hvtiRutilities::update_manifest()].
@@ -376,12 +407,16 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   if (!same(side$parent$sha256, now$sha256) ||
         !same(side$parent$size, now$size) ||
         !same(side$parent$mtime, now$mtime)) {
-    stop("analysis set `", name, "`: the built dataset has changed since the set ",
-         "was written. ", fix, call. = FALSE)
+    why <- if (identical(side$parent$file, now$file)) {
+      paste0("the built dataset (", now$file, ") has changed since the set was written.")
+    } else {
+      paste0("it was cut from ", side$parent$file, "; the built dataset is now ",
+             now$file, ".")
+    }
+    .stale_set(name, why)
   }
   if (!same(side$declaration_sha256, .declaration_sha(raw))) {
-    stop("analysis set `", name, "`: its declaration in _study.yml has changed ",
-         "since the set was written. ", fix, call. = FALSE)
+    .stale_set(name, "its declaration in _study.yml has changed since the set was written.")
   }
   m <- yaml::read_yaml(p$manifest)
   e <- Filter(function(x) identical(x$file, basename(p$parquet)), m$datasets)

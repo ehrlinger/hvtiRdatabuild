@@ -17,11 +17,15 @@ attrition table attached as \code{attr(x, "attrition")}.
 }
 \description{
 Reads the analysis set \code{name} written by \code{\link[=write_analysis_set]{write_analysis_set()}}, after
-checking that it is current. It stops, naming the \code{write_analysis_set()} call
-that fixes it, when the built dataset has changed since the set was written,
-when the set's declaration in \verb{_study.yml} has changed, or when the parquet no
-longer matches its manifest entry. A stale set is never rebuilt silently:
-its exclusions are decisions, and a changed attrition should be looked at.
+checking that it is current. A set is stale when the built dataset has a
+newer registered version than the one it was cut from, or when its
+declaration in \verb{_study.yml} has changed. A stale set is never rebuilt
+silently: its exclusions are decisions, and a changed attrition should be
+looked at. In a draft render it is read, with a message of class
+\code{hvtiRutilities_stale_analysis_set} giving the \code{\link[=write_analysis_set]{write_analysis_set()}} call
+that updates it. In a final render (\code{HVTI_TEMPLATE_STRICT} set, as
+\code{hvtiRtemplates::render_job(final = TRUE)} sets it) it stops with the same
+text. A parquet that no longer matches its manifest entry always stops.
 
 When the built dataset is registered as a dated parquet, "changed" means a
 newer version has been registered with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}}.

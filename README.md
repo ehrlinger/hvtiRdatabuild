@@ -20,8 +20,8 @@ Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4.
 verify an R-built dataset against its SAS oracle. `read_study_config()`,
 `dw_connect()`, `dw_modules()`, `dw_pull()`, and `print.pull_result()` read a
 study's warehouse modules into R. `write_analysis_set()` materializes a
-declared selection from a built dataset, and `read_analysis_set()` refuses a
-stale checkpoint. The build and derivation stages (`build_dataset()` and
+declared selection from a built dataset, and `read_analysis_set()` reads a
+stale checkpoint only in a draft, with a note, and refuses it in a final render. The build and derivation stages (`build_dataset()` and
 `derive_vars()`) remain future work.
 
 ## Installation
