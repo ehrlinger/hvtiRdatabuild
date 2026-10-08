@@ -36,6 +36,10 @@
     stop(where, " has the same name as a registered dataset, and its parquet ",
          "would overwrite that dataset or its cache. Rename the set.",
          call. = FALSE)
+  if (paste0(name, ".parquet") %in% .registered_version_files(cfg))
+    stop(where, " has the same name as a registered version of a dataset, and its ",
+         "parquet would overwrite that version. Nothing was written. Rename the set.",
+         call. = FALSE)
   unknown <- setdiff(names(raw), .set_keys)
   if (length(unknown))
     stop(where, " has unknown key(s): ", paste(unknown, collapse = ", "),
@@ -209,6 +213,25 @@
   invisible(target)
 }
 
+# The dataset entries in manifest.yaml. From hvtiRutilities 1.5.1 a manifest
+# holding a registered dated version starts its datasets list with a line of
+# text, so that hvtiRutilities 1.4.x stops on it rather than rewrite the entry.
+# It is not an entry, and is skipped.
+.manifest_entries <- function(path) {
+  if (!file.exists(path)) return(list())
+  Filter(is.list, yaml::read_yaml(path)$datasets)
+}
+
+# Every dated parquet the manifest records, current or earlier: each is a
+# dataset's registered data, which no analysis set may be written over.
+.registered_version_files <- function(cfg) {
+  unlist(lapply(.manifest_entries(file.path(cfg$root, "manifest.yaml")), function(e) {
+    history <- Filter(is.list, if (is.list(e$history)) e$history else list())
+    c(if (is.character(e$parquet)) e$parquet,
+      unlist(lapply(history, function(h) if (is.character(h$parquet)) h$parquet)))
+  }))
+}
+
 # The built dataset's identity: its sha256 as the manifest records it, plus a
 # stat. For a dataset registered as a dated parquet (hvtiRutilities 2026-10),
 # the identity is that registered version, so rebuilding the source without
@@ -216,8 +239,8 @@
 # is the source, whose stat catches a rewrite no read_built() call has recorded.
 # The parquet sits beside the source, which is where hvtiRutilities resolves it.
 .built_state <- function(cfg) {
-  m <- yaml::read_yaml(file.path(cfg$root, "manifest.yaml"))
-  e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
+  e <- Filter(function(x) identical(x$file, cfg$built),
+              .manifest_entries(file.path(cfg$root, "manifest.yaml")))
   if (!length(e) || is.null(e[[1L]]$sha256))
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
          "hvtiRutilities::register_data() or read_built() first.",
@@ -383,8 +406,7 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
     stop("analysis set `", name, "`: its declaration in _study.yml has changed ",
          "since the set was written. ", fix, call. = FALSE)
   }
-  m <- yaml::read_yaml(p$manifest)
-  e <- Filter(function(x) identical(x$file, basename(p$parquet)), m$datasets)
+  e <- Filter(function(x) identical(x$file, basename(p$parquet)), .manifest_entries(p$manifest))
   actual_sha <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
   if (!length(e) || !same(e[[1L]]$sha256, actual_sha)) {
     stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",
