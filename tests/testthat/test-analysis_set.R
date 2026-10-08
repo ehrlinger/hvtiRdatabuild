@@ -315,15 +315,6 @@ test_that("an unwritten set says how to write it", {
   expect_error(read_analysis_set("eda", cfg), 'write_analysis_set\\("eda"\\)')
 })
 
-stale_by_new_parent <- function(env = parent.frame()) {
-  cfg <- local_study(list(eda = eda_set()), env = env)
-  write_analysis_set("eda", cfg)
-  f <- hvtiRutilities::built_path(cfg)
-  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
-  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
-  hvtiRutilities::study_config(cfg$root)
-}
-
 test_that("a set cut from an older parent reads in a draft, with the update commands", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
@@ -343,7 +334,8 @@ test_that("a set cut from an older parent stops a final render with the same com
   withr::local_envvar(HVTI_TEMPLATE_STRICT = "1")
   cfg <- stale_by_new_parent()
 
-  expect_error(read_analysis_set("eda", cfg), "A final render does not use a stale cut", fixed = TRUE)
+  expect_error(read_analysis_set("eda", cfg), "A final render does not use a stale cut",
+               fixed = TRUE)
   expect_error(read_analysis_set("eda", cfg), 'write_analysis_set("eda"', fixed = TRUE)
 })
 
@@ -403,5 +395,6 @@ test_that("a dataset registered before dated versions is identified by its sourc
   write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
-  expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed", fixed = TRUE)
+  expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed",
+                 fixed = TRUE)
 })
