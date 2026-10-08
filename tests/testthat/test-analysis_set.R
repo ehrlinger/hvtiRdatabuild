@@ -323,7 +323,8 @@ test_that("a set cut from an older parent reads in a draft, with the update comm
 
   expect_message(d <- read_analysis_set("eda", cfg), class = "hvtiRutilities_stale_analysis_set")
   expect_s3_class(d, "data.frame")
-  msg <- tryCatch(read_analysis_set("eda", cfg), message = conditionMessage)
+  msg <- tryCatch(read_analysis_set("eda", cfg),
+                  hvtiRutilities_stale_analysis_set = conditionMessage)
   expect_match(msg, 'write_analysis_set("eda", hvtiRutilities::study_config())', fixed = TRUE)
   expect_match(msg, "This draft used the older cut", fixed = TRUE)
 })
@@ -349,6 +350,18 @@ test_that("an edited rule makes the set stale in the same way", {
   y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
   yaml::write_yaml(y, cfg$file)
   expect_message(read_analysis_set("eda", cfg), "declaration .* has changed")
+})
+
+test_that("an edited rule stops a final render", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = "true")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  y <- yaml::read_yaml(cfg$file)
+  y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
+  yaml::write_yaml(y, cfg$file)
+  expect_error(read_analysis_set("eda", cfg), "declaration .* has changed.*final render")
 })
 
 test_that("rebuilding the source without registering it does not make a set stale", {
