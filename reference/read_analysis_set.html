@@ -4,12 +4,20 @@ checking that it is current. It stops, naming the write_analysis_set() call
 that fixes it, when the built dataset has changed since the set was written,
 when the set's declaration in _study.yml has changed, or when the parquet no
 longer matches its manifest entry. A stale set is never rebuilt silently:
-its exclusions are decisions, and a changed attrition should be looked at."><meta property="og:description" content="Reads the analysis set name written by write_analysis_set(), after
+its exclusions are decisions, and a changed attrition should be looked at.
+When the built dataset is registered as a dated parquet, &quot;changed&quot; means a
+newer version has been registered with hvtiRutilities::update_manifest().
+Rebuilding the source alone does not make a set stale, because nothing reads
+the rebuild until it is registered."><meta property="og:description" content="Reads the analysis set name written by write_analysis_set(), after
 checking that it is current. It stops, naming the write_analysis_set() call
 that fixes it, when the built dataset has changed since the set was written,
 when the set's declaration in _study.yml has changed, or when the parquet no
 longer matches its manifest entry. A stale set is never rebuilt silently:
-its exclusions are decisions, and a changed attrition should be looked at."></head><body>
+its exclusions are decisions, and a changed attrition should be looked at.
+When the built dataset is registered as a dated parquet, &quot;changed&quot; means a
+newer version has been registered with hvtiRutilities::update_manifest().
+Rebuilding the source alone does not make a set stale, because nothing reads
+the rebuild until it is registered."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -57,6 +65,10 @@ that fixes it, when the built dataset has changed since the set was written,
 when the set's declaration in <code>_study.yml</code> has changed, or when the parquet no
 longer matches its manifest entry. A stale set is never rebuilt silently:
 its exclusions are decisions, and a changed attrition should be looked at.</p>
+<p>When the built dataset is registered as a dated parquet, "changed" means a
+newer version has been registered with <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html" class="external-link">hvtiRutilities::update_manifest()</a></code>.
+Rebuilding the source alone does not make a set stale, because nothing reads
+the rebuild until it is registered.</p>
     </div>
 
     <div class="section level2">

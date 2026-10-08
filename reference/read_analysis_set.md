@@ -10,6 +10,12 @@ the parquet no longer matches its manifest entry. A stale set is never
 rebuilt silently: its exclusions are decisions, and a changed attrition
 should be looked at.
 
+When the built dataset is registered as a dated parquet, "changed" means
+a newer version has been registered with
+[`hvtiRutilities::update_manifest()`](https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html).
+Rebuilding the source alone does not make a set stale, because nothing
+reads the rebuild until it is registered.
+
 ## Usage
 
 ``` r
