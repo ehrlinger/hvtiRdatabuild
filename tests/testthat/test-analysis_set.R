@@ -194,8 +194,8 @@ test_that("write produces parquet, sidecar and manifest entry", {
   expect_equal(nrow(out), 18L)  # 20 rows, 1 with NA aggrc, then 1 under 18 not already excluded
   expect_equal(side$counts$n, 18L)
   expect_equal(side$counts$n_events + side$counts$n_censored, 18L)
-  m <- yaml::read_yaml(p$manifest)
-  expect_true("eda.parquet" %in% vapply(m$datasets, function(e) e$file, character(1)))
+  files <- vapply(.manifest_entries(p$manifest), function(e) e$file, character(1))
+  expect_true("eda.parquet" %in% files)
 })
 
 test_that("write preserves an adopted legacy datasets layout", {
@@ -239,8 +239,8 @@ test_that("an expect mismatch writes nothing", {
   p <- .set_paths("eda", cfg)
   expect_false(file.exists(p$parquet))
   expect_false(file.exists(p$sidecar))
-  m <- yaml::read_yaml(p$manifest)
-  expect_false("eda.parquet" %in% vapply(m$datasets, function(e) e$file, character(1)))
+  files <- vapply(.manifest_entries(p$manifest), function(e) e$file, character(1))
+  expect_false("eda.parquet" %in% files)
 })
 
 test_that("missing columns and a non-unique id are errors", {
@@ -396,6 +396,7 @@ test_that("a dataset registered before dated versions is identified by its sourc
   f <- hvtiRutilities::built_path(cfg)
   mf <- file.path(cfg$root, "manifest.yaml")
   m <- yaml::read_yaml(mf)
+  m$datasets <- .manifest_entries(mf)
   i <- which(vapply(m$datasets, function(x) identical(x$file, cfg$built), logical(1)))
   m$datasets[[i]] <- list(
     file = cfg$built,
@@ -410,4 +411,36 @@ test_that("a dataset registered before dated versions is identified by its sourc
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
   expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed",
                  fixed = TRUE)
+})
+
+test_that("a manifest that starts with hvtiRutilities' guard line is read past it", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  # hvtiRutilities 1.5.1 writes this line ahead of the entries.
+  mf <- file.path(cfg$root, "manifest.yaml")
+  m <- yaml::read_yaml(mf)
+  m$datasets <- c(list("hvtiRutilities 1.5.1 or later required: guard line"), m$datasets)
+  yaml::write_yaml(m, mf)
+
+  expect_identical(.built_state(cfg)$file, .manifest_entries(mf)[[1L]]$parquet)
+  expect_s3_class(read_analysis_set("eda", cfg), "data.frame")
+})
+
+test_that("a set named for a registered version is refused before anything is written", {
+  skip_if_not_installed("arrow")
+  cfg <- local_study()
+  version <- .manifest_entries(file.path(cfg$root, "manifest.yaml"))[[1L]]$parquet
+  name <- tools::file_path_sans_ext(version)
+  yml <- file.path(cfg$root, "_study.yml")
+  y <- yaml::read_yaml(yml)
+  y$analysis_sets <- stats::setNames(list(eda_set()), name)
+  yaml::write_yaml(y, yml)
+  cfg <- hvtiRutilities::study_config(cfg$root)
+  path <- file.path(hvtiRutilities::study_dir("datasets", cfg$root), version)
+  before <- digest::digest(path, algo = "sha256", file = TRUE)
+
+  expect_error(write_analysis_set(name, cfg), "registered version of a dataset")
+  expect_identical(digest::digest(path, algo = "sha256", file = TRUE), before)
 })
