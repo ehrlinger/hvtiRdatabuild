@@ -161,7 +161,7 @@
 <span>             <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"build_program: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">dir</span>, <span class="st">"bd.sas"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="va">cfg_path</span><span class="op">)</span></span>
 <span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; duckdb keeps downloaded extensions and secrets in a temporary directory:</span></span>
-<span><span class="co">#&gt; ℹ /tmp/RtmpSuiaod/duckdb</span></span>
+<span><span class="co">#&gt; ℹ /tmp/Rtmpdr6UqI/duckdb</span></span>
 <span><span class="co">#&gt; This is removed when the R session ends.</span></span>
 <span><span class="co">#&gt; • Extensions are re-downloaded each session.</span></span>
 <span><span class="co">#&gt; • Secrets are lost.</span></span>
@@ -170,7 +170,7 @@
 <span><span class="co">#&gt; ℹ See ?duckdb_storage for details and alternatives.</span></span>
 <span><span class="va">dry</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/lift_master.html">lift_master</a></span><span class="op">(</span><span class="fu"><a href="../reference/read_master_config.html">read_master_config</a></span><span class="op">(</span><span class="va">cfg_path</span><span class="op">)</span>, <span class="va">con</span>, <span class="va">pq</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; key id                               unique     rows 2, null key parts 0, duplicates 0</span></span>
-<span><span class="co">#&gt; dry run: DDL for master_demo2_base_built_demo written to /tmp/RtmpSuiaod/master1f5b2e754fc/built_demo.parquet.ddl.sql</span></span>
+<span><span class="co">#&gt; dry run: DDL for master_demo2_base_built_demo written to /tmp/Rtmpdr6UqI/master1fb530c20005/built_demo.parquet.ddl.sql</span></span>
 <span><span class="va">dry</span><span class="op">$</span><span class="va">dry_run</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
@@ -251,7 +251,7 @@
 <span>                           key_values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>emrn <span class="op">=</span> <span class="st">"E3"</span><span class="op">)</span>, alt_key <span class="op">=</span> <span class="st">"epic"</span>, variable <span class="op">=</span> <span class="st">"age"</span>,</span>
 <span>                           expected_prior <span class="op">=</span> <span class="fl">70</span>, new_value <span class="op">=</span> <span class="fl">71</span>, evidence_type <span class="op">=</span> <span class="st">"chart_review"</span>,</span>
 <span>                           evidence_ref <span class="op">=</span> <span class="st">"invented"</span>, asserted_by <span class="op">=</span> <span class="st">"tester"</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Correction cf8280fe94eb899f5 appended.</span></span>
+<span><span class="co">#&gt; Correction c217ae139f80b8e4e appended.</span></span>
 <span><span class="va">prop</span><span class="op">$</span><span class="va">verdict</span></span>
 <span><span class="co">#&gt; [1] "appended"</span></span></code></pre></div>
 </div>
@@ -259,7 +259,7 @@
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/decide_correction.html">decide_correction</a></span><span class="op">(</span><span class="va">cfg2</span>, <span class="va">con</span>, <span class="va">prop</span><span class="op">$</span><span class="va">correction_id</span>, <span class="st">"accept"</span>, <span class="st">"tester"</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Decision d1ce86209a57385fb (accept) recorded on cf8280fe94eb899f5.</span></span>
+<span><span class="co">#&gt; Decision d06c81af225fd4f23 (accept) recorded on c217ae139f80b8e4e.</span></span>
 <span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQuery.html" class="external-link">dbGetQuery</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SELECT age FROM master_c WHERE emrn = 'E3'"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   age</span></span>
 <span><span class="co">#&gt; 1  71</span></span></code></pre></div>
