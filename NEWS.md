@@ -1,5 +1,15 @@
 # hvtiRdatabuild (unreleased)
 
+* An analysis set's parent is now the registered version of the built dataset
+  when hvtiRutilities registered it as a dated parquet. Rebuilding
+  `built.sas7bdat` without registering it no longer makes every set stale,
+  because jobs read nothing new until `hvtiRutilities::update_manifest()`
+  registers it. Sets written before this change name the SAS file as their
+  parent, so each is stale once after the study's first `update_manifest()`;
+  `write_analysis_set()` refreshes it. A dataset still registered the old way
+  is identified by its source, as before. Requires the hvtiRutilities release
+  that added dated versions.
+
 * Vignettes put the table of contents on the left and use the full width
   of the window, the same layout as the HVTI Quarto books and the
   hvtiRtemplates jobs. `vignettes/_quarto.yml` sets it once for every

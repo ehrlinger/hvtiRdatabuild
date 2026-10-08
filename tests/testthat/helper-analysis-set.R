@@ -1,4 +1,6 @@
 local_study <- function(sets = list(), env = parent.frame()) {
+  # register_data() converts the built dataset to a dated parquet, so it needs arrow.
+  testthat::skip_if_not_installed("arrow")
   root <- withr::local_tempdir(.local_envir = env)
   suppressMessages(invisible(hvtiRutilities::study_setup(
     root,
