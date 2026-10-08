@@ -315,17 +315,53 @@ test_that("an unwritten set says how to write it", {
   expect_error(read_analysis_set("eda", cfg), 'write_analysis_set\\("eda"\\)')
 })
 
-test_that("a newly registered built dataset makes the set stale", {
+test_that("a set cut from an older parent reads in a draft, with the update commands", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
+  cfg <- stale_by_new_parent()
+
+  expect_message(d <- read_analysis_set("eda", cfg), class = "hvtiRutilities_stale_analysis_set")
+  expect_s3_class(d, "data.frame")
+  msg <- tryCatch(read_analysis_set("eda", cfg),
+                  hvtiRutilities_stale_analysis_set = conditionMessage)
+  expect_match(msg, 'write_analysis_set("eda", hvtiRutilities::study_config())', fixed = TRUE)
+  expect_match(msg, "This draft used the older cut", fixed = TRUE)
+})
+
+test_that("a set cut from an older parent stops a final render with the same commands", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = "1")
+  cfg <- stale_by_new_parent()
+
+  expect_error(read_analysis_set("eda", cfg), "A final render does not use a stale cut",
+               fixed = TRUE)
+  expect_error(read_analysis_set("eda", cfg), 'write_analysis_set("eda"', fixed = TRUE)
+})
+
+test_that("an edited rule makes the set stale in the same way", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
   cfg <- local_study(list(eda = eda_set()))
   write_analysis_set("eda", cfg)
-  cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
-  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
-  expect_error(
-    read_analysis_set("eda", hvtiRutilities::study_config(cfg$root)),
-    "built dataset has changed"
-  )
+  y <- yaml::read_yaml(cfg$file)
+  y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
+  yaml::write_yaml(y, cfg$file)
+  expect_message(read_analysis_set("eda", cfg), "declaration .* has changed")
+})
+
+test_that("an edited rule stops a final render", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = "true")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  y <- yaml::read_yaml(cfg$file)
+  y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
+  yaml::write_yaml(y, cfg$file)
+  expect_error(read_analysis_set("eda", cfg), "declaration .* has changed.*final render")
 })
 
 test_that("rebuilding the source without registering it does not make a set stale", {
@@ -336,19 +372,8 @@ test_that("rebuilding the source without registering it does not make a set stal
   # A rebuild nobody registered.
   cat("21,70,5,0,3,1\n", file = hvtiRutilities::built_path(cfg), append = TRUE)
 
-  expect_no_error(read_analysis_set("eda", cfg))
+  expect_no_message(read_analysis_set("eda", cfg))
   expect_match(.built_state(cfg)$file, "[.]parquet$")
-})
-
-test_that("an edited rule makes the set stale", {
-  skip_if_not_installed("arrow")
-  skip_if_not_installed("hvtiPlotR")
-  cfg <- local_study(list(eda = eda_set()))
-  write_analysis_set("eda", cfg)
-  y <- yaml::read_yaml(cfg$file)
-  y$analysis_sets$eda$exclude[[2]]$when <- "age < 21"
-  yaml::write_yaml(y, cfg$file)
-  expect_error(read_analysis_set("eda", cfg), "declaration .* has changed")
 })
 
 test_that("a corrupted parquet fails the integrity check", {
@@ -383,7 +408,9 @@ test_that("a dataset registered before dated versions is identified by its sourc
   expect_identical(.built_state(cfg)$size, format(file.size(f), scientific = FALSE))
   write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
-  expect_error(read_analysis_set("eda", cfg), "built dataset has changed")
+  withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
+  expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed",
+                 fixed = TRUE)
 })
 
 test_that("a manifest that starts with hvtiRutilities' guard line is read past it", {
