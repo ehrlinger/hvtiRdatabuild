@@ -75,8 +75,10 @@ jobs:
           # fails this check on a version bump rather than a doc change.
           # This is the only job in the repo that installs roxygen2 -- keep
           # it that way, so the pin has exactly one place to be wrong.
+          # The ref must be cran::, not any::. pak drops the @version from an
+          # any:: ref, so any::roxygen2@8.1.0 installed 8.1.1 the day it shipped.
           extra-packages: |
-            any::roxygen2@8.1.0
+            cran::roxygen2@8.1.0
             local::.
             github::ehrlinger/hvtiRutilities
           # roxygenise() only needs this package's Imports loadable. The
