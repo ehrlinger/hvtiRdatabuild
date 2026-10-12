@@ -13,7 +13,8 @@ Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
 match. All ran over `/studies`; the 2026-09 files used 1.1.9, while
-`dwpull-census.json` used 1.4.3 and the two `lst-` files of 2026-10-12 used 1.4.4.
+`dwpull-census.json` used 1.4.3, and the four files of 2026-10-12
+(`lst-exposure`, `lst-listing`, `rung-overlap`, `log-verifiability`) used 1.4.4.
 
 | file | scan | run at |
 |---|---|---|
@@ -26,7 +27,7 @@ match. All ran over `/studies`; the 2026-09 files used 1.1.9, while
 | `macro-drift.json` | is the copy drift imputation's or the corpus's | 2026-09-06 09:17 |
 | `nimpute-wide.json` | as `nimpute-scan`, definitions from all `.sas` | 2026-09-06 13:19 |
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
-| `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
+| `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-10-12 12:52 |
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
 | `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-10-12 10:52 |
 | `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
@@ -459,11 +460,23 @@ Rerun on `lri-r05` under `hvtiRutilities` 1.4.4, after the fix:
 ✅ **The listing cross-check reproduces exactly:** 682 studies and 8,427 files,
 as in `lst-listing.json` of the same day.
 
-⚠️ **The log cross-check does not, and is not expected to.**
-`log-verifiability.json` is still the 2026-09-06 run, under 1.1.9 and over
-50,608 logs; this walk saw 50,929. Its 1,193 usable-log studies against that
-file's 1,180 measure five weeks of new logs and a taxonomy change, not a
-defect, until `log-verifiability.json` is rerun on the same footing.
+✅ **So does the log cross-check, against `log-verifiability.json` rerun the
+same day** over the same 50,929 logs: 1,193 studies with a usable log, 44,263
+usable logs and 50,891 read, identical in both. Against the 2026-09-06 file it
+had read 1,193 against 1,180; that gap was five weeks of new logs and a
+taxonomy change, as the rerun confirms.
+
+| `log-verifiability.json` | 2026-09-06 | 2026-10-12 |
+|---|---:|---:|
+| logs read | 50,570 | 50,891 |
+| usable for rung 1 | 44,032 | 44,263 |
+| studies with any log | 1,204 | 1,215 |
+| studies with a usable log | 1,180 | 1,193 |
+
+Only the `other` stem moved; `vars`, `build`, `imputsub` and `mult_imput` are
+identical to the integer, so the new logs are not imputation or build jobs.
+⚠️ The 79% and 45% port-verifiability figures quoted above divide by the
+1,487-study `.sas` census, which was not rerun, and are not updated here.
 
 ⭐ **The finding is unchanged: 680 of 682, 99.7%.** Rung 3 remains very nearly
 a subset of rung 1, and the same two studies' worth of exception remains. The
