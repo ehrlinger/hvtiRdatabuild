@@ -1,0 +1,59 @@
+{
+  "_provenance": {
+    "script": "lst-exposure-scan.R",
+    "question": "how much patient print-out is in .lst files, and who can read it?",
+    "run_at": "2026-10-12T10:28:34-0400",
+    "root": "/studies",
+    "hvtiRutilities_version": "1.4.4",
+    "listings_considered": 49550,
+    "listings_unreadable": 0,
+    "listings_oversized": 14,
+    "max_lst_mb": 200,
+    "mode_bits_look_uniform": false,
+    "distinct_modes": 3,
+    "contains_identifiers": false,
+    "emits_owner_names": false,
+    "emits_row_counts": false,
+    "emits_listing_values": false
+  },
+  "detection": {
+    "read": 49536,
+    "with_a_print_or_report_heading": 0,
+    "obs_header": 36825,
+    "obs_header_with_a_row_at_offset_1": 2,
+    "obs_header_with_a_row_in_window": 31849,
+    "obs_header_with_no_row_in_window": 4976,
+    "row_window": 8,
+    "obs_header_uppercase_only": 890,
+    "neither": 12711,
+    "any_print_pattern": 36825
+  },
+  "studies": {
+    "with_any_print_pattern": 1237,
+    "with_a_corroborated_print": 1136
+  },
+  "row_offset_distribution": {
+    "offset_1": 2,
+    "offset_2": 1523449,
+    "offset_3": 2334,
+    "offset_4": 63,
+    "offset_5": 215,
+    "offset_6": 56,
+    "offset_7": 31,
+    "offset_8": 39,
+    "none_in_window": 16693
+  },
+  "reachability": {
+    "group_readable": 49550,
+    "other_readable": 27,
+    "owner_only": 0,
+    "in_a_world_traversable_directory": 265,
+    "distinct_owners": 15
+  },
+  "volume": {
+    "all_listings_bytes": 28366585450,
+    "print_matched_bytes": 14890364567,
+    "all_listings_gb": 26.42,
+    "print_matched_gb": 13.87
+  }
+}
