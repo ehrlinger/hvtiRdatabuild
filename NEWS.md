@@ -1,4 +1,31 @@
-# hvtiRdatabuild (unreleased)
+# hvtiRdatabuild 0.3.0
+
+* **Now requires R 4.4.0 or newer**, up from 4.1.0, to match the rest of the
+  HVTI family. `hvtiR::install()` installs the members together, and several
+  already required 4.4.0, so on an older R the install failed whatever this
+  package declared. **Now requires hvtiRutilities 1.5.1.**
+
+* **The build layer.** Three pieces sit between `dw_pull()` and the analysis
+  sets. `build_dataset()` joins a study's patient-level modules on its cohort
+  and keeps repeated-event tables beside the result rather than widening them.
+  `derive_vars()` runs the study's own R code, committed with the study, and
+  takes back the data with an updated cohort. A `cohort_record`, from
+  `new_cohort_record()`, `append_cohort_stage()` and `cohort_summary()`, carries
+  inclusion, exclusion and attrition history through both, in order. A missing
+  inclusion value is an error, not an implicit pass or exclusion. Duplicate
+  source identifier columns are kept for audit, patient identifiers stay stable
+  across joins, and the `print()` and `str()` methods and callback diagnostics
+  never show a patient value. `vignette("coming-from-sas")` walks the build,
+  study code and attrition through a synthetic example. `dplyr` moves from
+  `Suggests` to `Imports`.
+
+* **A stale analysis set no longer stops a draft.** `read_analysis_set()`
+  reads a set whose parent or declaration has changed, and signals
+  `hvtiRutilities_stale_analysis_set` with the `write_analysis_set()` call that
+  updates it. A final render (`HVTI_TEMPLATE_STRICT` set, as
+  `render_job(final = TRUE)` does) still stops, with the same commands. This
+  reverses the earlier rule that every stale read stopped; a damaged set still
+  stops in every render.
 
 * An analysis set's parent is now the registered version of the built dataset
   when hvtiRutilities registered it as a dated parquet. Rebuilding
@@ -7,22 +34,25 @@
   registers it. Sets written before this change name the SAS file as their
   parent, so each is stale once after the study's first `update_manifest()`;
   `write_analysis_set()` refreshes it. A dataset still registered the old way
-  is identified by its source, as before. Requires the hvtiRutilities release
-  that added dated versions.
+  is identified by its source, as before.
+
+* `write_analysis_set()` and `read_analysis_set()` skip the line of text that
+  hvtiRutilities 1.5.1 writes at the head of a `manifest.yaml` holding a
+  registered dated version. Without this they stopped with "$ operator is
+  invalid for atomic vectors" on every study registered from 1.5.1 on.
+
+* `write_analysis_set()` refuses a set named for a registered dated version,
+  such as `built_20261008`, before writing anything. Its parquet would have
+  replaced that version, the registered data every job reads.
+
+* `DESCRIPTION` now declares the Quarto command line tool in
+  `SystemRequirements`. The vignettes have always needed it to build; the
+  field makes that visible to installers and to `R CMD check`.
 
 * Articles on the pkgdown site put the table of contents on the left and use
   the full width of the window, through `pkgdown/extra.css`. The installed
   vignettes are unchanged: the Quarto vignette engine renders them in its own
   minimal format, which has no sidebar layout.
-
-* Now requires R 4.4.0 or newer, up from 4.1.0, to match the rest of the
-  HVTI family. `hvtiR::install()` installs the members together, and several
-  already required 4.4.0, so on an older R the install failed whatever this
-  package declared.
-
-* `DESCRIPTION` now declares the Quarto command line tool in
-  `SystemRequirements`. The vignettes have always needed it to build; the
-  field makes that visible to installers and to `R CMD check`.
 
 # hvtiRdatabuild 0.2.4
 
