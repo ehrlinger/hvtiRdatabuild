@@ -1,9 +1,11 @@
 # hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and verifies them against
-the legacy SAS datasets they replace. Eight exports: `dw_connect()`, `dw_modules()`, `dw_pull()`,
-`read_study_config()`, `snapshot_oracle()`, `compare_built()`, `write_analysis_set()` and
-`read_analysis_set()`.
+the legacy SAS datasets they replace. Twenty-one exports as of 0.3.0, in six groups: pull
+(`read_study_config()`, `dw_connect()`, `dw_modules()`, `dw_pull()`), build (`build_dataset()`,
+`derive_vars()` and the cohort record), verify (`snapshot_oracle()`, `compare_built()`),
+analysis sets, dataset publication, and master datasets. `NAMESPACE` is the authority, and
+`_pkgdown.yml` groups the same exports by stage.
 
 **This is the package that touches PHI and warehouse credentials.** Most of its rules are
 about not leaking either, and they are not negotiable for convenience.
