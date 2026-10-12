@@ -1,4 +1,6 @@
 local_study <- function(sets = list(), env = parent.frame()) {
+  # register_data() converts the built dataset to a dated parquet, so it needs arrow.
+  testthat::skip_if_not_installed("arrow")
   root <- withr::local_tempdir(.local_envir = env)
   suppressMessages(invisible(hvtiRutilities::study_setup(
     root,
@@ -50,4 +52,14 @@ eda_set <- function(...) {
   # NULL-valued entry, which is what the "missing id" test needs.
   b[names(args)] <- args
   b
+}
+
+# A written set whose parent has since had a newer version registered.
+stale_by_new_parent <- function(env = parent.frame()) {
+  cfg <- local_study(list(eda = eda_set()), env = env)
+  write_analysis_set("eda", cfg)
+  f <- hvtiRutilities::built_path(cfg)
+  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
+  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
+  hvtiRutilities::study_config(cfg$root)
 }

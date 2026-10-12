@@ -19,13 +19,13 @@ Description: Builds analysis-ready clinical datasets for the clinical
   the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets
   they replace.
 Depends:
-    R (>= 4.1.0)
+    R (>= 4.4.0)
 Imports:
     DBI,
     digest,
     filelock,
     haven,
-    hvtiRutilities (>= 1.4.0),
+    hvtiRutilities (>= 1.5.1),
     tools,
     utils,
     yaml
@@ -46,6 +46,8 @@ Suggests:
     tidyselect,
     withr
 VignetteBuilder: quarto
+SystemRequirements: Quarto command line tool
+    (<https://github.com/quarto-dev/quarto-cli>)
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0
 Roxygen: list(markdown = TRUE)

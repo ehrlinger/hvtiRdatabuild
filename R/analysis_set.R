@@ -36,6 +36,10 @@
     stop(where, " has the same name as a registered dataset, and its parquet ",
          "would overwrite that dataset or its cache. Rename the set.",
          call. = FALSE)
+  if (paste0(name, ".parquet") %in% .registered_version_files(cfg))
+    stop(where, " has the same name as a registered version of a dataset, and its ",
+         "parquet would overwrite that version. Nothing was written. Rename the set.",
+         call. = FALSE)
   unknown <- setdiff(names(raw), .set_keys)
   if (length(unknown))
     stop(where, " has unknown key(s): ", paste(unknown, collapse = ", "),
@@ -209,19 +213,45 @@
   invisible(target)
 }
 
-# The built dataset's identity: its sha256 as the manifest records it (kept
-# current by read_built()'s cache, so it is never re-hashed here), plus a stat,
-# which catches a rewrite that no read_built() call has recorded yet.
+# The dataset entries in manifest.yaml. From hvtiRutilities 1.5.1 a manifest
+# holding a registered dated version starts its datasets list with a line of
+# text, so that hvtiRutilities 1.4.x stops on it rather than rewrite the entry.
+# It is not an entry, and is skipped.
+.manifest_entries <- function(path) {
+  if (!file.exists(path)) return(list())
+  Filter(is.list, yaml::read_yaml(path)$datasets)
+}
+
+# Every dated parquet the manifest records, current or earlier: each is a
+# dataset's registered data, which no analysis set may be written over.
+.registered_version_files <- function(cfg) {
+  unlist(lapply(.manifest_entries(file.path(cfg$root, "manifest.yaml")), function(e) {
+    history <- Filter(is.list, if (is.list(e$history)) e$history else list())
+    c(if (is.character(e$parquet)) e$parquet,
+      unlist(lapply(history, function(h) if (is.character(h$parquet)) h$parquet)))
+  }))
+}
+
+# The built dataset's identity: its sha256 as the manifest records it, plus a
+# stat. For a dataset registered as a dated parquet (hvtiRutilities 2026-10),
+# the identity is that registered version, so rebuilding the source without
+# registering it does not make a set stale; jobs read nothing new. Otherwise it
+# is the source, whose stat catches a rewrite no read_built() call has recorded.
+# The parquet sits beside the source, which is where hvtiRutilities resolves it.
 .built_state <- function(cfg) {
-  m <- yaml::read_yaml(file.path(cfg$root, "manifest.yaml"))
-  e <- Filter(function(x) identical(x$file, cfg$built), m$datasets)
+  e <- Filter(function(x) identical(x$file, cfg$built),
+              .manifest_entries(file.path(cfg$root, "manifest.yaml")))
   if (!length(e) || is.null(e[[1L]]$sha256))
     stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
          "hvtiRutilities::register_data() or read_built() first.",
          call. = FALSE)
-  p <- hvtiRutilities::built_path(cfg)
+  e <- e[[1L]]
+  versioned <- is.character(e$parquet) && length(e$parquet) == 1L &&
+    !is.na(e$parquet) && nzchar(e$parquet)
+  src <- hvtiRutilities::built_path(cfg)
+  p <- if (versioned) file.path(dirname(src), e$parquet) else src
   info <- file.info(p)
-  list(file = cfg$built, sha256 = e[[1L]]$sha256,
+  list(file = if (versioned) e$parquet else cfg$built, sha256 = e$sha256,
        size = if (file.exists(p)) format(info$size, scientific = FALSE) else NA_character_,
        mtime = if (file.exists(p)) {
          format(info$mtime, "%Y-%m-%dT%H:%M:%OS3Z", tz = "UTC")
@@ -330,15 +360,51 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   invisible(side)
 }
 
+# The templates' rule for a final render: HVTI_TEMPLATE_STRICT unset, 0, false
+# or no is a draft; anything else is final, so a mistyped value fails safe.
+.final_render <- function() {
+  !tolower(Sys.getenv("HVTI_TEMPLATE_STRICT")) %in% c("", "0", "false", "no")
+}
+
+# A stale set is never rebuilt silently. A draft may read the old cut, with a
+# message that says what changed and gives the commands; a final render stops
+# with the same text, because an accepted result is not built on exclusions
+# decided against older data.
+.stale_set <- function(name, why) {
+  fix <- paste0('To update it, run write_analysis_set("', name,
+                '", hvtiRutilities::study_config()), ',
+                "review the attrition it prints, then render again.")
+  if (.final_render()) {
+    stop("analysis set `", name, "`: ", why, " ", fix,
+         " A final render does not use a stale cut.", call. = FALSE)
+  }
+  message(structure(
+    class = c("hvtiRutilities_stale_analysis_set", "hvtiRutilities_out_of_date",
+              "message", "condition"),
+    list(message = paste0("analysis set `", name, "`: ", why,
+                          " This draft used the older cut. ", fix, "\n"),
+         call = NULL)
+  ))
+}
+
 #' Read an analysis set
 #'
 #' @description
 #' Reads the analysis set `name` written by [write_analysis_set()], after
-#' checking that it is current. It stops, naming the `write_analysis_set()` call
-#' that fixes it, when the built dataset has changed since the set was written,
-#' when the set's declaration in `_study.yml` has changed, or when the parquet no
-#' longer matches its manifest entry. A stale set is never rebuilt silently:
-#' its exclusions are decisions, and a changed attrition should be looked at.
+#' checking that it is current. A set is stale when the built dataset has a
+#' newer registered version than the one it was cut from, or when its
+#' declaration in `_study.yml` has changed. A stale set is never rebuilt
+#' silently: its exclusions are decisions, and a changed attrition should be
+#' looked at. In a draft render it is read, with a message of class
+#' `hvtiRutilities_stale_analysis_set` giving the [write_analysis_set()] call
+#' that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
+#' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
+#' text. A parquet that no longer matches its manifest entry always stops.
+#'
+#' When the built dataset is registered as a dated parquet, "changed" means a
+#' newer version has been registered with [hvtiRutilities::update_manifest()].
+#' Rebuilding the source alone does not make a set stale, because nothing reads
+#' the rebuild until it is registered.
 #'
 #' @param name Character(1). The set's name in `_study.yml`.
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
@@ -364,15 +430,18 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   if (!same(side$parent$sha256, now$sha256) ||
         !same(side$parent$size, now$size) ||
         !same(side$parent$mtime, now$mtime)) {
-    stop("analysis set `", name, "`: the built dataset has changed since the set ",
-         "was written. ", fix, call. = FALSE)
+    why <- if (identical(side$parent$file, now$file)) {
+      paste0("the built dataset (", now$file, ") has changed since the set was written.")
+    } else {
+      paste0("it was cut from ", side$parent$file, "; the built dataset is now ",
+             now$file, ".")
+    }
+    .stale_set(name, why)
   }
   if (!same(side$declaration_sha256, .declaration_sha(raw))) {
-    stop("analysis set `", name, "`: its declaration in _study.yml has changed ",
-         "since the set was written. ", fix, call. = FALSE)
+    .stale_set(name, "its declaration in _study.yml has changed since the set was written.")
   }
-  m <- yaml::read_yaml(p$manifest)
-  e <- Filter(function(x) identical(x$file, basename(p$parquet)), m$datasets)
+  e <- Filter(function(x) identical(x$file, basename(p$parquet)), .manifest_entries(p$manifest))
   actual_sha <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
   if (!length(e) || !same(e[[1L]]$sha256, actual_sha)) {
     stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",

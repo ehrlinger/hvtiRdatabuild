@@ -110,22 +110,25 @@ to lower the bar.
   because no repository in the family has a `CODEOWNERS` file, so a PR can merge unreviewed.
 - Versions are **straight three digits** (`0.1.1`). Never a `.9000` suffix or a fourth digit.
 - **Patch-digit bumps only**, as fixes land. Minor and major are the maintainer's decision.
-- **A change that ships earns a `NEWS.md` entry.** File it under the
-  `# hvtiRdatabuild (unreleased)` heading, which you add when it is not already there.
+- **A change that ships earns a `NEWS.md` entry.** Write it to a file of its own,
+  `news/<branch>.md` with `/` in the branch name replaced by `-`: the bullet or bullets
+  exactly as they will read in `NEWS.md`, and no heading. Do not edit `NEWS.md` itself; two
+  pull requests open at once would conflict there. The `news-fragment` job in `lint.yaml`
+  fails a pull request that ships something and adds no fragment.
   "Ships" means the file lands in the built tarball, which is more than code: `R/`, `man/`,
   `NAMESPACE`, `inst/`, `tests/`, `vignettes/`, `README.md` and `NEWS.md` itself all ship.
   Treat that as illustration, not an inventory. `R CMD build` output is the authority when a
   case is unclear, not this list.
 - **Bump when you name a version, not when you merge.** A pull request lands without
-  touching `Version:`. A separate commit renames that unreleased heading to the new version
-  and updates `DESCRIPTION` and its `Date`, at most once a day. The heading is gone again
-  after a bump, so the next change re-adds it. `.claude/house-style.md` carries the rule and
-  the reasoning.
+  touching `Version:`. A separate commit moves `Version:` in `DESCRIPTION` and its `Date`,
+  at most once a day, and runs `python3 .github/scripts/news.py collect`, which files the
+  fragments under `# hvtiRdatabuild X.Y.Z` in merge order and deletes them.
+  `.claude/house-style.md` carries the rule and the reasoning.
 - **Repo-governance files do not bump the version.** `AGENTS.md`, `CLAUDE.md`, `.github/`,
   `dev/`, `.lintr`, `_pkgdown.yml` and `equivalence_signoff.yaml` are all listed in
   `.Rbuildignore`, so they never reach an installed package, and a bump would announce a
   change no user can observe. The test is mechanical, so read `.Rbuildignore` rather than
-  judging by feel: if the file is excluded there, no bump and no `NEWS.md` entry. The
+  judging by feel: if the file is excluded there, no bump and no `news/` fragment. The
   docs-only commits already on `main` (`6ca1faa`, `ee28201`, `1f7d99a`) follow this.
 
 ## Looking up a dependency's API
