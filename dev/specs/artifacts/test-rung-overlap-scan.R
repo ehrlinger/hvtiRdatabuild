@@ -54,10 +54,12 @@ patterns_in <- function(path, names) {
   mget(intersect(names, ls(env)), envir = env)
 }
 
-join <- patterns_in(scan_script, c("RE_SHAPE", "RE_ERROR", "RE_MODEL"))
+join <- patterns_in(scan_script,
+                    c("RE_SHAPE", "RE_ERROR", "RE_MODEL", "RE_LST_KEEP"))
 from_log <- patterns_in(file.path(here, "log-verifiability-scan.R"),
                         c("RE_SHAPE", "RE_ERROR"))
-from_lst <- patterns_in(file.path(here, "lst-listing-scan.R"), c("RE_MODEL"))
+from_lst <- patterns_in(file.path(here, "lst-listing-scan.R"),
+                        c("RE_MODEL", "RE_LST_KEEP"))
 parents <- c(from_log, from_lst)
 
 for (nm in names(parents)) {
@@ -69,8 +71,11 @@ for (nm in names(parents)) {
     message(sprintf("%-28s %s", paste0(nm, " matches parent"), "ok"))
   }
 }
-if (length(parents) != 3L) {
-  message("FAIL  expected 3 parent patterns, found ", length(parents))
+# ⚠️ RE_LST_KEEP is the line prefilter. It is not a detection pattern, but a
+# line it drops never reaches one, so a drifted prefilter drifts the result
+# exactly as a drifted RE_MODEL would.
+if (length(parents) != 4L) {
+  message("FAIL  expected 4 parent patterns, found ", length(parents))
   fail <- fail + 1L
 }
 
@@ -107,6 +112,12 @@ put("thoracic/e", "out.lst", c("The PRINT Procedure",
 # F: two listings, only one a model, so the study is counted ONCE
 put("cardiac/f", "fit.lst", MODEL)
 put("cardiac/f", "freq.lst", c("The INVENTED Procedure", "(no estimates here)"))
+# H: a model listing in ALL CAPS only      -> rung 3 only
+#    🔴 The line prefilter matched "rocedure|stimates|ariance", which an
+#    upper-case banner does not contain, so this listing was dropped before
+#    RE_MODEL saw it. lst-listing-scan.R was fixed 2026-10-02 and this copy was
+#    not, because the guard above compared the patterns and not the prefilter.
+put("thoracic/h", "fit.lst", c("THE INVENTED PROCEDURE", "PARAMETER ESTIMATES"))
 
 outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
@@ -124,15 +135,15 @@ num <- function(field) {
 expected <- list(
   logs_read              = 5L,   # a, b, g, d, e
   logs_usable_for_rung_1 = 3L,   # a, b, g -- d has an ERROR, e has no shape
-  listings_read          = 6L,   # a, c, d, e, f x2
-  listings_with_a_model  = 4L,   # a, c, d, f
+  listings_read          = 7L,   # a, c, d, e, f x2, h
+  listings_with_a_model  = 5L,   # a, c, d, f, h
   both_rungs             = 1L,   # a
   rung_1_only            = 2L,   # b, g
-  rung_3_only            = 3L,   # c, d, f
-  either_rung            = 6L,
+  rung_3_only            = 4L,   # c, d, f, h
+  either_rung            = 7L,
   with_a_usable_log      = 3L,
-  with_a_model_listing   = 4L,   # ⭐ f counted once despite two listings
-  seen_with_any_log_or_listing = 7L
+  with_a_model_listing   = 5L,   # ⭐ f counted once despite two listings
+  seen_with_any_log_or_listing = 8L
 )
 for (nm in names(expected)) {
   got <- num(nm)
@@ -147,7 +158,7 @@ for (nm in names(expected)) {
 # output. The fixture plants distinctive words and study names, and none may
 # appear.
 for (leak in c("invented", "Invented", "INVENTED", "cardiac", "thoracic",
-               "Parameter Estimates", "Obs", "Procedure", "WORK.")) {
+               "Parameter Estimates", "PARAMETER ESTIMATES", "Obs", "Procedure", "WORK.")) {
   if (grepl(leak, j, fixed = TRUE)) {
     message("FAIL  output contains fixture text: ", leak); fail <- fail + 1L
   }
@@ -177,8 +188,8 @@ if (!file.exists(o3)) {
   j <- paste(readLines(o3), collapse = " ")
   over <- list(logs_read = 0L, listings_read = 0L, logs_usable_for_rung_1 = 0L,
                listings_with_a_model = 0L, both_rungs = 0L, either_rung = 0L,
-               logs_oversized = 5L, listings_oversized = 6L,
-               seen_with_any_log_or_listing = 7L)   # ⭐ existence is untouched
+               logs_oversized = 5L, listings_oversized = 7L,
+               seen_with_any_log_or_listing = 8L)   # ⭐ existence is untouched
   for (nm in names(over)) {
     got <- num(nm)
     ok <- identical(got, over[[nm]])
