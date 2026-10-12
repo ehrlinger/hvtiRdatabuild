@@ -35,6 +35,23 @@ reference:
   - dw_pull
   - print.pull_result
 
+- title: "Build: Assemble and Derive"
+  desc: >
+    Join the pulled modules into a study's built dataset, run its study-specific
+    derivation code, and carry the cohort's inclusion and exclusion history
+    through both in order.
+  contents:
+  - build_dataset
+  - derive_vars
+  - new_cohort_record
+  - append_cohort_stage
+  - cohort_summary
+  - print.build_result
+  - str.build_result
+  - print.derive_result
+  - str.derive_result
+  - str.cohort_record
+
 - title: "Analysis sets"
   desc: >
     Write and read declared, checkpointed selections of a study's built dataset.
