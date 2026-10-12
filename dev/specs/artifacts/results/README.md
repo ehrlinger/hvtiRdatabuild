@@ -431,17 +431,45 @@ pair differs. A drifted copy would still run and would report the overlap of two
 populations that are not the ones these artifacts describe -- which is the
 defect this whole body of work measured, in 1,064 macro names.
 
-🔴 **STALE AS OF 2026-10-12: the figures below were produced with the
-upper-case prefilter defect, and a rerun is pending.** This scan carried its
-own copy of `lst-listing-scan.R`'s line prefilter, inline and unnamed. The
-parent was fixed on 2026-10-02 and the copy was not, because the drift guard
-compared `RE_SHAPE`, `RE_ERROR` and `RE_MODEL` and not the prefilter. A line
-the prefilter drops never reaches a pattern, so the copies drifted in effect
-while every guarded pattern still matched. ⭐ The two cross-check fields
-reproduced 676 in September because both scans then shared the defect;
-`lst-listing.json` now reports 682. The prefilter is now `RE_LST_KEEP` in both
+### Rerun 2026-10-12: the ladder still nests, at 680 of 682
+
+🔴 **The September figures below were produced with the upper-case prefilter
+defect.** This scan carried its own copy of `lst-listing-scan.R`'s line
+prefilter, inline and unnamed. The parent was fixed on 2026-10-02 and the copy
+was not, because the drift guard compared `RE_SHAPE`, `RE_ERROR` and
+`RE_MODEL` and not the prefilter. A line the prefilter drops never reaches a
+pattern, so the copies drifted in effect while every guarded pattern still
+matched. ⭐ The listing cross-check reproduced 676 in September because both
+scans then shared the defect. The prefilter is now `RE_LST_KEEP` in both
 scripts, under the guard, and an all-caps model listing in the fixture fails
 on the old copy.
+
+Rerun on `lri-r05` under `hvtiRutilities` 1.4.4, after the fix:
+
+| | 2026-09-07 | 2026-10-12 |
+|---|---:|---:|
+| **both rungs** | 674 | **680** |
+| rung 1 only | 506 | 513 |
+| rung 3 only | 2 | 2 |
+| either rung | 1,182 | 1,195 |
+| holding a log or a listing | 1,283 | 1,289 |
+| with a usable log | 1,180 | 1,193 |
+| with a model listing | 676 | **682** |
+
+✅ **The listing cross-check reproduces exactly:** 682 studies and 8,427 files,
+as in `lst-listing.json` of the same day.
+
+⚠️ **The log cross-check does not, and is not expected to.**
+`log-verifiability.json` is still the 2026-09-06 run, under 1.1.9 and over
+50,608 logs; this walk saw 50,929. Its 1,193 usable-log studies against that
+file's 1,180 measure five weeks of new logs and a taxonomy change, not a
+defect, until `log-verifiability.json` is rerun on the same footing.
+
+⭐ **The finding is unchanged: 680 of 682, 99.7%.** Rung 3 remains very nearly
+a subset of rung 1, and the same two studies' worth of exception remains. The
+fix and the growth between runs cannot be separated in these counts, but
+neither moved the conclusion. Every limit stated below for the September run
+applies to this one unchanged.
 
 ### Run 2026-09-07: the ladder nests
 
