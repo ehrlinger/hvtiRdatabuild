@@ -26,8 +26,11 @@ read a study’s warehouse modules into R.
 materializes a declared selection from a built dataset, and
 [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
 reads a stale checkpoint only in a draft, with a note, and refuses it in
-a final render. The build and derivation stages (`build_dataset()` and
-`derive_vars()`) remain future work.
+a final render. The build and derivation stages
+([`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
+and
+[`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md))
+remain future work.
 
 ## Installation
 

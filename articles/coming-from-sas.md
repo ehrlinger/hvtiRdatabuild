@@ -17,30 +17,113 @@ program itself is the record of what happened. If an analyst commented
 out a block with `%macro skip`, that decision lives only in their copy
 of the script.
 
-R passes values through functions, and the study’s `study.yaml` is the
-record. Enabling a step is a change to a committed configuration file,
-not an uncommented block. The port is worth doing because what used to
-be invisible becomes reviewable.
+R passes values through functions. The study’s `study.yaml` records
+warehouse modules and named shared derivation flags. Study-specific
+predicates and variable formulas live in committed R code passed to
+[`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md).
+The `cohort_record` carries upstream selection and later exclusions
+through the build, in order. Enabling a shared step is a configuration
+change; changing a study-specific rule is a code change.
 
 ## Idiom translation
-
-``` r
-
-# Functions marked (S3) arrive in a later slice.
-```
 
 | SAS | R |
 |----|----|
 | `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) |
 | `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` |
+| `tp.bd.data.master.sas` | `build_dataset(raw, config, cohort)` |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
-| `%macro skip; ... %mend skip;` | `modules:` / `derive:` toggles in `study.yaml` |
-| `%vars(in=built, out=built, transf=1)` | `derive_vars(built, config)` (S3) |
+| `%macro skip; ... %mend skip;` | `modules:` / named shared `derive:` flags in `study.yaml` |
+| `%vars(in=built, out=built, transf=1)` | `derive_vars(build, config, study_derive)` |
 | `data x; set y; ... run;` | a `dplyr` pipeline |
 | `PROC CONTENTS` | [`hvtiRutilities::data_dictionary()`](https://ehrlinger.github.io/hvtiRutilities/reference/data_dictionary.html) |
 | `label x = 'Age at surgery';` | `labelled` + [`hvtiRutilities::label_map()`](https://ehrlinger.github.io/hvtiRutilities/reference/label_map.html) |
 | `first.id` / `last.id` | `group_by()` + `slice_head()` / `slice_tail()` |
 | `libname out xport` then `read.xport()` | parquet, or just return the object |
+
+## Build and derive with study-specific code
+
+This synthetic example shows the boundary between warehouse assembly and
+local study rules. The build carries the selected cohort forward. The
+callback adds a study variable, records its exclusion stage, and returns
+only included rows.
+
+``` r
+
+ids <- c("SYN201", "SYN202", "SYN203")
+cohort <- new_cohort_record(
+  members = data.frame(
+    patient_id = ids, stage_id = "selected", included = TRUE,
+    reason = NA_character_
+  ),
+  stages = data.frame(
+    stage_id = "selected", order = 1L, label = "Selected",
+    source = "upstream", provenance = "synthetic selection"
+  ),
+  patient_id_col = "masterid"
+)
+
+path <- tempfile(fileext = ".yaml")
+yaml::write_yaml(list(
+  study = "synthetic",
+  cohort_table = "synthetic.cohort",
+  warehouse = "synthetic_warehouse",
+  view_schema = "dbo",
+  pull_date = "2026-10-01",
+  modules = list("base", "vitalstatus"),
+  derive = list(scale_value = TRUE)
+), path)
+config <- read_study_config(path)
+unlink(path)
+
+base <- data.frame(
+  masterid = ids, base_value = c(3, 5, 8), keep = c(TRUE, FALSE, TRUE)
+)
+status <- data.frame(
+  masterid = ids, status_value = c("alive", "alive", "deceased")
+)
+raw <- structure(list(
+  tables = list(bdbase = base, bdstat = status),
+  manifest = data.frame(
+    module = c("base", "vitalstatus"), output = c("bdbase", "bdstat"),
+    n_rows = c(3L, 3L), n_cols = c(3L, 2L),
+    pulled_at = as.POSIXct(rep("2026-10-01", 2L), tz = "UTC")
+  )
+), class = "pull_result")
+built <- build_dataset(raw, config, cohort)
+
+study_derive <- function(data, cohort, config) {
+  keep <- data$keep
+  if (isTRUE(config$derive[["scale_value"]])) {
+    data$analysis_value <- data$base_value * 2
+  }
+  reason <- rep(NA_character_, length(keep))
+  reason[!keep] <- "synthetic study exclusion"
+  stage <- data.frame(
+    stage_id = "study_eligibility",
+    order = max(cohort$stages$order) + 1L,
+    label = "Study eligibility",
+    source = "derive",
+    provenance = "synthetic study rule"
+  )
+  outcomes <- data.frame(
+    patient_id = data$masterid, included = keep, reason = reason
+  )
+  updated <- append_cohort_stage(cohort, stage, outcomes)
+  list(data = data[keep, , drop = FALSE], cohort = updated)
+}
+derived <- derive_vars(built, config, study_derive)
+cohort_summary(derived$cohort)$stages
+#>            stage_id               label n_in n_excluded n_remaining
+#> 1          selected            Selected    3          0           3
+#> 2             build Patient-level build    3          0           3
+#> 3 study_eligibility   Study eligibility    3          1           2
+```
+
+Keep study rules in version-controlled R code. Do not put executable R
+expressions or source paths in `study.yaml`. Explicitly resolve missing
+predicate values before appending outcomes: a missing `included` value
+is an error, not an implicit pass or exclusion.
 
 ## Port the downstream dataset, not its first consumer
 

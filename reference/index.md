@@ -44,6 +44,33 @@ and pull the modules the study declares. The pull is read-only.
 - [`print(`*`<pull_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
   : Print a pull result
 
+## Build: Assemble and Derive
+
+Join the pulled modules into a study’s built dataset, run its
+study-specific derivation code, and carry the cohort’s inclusion and
+exclusion history through both in order.
+
+- [`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
+  : Assemble the patient-level dataset
+- [`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md)
+  : Apply study-specific variable derivations
+- [`new_cohort_record()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/new_cohort_record.md)
+  : Create an ordered cohort history
+- [`append_cohort_stage()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/append_cohort_stage.md)
+  : Append an outcome stage to a cohort history
+- [`cohort_summary()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_summary.md)
+  : Summarize cohort attrition without patient identifiers
+- [`print(`*`<build_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.build_result.md)
+  : Print a built dataset result without patient values
+- [`str(`*`<build_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/str.build_result.md)
+  : Safely inspect a built dataset result
+- [`print(`*`<derive_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.derive_result.md)
+  : Print a derived dataset result without patient values
+- [`str(`*`<derive_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/str.derive_result.md)
+  : Safely inspect a derived dataset result
+- [`str(`*`<cohort_record>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/str.cohort_record.md)
+  : Safely inspect a cohort record
+
 ## Analysis sets
 
 Write and read declared, checkpointed selections of a study’s built

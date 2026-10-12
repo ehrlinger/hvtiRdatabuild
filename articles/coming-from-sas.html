@@ -79,13 +79,9 @@
 </section><section class="level2"><h2 id="the-model-shift">The model shift<a class="anchor" aria-label="anchor" href="#the-model-shift"></a>
 </h2>
 <p>A SAS program mutates a dataset through a sequence of steps, and the program itself is the record of what happened. If an analyst commented out a block with <code>%macro skip</code>, that decision lives only in their copy of the script.</p>
-<p>R passes values through functions, and the study’s <code>study.yaml</code> is the record. Enabling a step is a change to a committed configuration file, not an uncommented block. The port is worth doing because what used to be invisible becomes reviewable.</p>
+<p>R passes values through functions. The study’s <code>study.yaml</code> records warehouse modules and named shared derivation flags. Study-specific predicates and variable formulas live in committed R code passed to <code><a href="../reference/derive_vars.html">derive_vars()</a></code>. The <code>cohort_record</code> carries upstream selection and later exclusions through the build, in order. Enabling a shared step is a configuration change; changing a study-specific rule is a code change.</p>
 </section><section class="level2"><h2 id="idiom-translation">Idiom translation<a class="anchor" aria-label="anchor" href="#idiom-translation"></a>
 </h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Functions marked (S3) arrive in a later slice.</span></span></code></pre></div>
-</div>
 <table class="table caption-top">
 <colgroup>
 <col style="width: 50%">
@@ -107,36 +103,39 @@
 <td><code>dw_pull(config, conn)</code></td>
 </tr>
 <tr class="odd">
+<td><code>tp.bd.data.master.sas</code></td>
+<td><code>build_dataset(raw, config, cohort)</code></td>
+</tr>
+<tr class="even">
 <td><code>libname library "&amp;STUDY/datasets"</code></td>
 <td>paths in <code>study.yaml</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>%macro skip; ... %mend skip;</code></td>
 <td>
-<code>modules:</code> / <code>derive:</code> toggles in <code>study.yaml</code>
+<code>modules:</code> / named shared <code>derive:</code> flags in <code>study.yaml</code>
 </td>
 </tr>
-<tr class="odd">
-<td><code>%vars(in=built, out=built, transf=1)</code></td>
-<td>
-<code>derive_vars(built, config)</code> (S3)</td>
-</tr>
 <tr class="even">
+<td><code>%vars(in=built, out=built, transf=1)</code></td>
+<td><code>derive_vars(build, config, study_derive)</code></td>
+</tr>
+<tr class="odd">
 <td><code>data x; set y; ... run;</code></td>
 <td>a <code>dplyr</code> pipeline</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>PROC CONTENTS</code></td>
 <td><code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/data_dictionary.html" class="external-link">hvtiRutilities::data_dictionary()</a></code></td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>label x = 'Age at surgery';</code></td>
 <td>
 <code>labelled</code> + <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/label_map.html" class="external-link">hvtiRutilities::label_map()</a></code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>first.id</code> / <code>last.id</code>
 </td>
@@ -144,14 +143,89 @@
 <code>group_by()</code> + <code>slice_head()</code> / <code>slice_tail()</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>libname out xport</code> then <code>read.xport()</code>
 </td>
 <td>parquet, or just return the object</td>
 </tr>
 </tbody>
-</table></section><section class="level2"><h2 id="port-the-downstream-dataset-not-its-first-consumer">Port the downstream dataset, not its first consumer<a class="anchor" aria-label="anchor" href="#port-the-downstream-dataset-not-its-first-consumer"></a>
+</table></section><section class="level2"><h2 id="build-and-derive-with-study-specific-code">Build and derive with study-specific code<a class="anchor" aria-label="anchor" href="#build-and-derive-with-study-specific-code"></a>
+</h2>
+<p>This synthetic example shows the boundary between warehouse assembly and local study rules. The build carries the selected cohort forward. The callback adds a study variable, records its exclusion stage, and returns only included rows.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SYN201"</span>, <span class="st">"SYN202"</span>, <span class="st">"SYN203"</span><span class="op">)</span></span>
+<span><span class="va">cohort</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/new_cohort_record.html">new_cohort_record</a></span><span class="op">(</span></span>
+<span>  members <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    patient_id <span class="op">=</span> <span class="va">ids</span>, stage_id <span class="op">=</span> <span class="st">"selected"</span>, included <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>    reason <span class="op">=</span> <span class="cn">NA_character_</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  stages <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    stage_id <span class="op">=</span> <span class="st">"selected"</span>, order <span class="op">=</span> <span class="fl">1L</span>, label <span class="op">=</span> <span class="st">"Selected"</span>,</span>
+<span>    source <span class="op">=</span> <span class="st">"upstream"</span>, provenance <span class="op">=</span> <span class="st">"synthetic selection"</span></span>
+<span>  <span class="op">)</span>,</span>
+<span>  patient_id_col <span class="op">=</span> <span class="st">"masterid"</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">path</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span>
+<span><span class="fu">yaml</span><span class="fu">::</span><span class="fu"><a href="https://yaml.r-lib.org/reference/write_yaml.html" class="external-link">write_yaml</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  study <span class="op">=</span> <span class="st">"synthetic"</span>,</span>
+<span>  cohort_table <span class="op">=</span> <span class="st">"synthetic.cohort"</span>,</span>
+<span>  warehouse <span class="op">=</span> <span class="st">"synthetic_warehouse"</span>,</span>
+<span>  view_schema <span class="op">=</span> <span class="st">"dbo"</span>,</span>
+<span>  pull_date <span class="op">=</span> <span class="st">"2026-10-01"</span>,</span>
+<span>  modules <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"base"</span>, <span class="st">"vitalstatus"</span><span class="op">)</span>,</span>
+<span>  derive <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>scale_value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span>, <span class="va">path</span><span class="op">)</span></span>
+<span><span class="va">config</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/read_study_config.html">read_study_config</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">path</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">base</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  masterid <span class="op">=</span> <span class="va">ids</span>, base_value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3</span>, <span class="fl">5</span>, <span class="fl">8</span><span class="op">)</span>, keep <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="cn">FALSE</span>, <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">status</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  masterid <span class="op">=</span> <span class="va">ids</span>, status_value <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"alive"</span>, <span class="st">"alive"</span>, <span class="st">"deceased"</span><span class="op">)</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/structure.html" class="external-link">structure</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
+<span>  tables <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>bdbase <span class="op">=</span> <span class="va">base</span>, bdstat <span class="op">=</span> <span class="va">status</span><span class="op">)</span>,</span>
+<span>  manifest <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    module <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"base"</span>, <span class="st">"vitalstatus"</span><span class="op">)</span>, output <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"bdbase"</span>, <span class="st">"bdstat"</span><span class="op">)</span>,</span>
+<span>    n_rows <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">3L</span><span class="op">)</span>, n_cols <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">2L</span><span class="op">)</span>,</span>
+<span>    pulled_at <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/as.POSIXlt.html" class="external-link">as.POSIXct</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="st">"2026-10-01"</span>, <span class="fl">2L</span><span class="op">)</span>, tz <span class="op">=</span> <span class="st">"UTC"</span><span class="op">)</span></span>
+<span>  <span class="op">)</span></span>
+<span><span class="op">)</span>, class <span class="op">=</span> <span class="st">"pull_result"</span><span class="op">)</span></span>
+<span><span class="va">built</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/build_dataset.html">build_dataset</a></span><span class="op">(</span><span class="va">raw</span>, <span class="va">config</span>, <span class="va">cohort</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">study_derive</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">data</span>, <span class="va">cohort</span>, <span class="va">config</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">keep</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">keep</span></span>
+<span>  <span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Logic.html" class="external-link">isTRUE</a></span><span class="op">(</span><span class="va">config</span><span class="op">$</span><span class="va">derive</span><span class="op">[[</span><span class="st">"scale_value"</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">data</span><span class="op">$</span><span class="va">analysis_value</span> <span class="op">&lt;-</span> <span class="va">data</span><span class="op">$</span><span class="va">base_value</span> <span class="op">*</span> <span class="fl">2</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">reason</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="cn">NA_character_</span>, <span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">keep</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">reason</span><span class="op">[</span><span class="op">!</span><span class="va">keep</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"synthetic study exclusion"</span></span>
+<span>  <span class="va">stage</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    stage_id <span class="op">=</span> <span class="st">"study_eligibility"</span>,</span>
+<span>    order <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max</a></span><span class="op">(</span><span class="va">cohort</span><span class="op">$</span><span class="va">stages</span><span class="op">$</span><span class="va">order</span><span class="op">)</span> <span class="op">+</span> <span class="fl">1L</span>,</span>
+<span>    label <span class="op">=</span> <span class="st">"Study eligibility"</span>,</span>
+<span>    source <span class="op">=</span> <span class="st">"derive"</span>,</span>
+<span>    provenance <span class="op">=</span> <span class="st">"synthetic study rule"</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="va">outcomes</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>    patient_id <span class="op">=</span> <span class="va">data</span><span class="op">$</span><span class="va">masterid</span>, included <span class="op">=</span> <span class="va">keep</span>, reason <span class="op">=</span> <span class="va">reason</span></span>
+<span>  <span class="op">)</span></span>
+<span>  <span class="va">updated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/append_cohort_stage.html">append_cohort_stage</a></span><span class="op">(</span><span class="va">cohort</span>, <span class="va">stage</span>, <span class="va">outcomes</span><span class="op">)</span></span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>data <span class="op">=</span> <span class="va">data</span><span class="op">[</span><span class="va">keep</span>, , drop <span class="op">=</span> <span class="cn">FALSE</span><span class="op">]</span>, cohort <span class="op">=</span> <span class="va">updated</span><span class="op">)</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">derived</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/derive_vars.html">derive_vars</a></span><span class="op">(</span><span class="va">built</span>, <span class="va">config</span>, <span class="va">study_derive</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/cohort_summary.html">cohort_summary</a></span><span class="op">(</span><span class="va">derived</span><span class="op">$</span><span class="va">cohort</span><span class="op">)</span><span class="op">$</span><span class="va">stages</span></span>
+<span><span class="co">#&gt;            stage_id               label n_in n_excluded n_remaining</span></span>
+<span><span class="co">#&gt; 1          selected            Selected    3          0           3</span></span>
+<span><span class="co">#&gt; 2             build Patient-level build    3          0           3</span></span>
+<span><span class="co">#&gt; 3 study_eligibility   Study eligibility    3          1           2</span></span></code></pre></div>
+</div>
+<p>Keep study rules in version-controlled R code. Do not put executable R expressions or source paths in <code>study.yaml</code>. Explicitly resolve missing predicate values before appending outcomes: a missing <code>included</code> value is an error, not an implicit pass or exclusion.</p>
+</section><section class="level2"><h2 id="port-the-downstream-dataset-not-its-first-consumer">Port the downstream dataset, not its first consumer<a class="anchor" aria-label="anchor" href="#port-the-downstream-dataset-not-its-first-consumer"></a>
 </h2>
 <p>A <code>bd.SAStoR.sas</code> job, often copied from <code>tp.bd.SAStoR.sas</code>, can look like a file-format adapter: it reads <code>built</code>, keeps a shorter variable list, and writes <code>builtr</code> for R. The useful boundary is not SAS versus R, however. The output is a downstream data contract that may feed descriptive summaries, models, tables, and figures long after the first job that happened to read it.</p>
 <p>Port that pattern as an analysis set. Declare the columns and any row exclusions once under <code>analysis_sets:</code> in the setup manifest, <code>_study.yml</code>, then let every downstream job that needs that contract read the same checkpoint. This is not the warehouse-build <code>study.yaml</code> read by <code><a href="../reference/read_study_config.html">read_study_config()</a></code>:</p>
