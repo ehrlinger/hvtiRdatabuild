@@ -2,11 +2,11 @@
   "_provenance": {
     "script": "log-verifiability-scan.R",
     "question": "for what fraction of studies could a ported vars.sas be verified at rung 1?",
-    "run_at": "2026-09-07T12:26:11-0400",
+    "run_at": "2026-10-12T12:52:19-0400",
     "root": "/studies",
-    "hvtiRutilities_version": "1.1.9",
+    "hvtiRutilities_version": "1.4.4",
     "taxonomy_folders": "analyses,datasets,descriptive,distributions,documents,estimates,graphs",
-    "logs_considered": 50608,
+    "logs_considered": 50929,
     "logs_unreadable": 0,
     "logs_oversized": 38,
     "max_log_mb": 200,
@@ -14,16 +14,16 @@
     "emits_dataset_dimensions": false
   },
   "logs": {
-    "read": 50570,
-    "with_shape_note": 48330,
-    "with_error": 4426,
-    "with_warning": 35692,
-    "ended_normally": 44931,
-    "usable_for_rung_1": 44032
+    "read": 50891,
+    "with_shape_note": 48602,
+    "with_error": 4470,
+    "with_warning": 35941,
+    "ended_normally": 45194,
+    "usable_for_rung_1": 44263
   },
   "studies": {
-    "with_any_log": 1204,
-    "with_a_usable_log": 1180
+    "with_any_log": 1215,
+    "with_a_usable_log": 1193
   },
   "by_stem": [
     {
@@ -52,9 +52,9 @@
     },
     {
       "stem": "other",
-      "logs": 50425,
-      "with_shape_note": 48209,
-      "usable_for_rung_1": 43923
+      "logs": 50746,
+      "with_shape_note": 48481,
+      "usable_for_rung_1": 44154
     }
   ]
 }
