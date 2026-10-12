@@ -58,6 +58,14 @@ put("cardiac/eps", "notes.lst", c("invented text with no procedure heading"))
 put("cardiac/alpha", "model2.lst",
     c("The LOGISTIC Procedure", "Analysis of Maximum Likelihood Estimates"))
 
+# 🔴 eta and theta are ALL CAPS. The prefilter matched `^ *[Oo]bs ` and
+# "rocedure" BEFORE lowercasing, so every run before 2026-10-02 dropped both:
+# an `OBS` header with no banner (the shape PROC PRINT's LISTING output takes)
+# and an upper-case banner. Invented headers only, and no rows.
+put("thoracic/eta", "upper.lst", c("OBS    INVENTEDCOL    ANOTHERINVENTED"))
+put("vascular/theta", "banner.lst",
+    c("THE PRINT PROCEDURE", "OBS    INVENTEDCOL"))
+
 outfile <- file.path(root, "out.json")
 rscript <- file.path(R.home("bin"), "Rscript")
 res <- system2(rscript, c(shQuote(normalizePath(scan_script)),
@@ -73,14 +81,14 @@ num <- function(field) {
 }
 
 expected <- list(
-  listings_considered = 6L,
-  read = 6L,
+  listings_considered = 8L,
+  read = 8L,
   # alpha's two, beta's one
   with_model_listing = 3L,
-  with_print_output = 1L,          # gamma
-  with_any_procedure = 5L,         # all but eps
+  with_print_output = 3L,          # gamma, eta, theta
+  with_any_procedure = 6L,         # all but eps and eta (eta has no banner)
   with_nothing_recognised = 1L,    # eps
-  with_any_listing = 5L,
+  with_any_listing = 7L,
   # ⭐ alpha counted once despite two model listings, plus beta
   with_a_model_listing = 2L
 )
@@ -119,7 +127,7 @@ jt <- paste(readLines(o3), collapse = " ")
 numt <- function(f) as.integer(sub(".*: *", "",
   regmatches(jt, regexpr(paste0("\"", f, "\": *-?[0-9]+"), jt))))
 for (c in list(list("all-oversized: read", numt("read"), 0L),
-               list("all-oversized: any listing", numt("with_any_listing"), 5L),
+               list("all-oversized: any listing", numt("with_any_listing"), 7L),
                list("all-oversized: model", numt("with_a_model_listing"), 0L))) {
   ok <- identical(c[[2]], c[[3]])
   if (!ok) fail <- fail + 1L

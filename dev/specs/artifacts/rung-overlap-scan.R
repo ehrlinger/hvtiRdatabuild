@@ -85,6 +85,11 @@ max_mb     <- as.numeric(getarg("--max-mb", "200"))
 # three, and let the test say so if you forget.
 RE_SHAPE   <- "^note: the data set .* has [0-9]+ observations and [0-9]+ variables"
 RE_ERROR   <- "^error"
+# 🔴 Copied from lst-listing-scan.R with the patterns above, and guarded the
+# same way. The copy that lived inline below kept the lower-case-only
+# fragments after the parent was fixed on 2026-10-02, so an upper-case model
+# banner never reached RE_MODEL. The guard compared the patterns and not this.
+RE_LST_KEEP <- "rocedure|ROCEDURE|stimates|STIMATES|ariance|ARIANCE|^ *[Oo][Bb][Ss] "
 RE_MODEL   <- paste0("analysis of maximum likelihood estimates|",
                      "parameter estimates|",
                      "solution for fixed effects|",
@@ -159,7 +164,7 @@ inspect_lst <- function(path) {
     lines <- tryCatch(suppressWarnings(readLines(con, n = chunk, warn = FALSE)),
                       error = function(e) character(0))
     if (!length(lines)) break
-    keep <- grepl("rocedure|stimates|ariance|^ *[Oo]bs ", lines)
+    keep <- grepl(RE_LST_KEEP, lines)
     if (!any(keep)) { rm(lines, keep); next }
     lines <- tolower(lines[keep])
     if (any(grepl(RE_MODEL, lines))) { model <- TRUE; rm(lines, keep); break }

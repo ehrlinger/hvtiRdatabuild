@@ -86,6 +86,9 @@ RE_MODEL <- paste0("analysis of maximum likelihood estimates|",
 # these files is known, and never read.
 RE_PRINT <- "^ *obs +|the (print|report) procedure"
 RE_ANYPROC <- "the [a-z]+ procedure"
+# The line prefilter, named so `test-rung-overlap-scan.R` can hold its copy to
+# this one. Why it carries upper-case literals is explained where it is used.
+RE_LST_KEEP <- "rocedure|ROCEDURE|stimates|STIMATES|ariance|ARIANCE|^ *[Oo][Bb][Ss] "
 
 inspect <- function(path) {
   if (max_mb > 0) {
@@ -107,7 +110,13 @@ inspect <- function(path) {
     # case-insensitive WITHOUT the cost of ignore.case: "Procedure" and
     # "procedure" both contain "rocedure", "Estimates" and "estimates" both
     # contain "stimates".
-    keep <- grepl("rocedure|stimates|ariance|^ *[Oo]bs ", lines)
+    # 🔴 ...but NOT for ALL CAPS, which those fragments miss: "PROCEDURE" does
+    # not contain "rocedure", and `[Oo]bs` does not match `OBS`. Every run
+    # before 2026-10-02 dropped an upper-case `OBS` header (the shape PROC
+    # PRINT's LISTING output takes) and an upper-case banner before any pattern
+    # saw them. The upper-case literal is added beside each fragment, which
+    # keeps the prefilter as cheap as it was.
+    keep <- grepl(RE_LST_KEEP, lines)
     if (!any(keep)) { rm(lines, keep); next }
     lines <- tolower(lines[keep])
     if (!has[["model"]] && any(grepl(RE_MODEL, lines))) has[["model"]] <- TRUE

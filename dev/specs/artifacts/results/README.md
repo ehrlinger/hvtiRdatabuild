@@ -12,7 +12,8 @@ contract, and it is why they are safe to hold in the repository at all.
 Every file records, in its own `_provenance` block, the root, the scope, the
 `hvtiRutilities` version and the taxonomy folder list it used. **The study counts
 are a function of that taxonomy**, so two runs are comparable only when those
-match. All fourteen below used 1.1.9 over `/studies`.
+match. All ran over `/studies`; the 2026-09 files used 1.1.9, while
+`dwpull-census.json` used 1.4.3 and the two `lst-` files of 2026-10-12 used 1.4.4.
 
 | file | scan | run at |
 |---|---|---|
@@ -27,10 +28,11 @@ match. All fourteen below used 1.1.9 over `/studies`.
 | `studylocal-wide.json` | as `studylocal-scan`, definitions from all `.sas` | 2026-09-06 13:22 |
 | `log-verifiability.json` | ⭐ what fraction of studies could be verified | 2026-09-06 14:04 |
 | `studylocal-defsonly.json` | ⭐ the definition scope alone, calls held fixed | 2026-09-06 14:08 |
-| `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-09-06 16:02 |
+| `lst-listing.json` | ⭐ what was filed, and can it check a port at rung 3 | 2026-10-12 10:52 |
 | `build-structure.json` | ⭐ what a build is made of, counts only | 2026-09-06 16:29 |
 | `direct-procmi.json` | ⭐ does anyone run `PROC MI` without the macro | 2026-09-06 19:35 |
 | `dwpull-census.json` | ⭐ what studies change from the warehouse-pull template (#72) | 2026-10-02 14:31 |
+| `lst-exposure.json` | ⭐ how much print-out the listings hold, and who can read it | 2026-10-12 10:28 |
 
 ## `dwpull-census.json` is counts only, and why it says so
 
@@ -290,6 +292,123 @@ macro-call scoping in the imputation spec's §2 was right, and the 822 studies
 `build-structure.json` reports for `PROC MI` are studies holding a file that
 CONTAINS one, which is a count of definitions rather than of runs.
 
+## `lst-exposure-scan.R`: the print-out figure, split and reachable
+
+⚠️ **`lst-listing.json`'s 35,735 is a pattern match, not a finding about
+content.** `RE_PRINT` is `^ *obs +|the (print|report) procedure` as ONE pattern:
+a reliable heading OR any line beginning with `obs `. A file matching the second
+may be a print-out, or may have a column labelled that way. Reading it as
+"35,735 listings carry patient data" is the same noun-to-verb step that produced
+three corrected overclaims in this directory.
+
+🔴 **The artifact cannot decompose it, and arithmetic on the existing fields
+does not either.** 46,167 files carry some flag and 36,622 carry a procedure
+heading, so at most 9,545 print matches came from a file with no heading at all
+-- but that is not a lower bound on heading-backed detection, because a file can
+match `the freq procedure` for one flag and `obs ` for the other. The split
+needs a run that records it.
+
+⭐ **And exposure is CONTENT TIMES REACHABILITY, of which only content has been
+measured.** 35,735 print-outs in owner-only directories is an inventory item;
+the same files readable by everyone on a shared research volume is a different
+conversation. A mode bit is not content, so measuring it discloses nothing.
+
+The scan therefore reports a BRACKET (`both` / `heading_only` / `obs_only`), the
+study counts that never existed, POSIX readability, and volume in BYTES.
+
+🔴 **No row count, deliberately.** A `PROC PRINT` row count is a cohort size, and
+`log-verifiability-scan.R` already declined to read the N and M out of a shape
+NOTE for that reason. Adding it here would drift into a disclosure a sibling
+scan refused on purpose.
+
+🔴 **No owner name.** Owners are counted, never named -- the aggregate-inside,
+emit-a-scalar pattern from `rung-overlap-scan.R`. ⚠️ The artifact withdrawn on
+2026-09-06 disclosed a personal home directory, which is this exact class of
+value; the difference is aggregation, not filtering.
+
+⚠️ **Two limits the output states about itself.** `mode_bits_look_uniform` says
+whether a network filesystem synthesised one mode for every file, in which case
+the reachability figures describe the mount rather than any per-file decision.
+And `in_a_world_traversable_directory` checks the IMMEDIATE directory only, so it
+over-counts: a file in an open folder under a private parent is not reachable.
+
+### Run 2026-10-12: 31,849 corroborated print-outs, all group-readable
+
+Run on `lri-r05` under `hvtiRutilities` 1.4.4, not 1.1.9, so its study counts
+are not strictly comparable with the files above. The effect looks small:
+studies with any print pattern moved from 1,233 in an uncommitted run of
+2026-09-08 to 1,237.
+
+| | studies | files |
+|---|---:|---:|
+| listings considered | | 49,550 |
+| read (14 oversized skipped) | | 49,536 |
+| `Obs` header | | 36,825 |
+| ⭐ a data row within 8 lines of it | **1,136** | **31,849** |
+| a `PRINT` or `REPORT` procedure heading | | **0** |
+| upper-case-only `OBS` | | 890 |
+| any print pattern | 1,237 | 36,825 |
+
+🔴 **The 2026-09-08 run reported two corroborated files, and it was wrong.** It
+looked for a data row only on the line immediately below an `Obs` header.
+`PROC PRINT`'s listing puts a blank line there, and the offset distribution
+this run added shows it: **1,523,449 headers have their first row at offset 2,
+and 2 at offset 1.** That run's 2 was the 2 at offset 1. Measured over an
+eight-line window, 86% of the files with an `Obs` header carry a row under it.
+The uncommitted run is not kept; this file supersedes it.
+
+⭐ **The heading half of `RE_PRINT` finds nothing.** No listing carries "The
+PRINT Procedure" or "The REPORT Procedure". Every detection is an `Obs`
+header, so the bracket is degenerate: `both` and `heading_only` are 0.
+
+**Reachability, from mode bits only; no file was read for these.**
+`mode_bits_look_uniform` is `false`, with 3 distinct modes, so these are
+per-file decisions and not the mount's.
+
+| | files |
+|---|---:|
+| group readable | 49,550 (all) |
+| owner only | 0 |
+| readable by others | 27 |
+| in a world-traversable directory (over-counts) | 265 |
+| distinct owners | 15 |
+
+⭐ **Group-readable is not the same as exposed, and the scan cannot say which it
+is.** Per the maintainer (2026-10-12), everyone with access to the LRI server
+holds current CITI and HIPAA training. So the 31,849 print-outs are readable by
+people already cleared to read patient data. That makes them an inventory item,
+not a disclosure. The 27 readable by others reduce to the same question of who
+holds a login. ⚠️ That is a statement about the access policy, which the scan
+does not measure, and it holds only while the policy does.
+
+**Volume:** 26.42 GB of listings, 13.87 GB of them print-matched.
+
+## `lst-listing.json` regenerated 2026-10-12, after the upper-case fix
+
+Run on `lri-r05` under `hvtiRutilities` 1.4.4. The previous file ran under
+1.1.9, so the study rows mix the prefilter fix, a taxonomy change and five
+weeks of new files. The file rows are not affected by the taxonomy.
+
+| | 2026-09-07 | 2026-10-12 | change |
+|---|---:|---:|---:|
+| listings considered | 49,307 | 49,552 | +245 |
+| with print output | 35,735 | 36,827 | **+1,092** |
+| with nothing recognised | 3,126 | 2,472 | **−654** |
+| with any procedure | 36,622 | 36,833 | +211 |
+| with a model listing | 8,397 | 8,427 | +30 |
+| studies with any listing | 1,267 | 1,273 | +6 |
+| studies with a model listing | 676 | **682** | +6 |
+
+⭐ **The fix shows up where it should and nowhere else.** Print output grew
+by 1,092 against 245 new files, and the nothing-recognised count FELL by 654
+while the population grew. `lst-exposure.json` counts 890 upper-case-only
+`OBS` headers, which accounts for most of the print-output rise. The procedure
+and model rows moved roughly with the file count.
+
+⚠️ **The rung-3 study count is now 682, not 676.** `rung-overlap.json` below
+still reports the 674 of 676 join and has to be rerun before either number is
+cited again.
+
 ## The rung 1 / rung 3 join, and why it needed its own scan
 
 ⚠️ **Neither `log-verifiability.json` nor `lst-listing.json` can be joined to the
@@ -311,6 +430,46 @@ is guarded rather than trusted.** `test-rung-overlap-scan.R` evaluates
 pair differs. A drifted copy would still run and would report the overlap of two
 populations that are not the ones these artifacts describe -- which is the
 defect this whole body of work measured, in 1,064 macro names.
+
+### Rerun 2026-10-12: the ladder still nests, at 680 of 682
+
+🔴 **The September figures below were produced with the upper-case prefilter
+defect.** This scan carried its own copy of `lst-listing-scan.R`'s line
+prefilter, inline and unnamed. The parent was fixed on 2026-10-02 and the copy
+was not, because the drift guard compared `RE_SHAPE`, `RE_ERROR` and
+`RE_MODEL` and not the prefilter. A line the prefilter drops never reaches a
+pattern, so the copies drifted in effect while every guarded pattern still
+matched. ⭐ The listing cross-check reproduced 676 in September because both
+scans then shared the defect. The prefilter is now `RE_LST_KEEP` in both
+scripts, under the guard, and an all-caps model listing in the fixture fails
+on the old copy.
+
+Rerun on `lri-r05` under `hvtiRutilities` 1.4.4, after the fix:
+
+| | 2026-09-07 | 2026-10-12 |
+|---|---:|---:|
+| **both rungs** | 674 | **680** |
+| rung 1 only | 506 | 513 |
+| rung 3 only | 2 | 2 |
+| either rung | 1,182 | 1,195 |
+| holding a log or a listing | 1,283 | 1,289 |
+| with a usable log | 1,180 | 1,193 |
+| with a model listing | 676 | **682** |
+
+✅ **The listing cross-check reproduces exactly:** 682 studies and 8,427 files,
+as in `lst-listing.json` of the same day.
+
+⚠️ **The log cross-check does not, and is not expected to.**
+`log-verifiability.json` is still the 2026-09-06 run, under 1.1.9 and over
+50,608 logs; this walk saw 50,929. Its 1,193 usable-log studies against that
+file's 1,180 measure five weeks of new logs and a taxonomy change, not a
+defect, until `log-verifiability.json` is rerun on the same footing.
+
+⭐ **The finding is unchanged: 680 of 682, 99.7%.** Rung 3 remains very nearly
+a subset of rung 1, and the same two studies' worth of exception remains. The
+fix and the growth between runs cannot be separated in these counts, but
+neither moved the conclusion. Every limit stated below for the September run
+applies to this one unchanged.
 
 ### Run 2026-09-07: the ladder nests
 
