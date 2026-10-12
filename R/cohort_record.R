@@ -13,6 +13,20 @@
 #'
 #' @return An object of class `cohort_record` with `members`, `stages`, and
 #'   `patient_id_col` elements.
+#' @examples
+#' # Synthetic identifiers; no PHI.
+#' cohort <- new_cohort_record(
+#'   members = data.frame(
+#'     patient_id = c("SYN101", "SYN102", "SYN103"), stage_id = "selected",
+#'     included = TRUE, reason = NA_character_
+#'   ),
+#'   stages = data.frame(
+#'     stage_id = "selected", order = 1L, label = "Selected",
+#'     source = "upstream", provenance = "synthetic selection"
+#'   ),
+#'   patient_id_col = "masterid"
+#' )
+#' cohort
 #' @export
 new_cohort_record <- function(members, stages, patient_id_col) {
   .validate_cohort_tables(members, stages)
@@ -56,6 +70,32 @@ new_cohort_record <- function(members, stages, patient_id_col) {
 #'   outcome for every patient active at the preceding stage.
 #'
 #' @return An updated object of class `cohort_record`.
+#' @examples
+#' # Synthetic identifiers; no PHI.
+#' cohort <- new_cohort_record(
+#'   members = data.frame(
+#'     patient_id = c("SYN101", "SYN102", "SYN103"), stage_id = "selected",
+#'     included = TRUE, reason = NA_character_
+#'   ),
+#'   stages = data.frame(
+#'     stage_id = "selected", order = 1L, label = "Selected",
+#'     source = "upstream", provenance = "synthetic selection"
+#'   ),
+#'   patient_id_col = "masterid"
+#' )
+#' cohort <- append_cohort_stage(
+#'   cohort,
+#'   stage = data.frame(
+#'     stage_id = "adults", order = 2L, label = "Adults only",
+#'     source = "derive", provenance = "synthetic rule"
+#'   ),
+#'   outcomes = data.frame(
+#'     patient_id = c("SYN101", "SYN102", "SYN103"),
+#'     included = c(TRUE, FALSE, TRUE),
+#'     reason = c(NA, "synthetic exclusion", NA)
+#'   )
+#' )
+#' cohort
 #' @export
 append_cohort_stage <- function(cohort, stage, outcomes) {
   if (!inherits(cohort, "cohort_record")) {
@@ -101,6 +141,32 @@ append_cohort_stage <- function(cohort, stage, outcomes) {
 #'
 #' @return A list with `stages` (stage counts) and `reasons` (exclusion counts)
 #'   data frames. Neither table contains patient identifiers.
+#' @examples
+#' # Synthetic identifiers; no PHI.
+#' cohort <- new_cohort_record(
+#'   members = data.frame(
+#'     patient_id = c("SYN101", "SYN102", "SYN103"), stage_id = "selected",
+#'     included = TRUE, reason = NA_character_
+#'   ),
+#'   stages = data.frame(
+#'     stage_id = "selected", order = 1L, label = "Selected",
+#'     source = "upstream", provenance = "synthetic selection"
+#'   ),
+#'   patient_id_col = "masterid"
+#' )
+#' cohort <- append_cohort_stage(
+#'   cohort,
+#'   stage = data.frame(
+#'     stage_id = "adults", order = 2L, label = "Adults only",
+#'     source = "derive", provenance = "synthetic rule"
+#'   ),
+#'   outcomes = data.frame(
+#'     patient_id = c("SYN101", "SYN102", "SYN103"),
+#'     included = c(TRUE, FALSE, TRUE),
+#'     reason = c(NA, "synthetic exclusion", NA)
+#'   )
+#' )
+#' cohort_summary(cohort)$stages
 #' @export
 cohort_summary <- function(cohort) {
   if (!inherits(cohort, "cohort_record")) {

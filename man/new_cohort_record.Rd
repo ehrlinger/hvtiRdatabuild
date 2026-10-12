@@ -25,3 +25,18 @@ A cohort record stores each patient's outcome at every stage they entered.
 Patients excluded at a stage do not appear in later stages. Summaries are
 derived from these outcomes, so stage counts cannot drift from membership.
 }
+\examples{
+# Synthetic identifiers; no PHI.
+cohort <- new_cohort_record(
+  members = data.frame(
+    patient_id = c("SYN101", "SYN102", "SYN103"), stage_id = "selected",
+    included = TRUE, reason = NA_character_
+  ),
+  stages = data.frame(
+    stage_id = "selected", order = 1L, label = "Selected",
+    source = "upstream", provenance = "synthetic selection"
+  ),
+  patient_id_col = "masterid"
+)
+cohort
+}

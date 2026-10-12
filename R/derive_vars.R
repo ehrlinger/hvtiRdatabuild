@@ -11,6 +11,61 @@
 #'
 #' @return An object of class `derive_result` with `data`, `cohort`, and
 #'   unchanged supporting `tables` elements.
+#' @examples
+#' # Synthetic identifiers and values; no PHI, no warehouse connection.
+#' ids <- c("SYN201", "SYN202", "SYN203")
+#' cohort <- new_cohort_record(
+#'   members = data.frame(
+#'     patient_id = ids, stage_id = "selected", included = TRUE,
+#'     reason = NA_character_
+#'   ),
+#'   stages = data.frame(
+#'     stage_id = "selected", order = 1L, label = "Selected",
+#'     source = "upstream", provenance = "synthetic selection"
+#'   ),
+#'   patient_id_col = "masterid"
+#' )
+#' path <- tempfile(fileext = ".yaml")
+#' yaml::write_yaml(list(
+#'   study = "synthetic", cohort_table = "synthetic.cohort",
+#'   warehouse = "synthetic_warehouse", view_schema = "dbo",
+#'   pull_date = "2026-10-01", modules = list("base", "vitalstatus"),
+#'   derive = list(scale_value = TRUE)
+#' ), path)
+#' config <- read_study_config(path)
+#' unlink(path)
+#' raw <- structure(list(
+#'   tables = list(
+#'     bdbase = data.frame(masterid = ids, base_value = c(3, 5, 8),
+#'                         keep = c(TRUE, FALSE, TRUE)),
+#'     bdstat = data.frame(masterid = ids,
+#'                         status_value = c("alive", "alive", "deceased"))
+#'   ),
+#'   manifest = data.frame(
+#'     module = c("base", "vitalstatus"), output = c("bdbase", "bdstat"),
+#'     n_rows = c(3L, 3L), n_cols = c(3L, 2L),
+#'     pulled_at = as.POSIXct(rep("2026-10-01", 2L), tz = "UTC")
+#'   )
+#' ), class = "pull_result")
+#' built <- build_dataset(raw, config, cohort)
+#' study_derive <- function(data, cohort, config) {
+#'   keep <- data$keep
+#'   if (isTRUE(config$derive[["scale_value"]])) {
+#'     data$analysis_value <- data$base_value * 2
+#'   }
+#'   reason <- ifelse(keep, NA_character_, "synthetic study exclusion")
+#'   stage <- data.frame(
+#'     stage_id = "study_eligibility", order = max(cohort$stages$order) + 1L,
+#'     label = "Study eligibility", source = "derive",
+#'     provenance = "synthetic study rule"
+#'   )
+#'   outcomes <- data.frame(patient_id = data$masterid, included = keep,
+#'                          reason = reason)
+#'   list(data = data[keep, , drop = FALSE],
+#'        cohort = append_cohort_stage(cohort, stage, outcomes))
+#' }
+#' derived <- derive_vars(built, config, study_derive)
+#' derived
 #' @export
 derive_vars <- function(build, config, study_derive) {
   if (!inherits(build, "build_result") || !is.data.frame(build$data) ||
