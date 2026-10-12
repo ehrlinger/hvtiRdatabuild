@@ -33,3 +33,37 @@ the manifest. A set that names an \code{event} column, one of its \code{vars}, a
 counts \code{n_events} (rows where it equals 1) and \code{n_censored}; an \code{expect} on
 either count needs that \code{event} key.
 }
+\examples{
+\donttest{
+if (requireNamespace("arrow", quietly = TRUE)) {
+  # A throwaway study in a temporary directory. Values are invented; no PHI.
+  root <- tempfile("study")
+  dir.create(root)
+  suppressMessages(hvtiRutilities::study_setup(
+    root, study = "Synthetic", study_tracker_id = 1L, adopt = TRUE
+  ))
+  built <- data.frame(
+    ccfid = 1:6, age = c(15, 42, 55, 61, 70, 48),
+    dead = c(0L, 1L, 0L, 1L, 0L, 0L)
+  )
+  utils::write.csv(
+    built,
+    file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
+    row.names = FALSE
+  )
+  suppressMessages(hvtiRutilities::register_data(root, built = "built.csv"))
+  yml <- file.path(root, "_study.yml")
+  y <- yaml::read_yaml(yml)
+  y$analysis_sets <- list(primary = list(
+    id = "ccfid", vars = c("ccfid", "age", "dead"), event = "dead",
+    exclude = list(list(reason = "Under 18", when = "age < 18"))
+  ))
+  yaml::write_yaml(y, yml)
+  cfg <- hvtiRutilities::study_config(root)
+  side <- write_analysis_set("primary", cfg)
+  print(side$counts)
+  unlink(root, recursive = TRUE)
+}
+}
+
+}
