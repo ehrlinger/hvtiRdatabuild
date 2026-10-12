@@ -33,7 +33,7 @@ the rebuild until it is registered.'></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -110,6 +110,47 @@ attrition table attached as <code>attr(x, "attrition")</code>.</p>
     <div class="dont-index"><p><code><a href="write_analysis_set.html">write_analysis_set()</a></code></p></div>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># \donttest{</span></span></span>
+<span class="r-in"><span><span class="kw">if</span> <span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/ns-load.html" class="external-link">requireNamespace</a></span><span class="op">(</span><span class="st">"arrow"</span>, quietly <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span></span>
+<span class="r-in"><span>  <span class="co"># A throwaway study in a temporary directory. Values are invented; no PHI.</span></span></span>
+<span class="r-in"><span>  <span class="va">root</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"study"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">root</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_setup.html" class="external-link">study_setup</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="va">root</span>, study <span class="op">=</span> <span class="st">"Synthetic"</span>, study_tracker_id <span class="op">=</span> <span class="fl">1L</span>, adopt <span class="op">=</span> <span class="cn">TRUE</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">built</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    ccfid <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">6</span>, age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">15</span>, <span class="fl">42</span>, <span class="fl">55</span>, <span class="fl">61</span>, <span class="fl">70</span>, <span class="fl">48</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    dead <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">0L</span>, <span class="fl">1L</span>, <span class="fl">0L</span>, <span class="fl">1L</span>, <span class="fl">0L</span>, <span class="fl">0L</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu">utils</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/utils/write.table.html" class="external-link">write.csv</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    <span class="va">built</span>,</span></span>
+<span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_dir.html" class="external-link">study_dir</a></span><span class="op">(</span><span class="st">"datasets"</span>, <span class="va">root</span><span class="op">)</span>, <span class="st">"built.csv"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    row.names <span class="op">=</span> <span class="cn">FALSE</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/register_data.html" class="external-link">register_data</a></span><span class="op">(</span><span class="va">root</span>, built <span class="op">=</span> <span class="st">"built.csv"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">yml</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">root</span>, <span class="st">"_study.yml"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span> <span class="op">&lt;-</span> <span class="fu">yaml</span><span class="fu">::</span><span class="fu"><a href="https://yaml.r-lib.org/reference/read_yaml.html" class="external-link">read_yaml</a></span><span class="op">(</span><span class="va">yml</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">y</span><span class="op">$</span><span class="va">analysis_sets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>primary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    id <span class="op">=</span> <span class="st">"ccfid"</span>, vars <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ccfid"</span>, <span class="st">"age"</span>, <span class="st">"dead"</span><span class="op">)</span>, event <span class="op">=</span> <span class="st">"dead"</span>,</span></span>
+<span class="r-in"><span>    exclude <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>reason <span class="op">=</span> <span class="st">"Under 18"</span>, when <span class="op">=</span> <span class="st">"age &lt; 18"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu">yaml</span><span class="fu">::</span><span class="fu"><a href="https://yaml.r-lib.org/reference/write_yaml.html" class="external-link">write_yaml</a></span><span class="op">(</span><span class="va">y</span>, <span class="va">yml</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">cfg</span> <span class="op">&lt;-</span> <span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_config.html" class="external-link">study_config</a></span><span class="op">(</span><span class="va">root</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="write_analysis_set.html">write_analysis_set</a></span><span class="op">(</span><span class="st">"primary"</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="va">d</span> <span class="op">&lt;-</span> <span class="fu">read_analysis_set</span><span class="op">(</span><span class="st">"primary"</span>, <span class="va">cfg</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">d</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/print.html" class="external-link">print</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/attr.html" class="external-link">attr</a></span><span class="op">(</span><span class="va">d</span>, <span class="st">"attrition"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">root</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">}</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 5 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   rule   reason n_before n_excluded n_after</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1    1 Under 18        6          1       5</span>
+<span class="r-in"><span><span class="co"># }</span></span></span>
+<span class="r-in"><span></span></span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 

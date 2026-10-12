@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.4</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,6 +63,38 @@
 data frames. Neither table contains patient identifiers.</p>
     </div>
 
+    <div class="section level2">
+    <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="co"># Synthetic identifiers; no PHI.</span></span></span>
+<span class="r-in"><span><span class="va">cohort</span> <span class="op">&lt;-</span> <span class="fu"><a href="new_cohort_record.html">new_cohort_record</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  members <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SYN101"</span>, <span class="st">"SYN102"</span>, <span class="st">"SYN103"</span><span class="op">)</span>, stage_id <span class="op">=</span> <span class="st">"selected"</span>,</span></span>
+<span class="r-in"><span>    included <span class="op">=</span> <span class="cn">TRUE</span>, reason <span class="op">=</span> <span class="cn">NA_character_</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  stages <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    stage_id <span class="op">=</span> <span class="st">"selected"</span>, order <span class="op">=</span> <span class="fl">1L</span>, label <span class="op">=</span> <span class="st">"Selected"</span>,</span></span>
+<span class="r-in"><span>    source <span class="op">=</span> <span class="st">"upstream"</span>, provenance <span class="op">=</span> <span class="st">"synthetic selection"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  patient_id_col <span class="op">=</span> <span class="st">"masterid"</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">cohort</span> <span class="op">&lt;-</span> <span class="fu"><a href="append_cohort_stage.html">append_cohort_stage</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="va">cohort</span>,</span></span>
+<span class="r-in"><span>  stage <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    stage_id <span class="op">=</span> <span class="st">"adults"</span>, order <span class="op">=</span> <span class="fl">2L</span>, label <span class="op">=</span> <span class="st">"Adults only"</span>,</span></span>
+<span class="r-in"><span>    source <span class="op">=</span> <span class="st">"derive"</span>, provenance <span class="op">=</span> <span class="st">"synthetic rule"</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span>,</span></span>
+<span class="r-in"><span>  outcomes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span></span>
+<span class="r-in"><span>    patient_id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"SYN101"</span>, <span class="st">"SYN102"</span>, <span class="st">"SYN103"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    included <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">TRUE</span>, <span class="cn">FALSE</span>, <span class="cn">TRUE</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>    reason <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>, <span class="st">"synthetic exclusion"</span>, <span class="cn">NA</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="op">)</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">cohort_summary</span><span class="op">(</span><span class="va">cohort</span><span class="op">)</span><span class="op">$</span><span class="va">stages</span></span></span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   stage_id       label n_in n_excluded n_remaining</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 1 selected    Selected    3          0           3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> 2   adults Adults only    3          1           2</span>
+</code></pre></div>
+    </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>
 
