@@ -406,7 +406,14 @@ test_that("a dataset registered before dated versions is identified by its sourc
 
   expect_identical(.built_state(cfg)$file, cfg$built)
   expect_identical(.built_state(cfg)$size, format(file.size(f), scientific = FALSE))
-  write_analysis_set("eda", cfg)
+  # From hvtiRutilities 1.5.x on, a dataset with no dated version is working
+  # data, which read_built() serves only to the console and to datasets or
+  # descriptive jobs. Write the set as a datasets job would, by standing in for
+  # the job knitr is rendering; knitr's exported current_input() is what the
+  # gate reads, and an older hvtiRutilities ignores it.
+  job <- file.path(hvtiRutilities::study_dir("datasets", cfg$root), "build", "build.qmd")
+  testthat::local_mocked_bindings(current_input = function(dir = FALSE) job, .package = "knitr")
+  suppressMessages(write_analysis_set("eda", cfg), classes = "hvtiRutilities_working_read")
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
   expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed",
