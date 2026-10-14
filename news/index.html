@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,10 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.1" id="hvtirdatabuild-031">hvtiRdatabuild 0.3.1<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-031"></a></h2>
+<ul><li>The test of an analysis set over a dataset registered before dated versions now writes the set as a datasets job would. hvtiRutilities’ stage gate serves a dataset with no dated version only to the console and to datasets or descriptive jobs, so the test’s non-interactive run was refused. Test-only.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.0" id="hvtirdatabuild-030">hvtiRdatabuild 0.3.0<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-030"></a></h2>
 <ul><li><p><strong>Now requires R 4.4.0 or newer</strong>, up from 4.1.0, to match the rest of the HVTI family. <code>hvtiR::install()</code> installs the members together, and several already required 4.4.0, so on an older R the install failed whatever this package declared. <strong>Now requires hvtiRutilities 1.5.1.</strong></p></li>
