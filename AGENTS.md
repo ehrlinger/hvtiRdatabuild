@@ -216,3 +216,22 @@ guess.
 Documentation prose follows the house voice. Examples and vignettes here
 must use synthetic data — an example is documentation that runs, and
 `R CMD check` runs it on machines that are not yours.
+
+## Release ordering
+
+This package is **tier 3** in the hvtiR release order. It imports
+`hvtiRutilities` and suggests `hvtiPlotR`. `hvtiRtemplates` suggests it.
+
+- **Order follows hard dependencies (`Imports`) only.** `Suggests` never
+  forces an order; it matters only when a version floor moves.
+- **A floor on another hvtiR package moves only in this package’s own
+  bump**, to the version it was tested against, and only when it relies
+  on something new there.
+- **Before a bump merges, run each dependent’s tests against this
+  package’s branch**: install it into a scratch library and run
+  `R_LIBS=<lib> Rscript -e 'devtools::test()'` in the dependent.
+- **Tag every bump** `vX.Y.Z`. `Remotes` are unpinned, so a floor is
+  checked against the dependency’s `main`, not a tag.
+
+The full policy and dependency graph are in the maintainer’s Obsidian
+vault at `Projects/hvtiR release ordering.md`.

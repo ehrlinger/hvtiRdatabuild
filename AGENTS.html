@@ -154,6 +154,19 @@
 <h2 id="prose">Prose<a class="anchor" aria-label="anchor" href="#prose"></a></h2>
 <p>Documentation prose follows the house voice. Examples and vignettes here must use synthetic data — an example is documentation that runs, and <code>R CMD check</code> runs it on machines that are not yours.</p>
 </div>
+<div class="section level2">
+<h2 id="release-ordering">Release ordering<a class="anchor" aria-label="anchor" href="#release-ordering"></a></h2>
+<p>This package is <strong>tier 3</strong> in the hvtiR release order. It imports <code>hvtiRutilities</code> and suggests <code>hvtiPlotR</code>. <code>hvtiRtemplates</code> suggests it.</p>
+<ul><li>
+<strong>Order follows hard dependencies (<code>Imports</code>) only.</strong> <code>Suggests</code> never forces an order; it matters only when a version floor moves.</li>
+<li>
+<strong>A floor on another hvtiR package moves only in this package’s own bump</strong>, to the version it was tested against, and only when it relies on something new there.</li>
+<li>
+<strong>Before a bump merges, run each dependent’s tests against this package’s branch</strong>: install it into a scratch library and run <code>R_LIBS=&lt;lib&gt; Rscript -e 'devtools::test()'</code> in the dependent.</li>
+<li>
+<strong>Tag every bump</strong> <code>vX.Y.Z</code>. <code>Remotes</code> are unpinned, so a floor is checked against the dependency’s <code>main</code>, not a tag.</li>
+</ul><p>The full policy and dependency graph are in the maintainer’s Obsidian vault at <code>Projects/hvtiR release ordering.md</code>.</p>
+</div>
 </div>
 
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
