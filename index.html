@@ -72,17 +72,23 @@
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
+<p>hvtiRdatabuild is part of the HVTI R family. Install it with the rest of the family through <a href="https://github.com/ehrlinger/hvtiR" class="external-link">hvtiR</a>:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># install.packages("remotes")</span></span>
-<span><span class="fu">remotes</span><span class="fu">::</span><span class="fu">install_github</span><span class="op">(</span><span class="st">"ehrlinger/hvtiRdatabuild"</span><span class="op">)</span></span></code></pre></div>
-<p>This package imports <code>hvtiRutilities</code>, which is <strong>not on CRAN</strong>. The <code>Remotes:</code> field in <code>DESCRIPTION</code> points <code>remotes</code>/<code>pak</code> at <code>ehrlinger/hvtiRutilities</code>, so the command above pulls it in automatically. Installing with plain <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> will fail to resolve it.</p>
+<code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
+<span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"ehrlinger/hvtiR"</span><span class="op">)</span></span>
+<span><span class="fu">hvtiR</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
+<p><code>hvtiR::install()</code> installs every member in one call, so the versions the members require of one another resolve together. Update later with <code>hvtiR::update()</code>, from a fresh R session: it will not overwrite a package that is already loaded.</p>
+<p>To install hvtiRdatabuild on its own:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"ehrlinger/hvtiRdatabuild"</span><span class="op">)</span></span></code></pre></div>
+<p>This package imports <code>hvtiRutilities</code>, which is <strong>not on CRAN</strong>. The <code>Remotes:</code> field in <code>DESCRIPTION</code> points pak at <code>ehrlinger/hvtiRutilities</code>, so either command above pulls it in. Installing with plain <code><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages()</a></code> will fail to resolve it.</p>
 <p><code>arrow</code> is an optional dependency required for oracle snapshots and analysis set parquet files.</p>
 </div>
 <div class="section level2">
 <h2 id="declaring-an-analysis-set">Declaring an analysis set<a class="anchor" aria-label="anchor" href="#declaring-an-analysis-set"></a>
 </h2>
 <p>Add the patient-identifier column (<code>id</code>), selected columns (<code>vars</code>), exclusions, and expected counts under <code>analysis_sets:</code> in <code>_study.yml</code>. From the study root, load the utilities configuration, then write the checkpoint once and read that exact selection in downstream jobs:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">set_config</span> <span class="op">&lt;-</span> <span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_config.html" class="external-link">study_config</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu"><a href="reference/write_analysis_set.html">write_analysis_set</a></span><span class="op">(</span><span class="st">"eda"</span>, <span class="va">set_config</span><span class="op">)</span></span>
 <span><span class="va">eda</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/read_analysis_set.html">read_analysis_set</a></span><span class="op">(</span><span class="st">"eda"</span>, <span class="va">set_config</span><span class="op">)</span></span></code></pre></div>
@@ -91,7 +97,7 @@
 <div class="section level2">
 <h2 id="pulling-warehouse-modules-for-a-study">Pulling warehouse modules for a study<a class="anchor" aria-label="anchor" href="#pulling-warehouse-modules-for-a-study"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatabuild" class="external-link">hvtiRdatabuild</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># What modules exist, and what each one requires.</span></span>
@@ -116,7 +122,7 @@
 <div class="section level2">
 <h2 id="verifying-an-r-build-against-sas">Verifying an R build against SAS<a class="anchor" aria-label="anchor" href="#verifying-an-r-build-against-sas"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/ehrlinger/hvtiRdatabuild" class="external-link">hvtiRdatabuild</a></span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># Freeze the SAS-built dataset once.</span></span>
@@ -135,7 +141,7 @@
 <h2 id="local-integration-testing">Local integration testing<a class="anchor" aria-label="anchor" href="#local-integration-testing"></a>
 </h2>
 <p>The committed fixtures are synthetic. To exercise the read path against real SAS output, point <code>HVTI_ORACLE_DIR</code> at a study directory:</p>
-<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a><span class="va">HVTI_ORACLE_DIR</span><span class="op">=</span>/studies/st1234/datasets <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span></code></pre></div>
 <p>That directory holds PHI. It must live outside this repository, and nothing in the test suite copies from it. With the variable unset (the default, and what CI sees), these tests skip.</p>
 <p><code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> never emits identifiers unless <code>show_ids = TRUE</code>, because <code>ccfidu</code> is a medical record number combined with a date of surgery. Do not enable it in a session whose output is logged or shared.</p>
 </div>

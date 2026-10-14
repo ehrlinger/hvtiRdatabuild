@@ -34,16 +34,32 @@ remain future work.
 
 ## Installation
 
+hvtiRdatabuild is part of the HVTI R family. Install it with the rest of
+the family through [hvtiR](https://github.com/ehrlinger/hvtiR):
+
 ``` r
 
-# install.packages("remotes")
-remotes::install_github("ehrlinger/hvtiRdatabuild")
+# install.packages("pak")
+pak::pak("ehrlinger/hvtiR")
+hvtiR::install()
+```
+
+`hvtiR::install()` installs every member in one call, so the versions
+the members require of one another resolve together. Update later with
+`hvtiR::update()`, from a fresh R session: it will not overwrite a
+package that is already loaded.
+
+To install hvtiRdatabuild on its own:
+
+``` r
+
+pak::pak("ehrlinger/hvtiRdatabuild")
 ```
 
 This package imports `hvtiRutilities`, which is **not on CRAN**. The
-`Remotes:` field in `DESCRIPTION` points `remotes`/`pak` at
-`ehrlinger/hvtiRutilities`, so the command above pulls it in
-automatically. Installing with plain
+`Remotes:` field in `DESCRIPTION` points pak at
+`ehrlinger/hvtiRutilities`, so either command above pulls it in.
+Installing with plain
 [`install.packages()`](https://rdrr.io/r/utils/install.packages.html)
 will fail to resolve it.
 
