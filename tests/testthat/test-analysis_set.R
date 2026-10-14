@@ -391,6 +391,7 @@ test_that("a corrupted parquet fails the integrity check", {
 test_that("a dataset registered before dated versions is identified by its source", {
   skip_if_not_installed("arrow")
   skip_if_not_installed("hvtiPlotR")
+  skip_if_not_installed("knitr")
   cfg <- local_study(list(eda = eda_set()))
   # Rewrite the entry in the pre-2026-10 shape: the source's own hash, no `parquet`.
   f <- hvtiRutilities::built_path(cfg)
