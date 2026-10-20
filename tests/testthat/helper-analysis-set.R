@@ -6,7 +6,9 @@ local_study <- function(sets = list(), env = parent.frame()) {
     root,
     study = "Test",
     study_tracker_id = 1L,
-    adopt = TRUE
+    adopt = TRUE,
+    cleanup = FALSE,
+    renv = FALSE
   )))
   n <- 20L
   d <- data.frame(
