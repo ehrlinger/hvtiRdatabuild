@@ -1,3 +1,13 @@
+# hvtiRdatabuild 0.3.2
+
+* The README's Installation section now leads with `hvtiR::install()`, which
+  installs the whole HVTI R family in one call, and then gives
+  `pak::pak("ehrlinger/hvtiRdatabuild")` for this package alone.
+
+* Tests and examples pass `renv` and `cleanup` to `hvtiRutilities::study_setup()` explicitly, ahead of
+  `hvtiRutilities` turning both on by default. A new test fails on any call that leaves them implicit.
+* The `hvtiRutilities` floor rises to 1.5.2, the first release whose `study_setup()` takes `renv` and `cleanup`.
+
 # hvtiRdatabuild 0.3.1
 
 * The test of an analysis set over a dataset registered before dated versions
