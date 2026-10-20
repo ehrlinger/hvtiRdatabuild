@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,12 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.2" id="hvtirdatabuild-032">hvtiRdatabuild 0.3.2<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-032"></a></h2>
+<ul><li><p>The README’s Installation section now leads with <code>hvtiR::install()</code>, which installs the whole HVTI R family in one call, and then gives <code>pak::pak("ehrlinger/hvtiRdatabuild")</code> for this package alone.</p></li>
+<li><p>Tests and examples pass <code>renv</code> and <code>cleanup</code> to <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_setup.html" class="external-link">hvtiRutilities::study_setup()</a></code> explicitly, ahead of <code>hvtiRutilities</code> turning both on by default. A new test fails on any call that leaves them implicit.</p></li>
+<li><p>The <code>hvtiRutilities</code> floor rises to 1.5.2, the first release whose <code>study_setup()</code> takes <code>renv</code> and <code>cleanup</code>.</p></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.1" id="hvtirdatabuild-031">hvtiRdatabuild 0.3.1<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-031"></a></h2>
 <ul><li>The test of an analysis set over a dataset registered before dated versions now writes the set as a datasets job would. hvtiRutilities’ stage gate serves a dataset with no dated version only to the console and to datasets or descriptive jobs, so the test’s non-interactive run was refused. Test-only.</li>
