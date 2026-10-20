@@ -50,7 +50,8 @@ if (requireNamespace("arrow", quietly = TRUE)) {
   root <- tempfile("study")
   dir.create(root)
   suppressMessages(hvtiRutilities::study_setup(
-    root, study = "Synthetic", study_tracker_id = 1L, adopt = TRUE
+    root, study = "Synthetic", study_tracker_id = 1L, adopt = TRUE,
+    cleanup = FALSE, renv = FALSE
   ))
   built <- data.frame(
     ccfid = 1:6, age = c(15, 42, 55, 61, 70, 48),
