@@ -26,7 +26,7 @@ Imports:
     dplyr,
     filelock,
     haven,
-    hvtiRutilities (>= 1.5.2),
+    hvtiRutilities (>= 1.5.3),
     tools,
     utils,
     yaml
