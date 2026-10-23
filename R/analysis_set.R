@@ -286,6 +286,10 @@
 #' counts `n_events` (rows where it equals 1) and `n_censored`; an `expect` on
 #' either count needs that `event` key.
 #'
+#' The parent is read with [hvtiRutilities::read_built()], and a working read is refused: an
+#' analysis set is built from registered data only. Under `HVTI_DATA=working`, or for a dataset
+#' with no dated version, it stops and names `update_manifest()`.
+#'
 #' @param name Character(1). The set's name in `_study.yml`.
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
 #'
@@ -335,7 +339,20 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   raw <- .set_raw(name, cfg)
   b <- .set_validate(raw, name, cfg)
   parent_before <- .built_state(cfg)
-  d <- hvtiRutilities::read_built(cfg)
+  # An analysis set is a durable artifact other jobs reuse, so it is built from registered data
+  # only. A working read (HVTI_DATA=working, or a dataset with no dated version) would build it
+  # from the working file while .built_state() records the registered parent, and a final render
+  # downstream would then read draft rows that look registered.
+  d <- withCallingHandlers(
+    hvtiRutilities::read_built(cfg),
+    hvtiRutilities_working_read = function(m) {
+      stop("analysis set `", name, "`: its parent was read from the working file, not a ",
+           "registered version, and an analysis set is built from registered data only. ",
+           "Nothing was written. Register the build with hvtiRutilities::update_manifest(), ",
+           "or unset HVTI_DATA, then run write_analysis_set(\"", name, "\") again.",
+           call. = FALSE)
+    }
+  )
   parent_after <- .built_state(cfg)
   if (!.same_built_state(parent_before, parent_after)) {
     stop("analysis set `", name, "`: the built dataset changed while it was being read. ",

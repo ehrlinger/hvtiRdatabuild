@@ -407,14 +407,19 @@ test_that("a dataset registered before dated versions is identified by its sourc
 
   expect_identical(.built_state(cfg)$file, cfg$built)
   expect_identical(.built_state(cfg)$size, format(file.size(f), scientific = FALSE))
-  # From hvtiRutilities 1.5.x on, a dataset with no dated version is working
-  # data, which read_built() serves only to the console and to datasets or
-  # descriptive jobs. Write the set as a datasets job would, by standing in for
-  # the job knitr is rendering; knitr's exported current_input() is what the
-  # gate reads, and an older hvtiRutilities ignores it.
+  # A set written from a legacy parent can only predate this release, which refuses a working
+  # read. Stand in for that older writer: read the parent for real, without the working-read
+  # signal the new check catches. The gate in hvtiRutilities still runs inside real(), so the
+  # job knitr is rendering is stood in for too: its exported current_input() is what the gate
+  # reads, and an older hvtiRutilities ignores it.
   job <- file.path(hvtiRutilities::study_dir("datasets", cfg$root), "build", "build.qmd")
   testthat::local_mocked_bindings(current_input = function(dir = FALSE) job, .package = "knitr")
-  suppressMessages(write_analysis_set("eda", cfg), classes = "hvtiRutilities_working_read")
+  real <- hvtiRutilities::read_built
+  testthat::local_mocked_bindings(
+    read_built = function(...) suppressMessages(real(...), classes = "hvtiRutilities_working_read"),
+    .package = "hvtiRutilities"
+  )
+  write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
   expect_message(read_analysis_set("eda", cfg), "the built dataset (built.csv) has changed",
@@ -451,4 +456,42 @@ test_that("a set named for a registered version is refused before anything is wr
 
   expect_error(write_analysis_set(name, cfg), "registered version of a dataset")
   expect_identical(digest::digest(path, algo = "sha256", file = TRUE), before)
+})
+
+working_read_condition <- function() {
+  structure(
+    class = c("hvtiRutilities_working_read", "message", "condition"),
+    list(message = "Read the working built.csv, not a registered version.\n", call = NULL)
+  )
+}
+
+test_that("an analysis set is never built from a working read", {
+  cfg <- local_study(list(eda = eda_set()))
+  real <- hvtiRutilities::read_built
+  testthat::local_mocked_bindings(
+    read_built = function(...) {
+      message(working_read_condition())
+      real(...)
+    },
+    .package = "hvtiRutilities"
+  )
+  datasets <- hvtiRutilities::study_dir("datasets", cfg$root)
+  before <- sort(list.files(datasets, recursive = TRUE))
+  expect_error(write_analysis_set("eda", cfg), "update_manifest()", fixed = TRUE)
+  expect_error(write_analysis_set("eda", cfg), "registered data only", fixed = TRUE)
+  expect_identical(sort(list.files(datasets, recursive = TRUE)), before)
+})
+
+test_that("HVTI_DATA=working in a console session is refused end to end", {
+  cfg <- local_study(list(eda = eda_set()))
+  withr::local_envvar(HVTI_DATA = "working")
+  # The console is where hvtiRutilities allows a working read without a render.
+  testthat::local_mocked_bindings(.is_interactive = function() TRUE, .package = "hvtiRutilities")
+  expect_error(write_analysis_set("eda", cfg), "registered data only", fixed = TRUE)
+})
+
+test_that("a registered read still writes the set", {
+  cfg <- local_study(list(eda = eda_set()))
+  withr::local_envvar(HVTI_DATA = NA)
+  expect_no_error(write_analysis_set("eda", cfg))
 })

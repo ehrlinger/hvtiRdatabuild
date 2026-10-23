@@ -32,6 +32,10 @@ by \code{id} is used to track exclusions and is never written to the sidecar or
 the manifest. A set that names an \code{event} column, one of its \code{vars}, also
 counts \code{n_events} (rows where it equals 1) and \code{n_censored}; an \code{expect} on
 either count needs that \code{event} key.
+
+The parent is read with \code{\link[hvtiRutilities:read_built]{hvtiRutilities::read_built()}}, and a working read is refused: an
+analysis set is built from registered data only. Under \code{HVTI_DATA=working}, or for a dataset
+with no dated version, it stops and names \code{update_manifest()}.
 }
 \examples{
 \donttest{
