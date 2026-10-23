@@ -175,6 +175,12 @@ output is logged or shared.
 
 - [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md):
   the migration guide for SAS users. Start here.
+- [`vignette("registered-datasets", package = "hvtiRutilities")`](https://ehrlinger.github.io/hvtiRutilities/articles/registered-datasets.html):
+  for analysts running jobs on a study. What registering a dataset does,
+  why its versions are named `<name>_YYYYMMDD_rN.parquet`, which version
+  a job reads, and how a report says so. Registration lives in
+  hvtiRutilities (`register_data()`, `update_manifest()`), so the guide
+  does too.
 
 ## Design
 
