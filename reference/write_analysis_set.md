@@ -41,6 +41,12 @@ column, one of its `vars`, also counts `n_events` (rows where it
 equals 1) and `n_censored`; an `expect` on either count needs that
 `event` key.
 
+The parent is read with
+[`hvtiRutilities::read_built()`](https://ehrlinger.github.io/hvtiRutilities/reference/read_built.html),
+and a working read is refused: an analysis set is built from registered
+data only. Under `HVTI_DATA=working`, or for a dataset with no dated
+version, it stops and names `update_manifest()`.
+
 ## Examples
 
 ``` r
