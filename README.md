@@ -153,6 +153,10 @@ session whose output is logged or shared.
 ## Documentation
 
 - `vignette("coming-from-sas")`: the migration guide for SAS users. Start here.
+- `vignette("registered-datasets", package = "hvtiRutilities")`: for analysts running jobs on a study. What
+  registering a dataset does, why its versions are named `<name>_YYYYMMDD_rN.parquet`, which version a job reads,
+  and how a report says so. Registration lives in hvtiRutilities (`register_data()`, `update_manifest()`), so the
+  guide does too.
 
 ## Design
 
