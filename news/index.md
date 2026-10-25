@@ -1,5 +1,28 @@
 # Changelog
 
+## hvtiRdatabuild 0.3.3
+
+- [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+  builds a set from registered data only, because an analysis set is
+  reused by other jobs. It refuses a working read of the study dataset,
+  stops and writes nothing.
+  - A dataset with no dated version, including one registered before
+    dated versions (a manifest entry with no `parquet`), is refused
+    before it is read and the message names
+    [`hvtiRutilities::update_manifest()`](https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html).
+    Run it once to convert a legacy registration; sets already written
+    read as before.
+  - A registered dataset read as working because `HVTI_DATA=working` is
+    set is refused with a message that says to unset `HVTI_DATA`.
+  - In a final render or an `Rscript` run, hvtiRutilities’ own gate may
+    refuse the read first, with its own message.
+  - Requires hvtiRutilities 1.5.3, the first release that signals a
+    working read.
+- The README points analysts to
+  [`vignette("registered-datasets", package = "hvtiRutilities")`](https://ehrlinger.github.io/hvtiRutilities/articles/registered-datasets.html),
+  which explains dataset registration, version names and which version a
+  job reads. It ships with hvtiRutilities 1.5.12 and later.
+
 ## hvtiRdatabuild 0.3.2
 
 - The README’s Installation section now leads with `hvtiR::install()`,

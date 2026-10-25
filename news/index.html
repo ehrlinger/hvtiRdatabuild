@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,17 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.3" id="hvtirdatabuild-033">hvtiRdatabuild 0.3.3<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-033"></a></h2>
+<ul><li>
+<code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> builds a set from registered data only, because an analysis set is reused by other jobs. It refuses a working read of the study dataset, stops and writes nothing.
+<ul><li>A dataset with no dated version, including one registered before dated versions (a manifest entry with no <code>parquet</code>), is refused before it is read and the message names <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/update_manifest.html" class="external-link">hvtiRutilities::update_manifest()</a></code>. Run it once to convert a legacy registration; sets already written read as before.</li>
+<li>A registered dataset read as working because <code>HVTI_DATA=working</code> is set is refused with a message that says to unset <code>HVTI_DATA</code>.</li>
+<li>In a final render or an <code>Rscript</code> run, hvtiRutilities’ own gate may refuse the read first, with its own message.</li>
+<li>Requires hvtiRutilities 1.5.3, the first release that signals a working read.</li>
+</ul></li>
+<li>The README points analysts to <code><a href="https://ehrlinger.github.io/hvtiRutilities/articles/registered-datasets.html" class="external-link">vignette("registered-datasets", package = "hvtiRutilities")</a></code>, which explains dataset registration, version names and which version a job reads. It ships with hvtiRutilities 1.5.12 and later.</li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.2" id="hvtirdatabuild-032">hvtiRdatabuild 0.3.2<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-032"></a></h2>
 <ul><li><p>The README’s Installation section now leads with <code>hvtiR::install()</code>, which installs the whole HVTI R family in one call, and then gives <code>pak::pak("ehrlinger/hvtiRdatabuild")</code> for this package alone.</p></li>

@@ -44,8 +44,12 @@ equals 1) and `n_censored`; an `expect` on either count needs that
 The parent is read with
 [`hvtiRutilities::read_built()`](https://ehrlinger.github.io/hvtiRutilities/reference/read_built.html),
 and a working read is refused: an analysis set is built from registered
-data only. Under `HVTI_DATA=working`, or for a dataset with no dated
-version, it stops and names `update_manifest()`.
+data only. A dataset with no dated version, including one registered
+before dated versions, stops before it is read and names
+`update_manifest()`. A registered dataset read as working because
+`HVTI_DATA=working` is set stops and says to unset `HVTI_DATA`. A
+study's own render gate in hvtiRutilities may refuse the read first,
+with its own message.
 
 ## Examples
 

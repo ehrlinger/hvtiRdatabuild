@@ -17,7 +17,7 @@ parent dataset and the attrition."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.2</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -92,8 +92,11 @@ the manifest. A set that names an <code>event</code> column, one of its <code>va
 counts <code>n_events</code> (rows where it equals 1) and <code>n_censored</code>; an <code>expect</code> on
 either count needs that <code>event</code> key.</p>
 <p>The parent is read with <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/read_built.html" class="external-link">hvtiRutilities::read_built()</a></code>, and a working read is refused: an
-analysis set is built from registered data only. Under <code>HVTI_DATA=working</code>, or for a dataset
-with no dated version, it stops and names <code>update_manifest()</code>.</p>
+analysis set is built from registered data only. A dataset with no dated version, including one
+registered before dated versions, stops before it is read and names <code>update_manifest()</code>. A
+registered dataset read as working because <code>HVTI_DATA=working</code> is set stops and says to unset
+<code>HVTI_DATA</code>. A study's own render gate in hvtiRutilities may refuse the read first, with its
+own message.</p>
     </div>
 
     <div class="section level2">
