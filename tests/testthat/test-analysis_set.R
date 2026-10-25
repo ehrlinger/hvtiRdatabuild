@@ -419,6 +419,7 @@ test_that("a dataset registered before dated versions is identified by its sourc
     read_built = function(...) suppressMessages(real(...), classes = "hvtiRutilities_working_read"),
     .package = "hvtiRutilities"
   )
+  local_mocked_bindings(.parent_registered = function(cfg) TRUE)
   write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
@@ -477,9 +478,44 @@ test_that("an analysis set is never built from a working read", {
   )
   datasets <- hvtiRutilities::study_dir("datasets", cfg$root)
   before <- sort(list.files(datasets, recursive = TRUE))
-  expect_error(write_analysis_set("eda", cfg), "update_manifest()", fixed = TRUE)
+  expect_error(write_analysis_set("eda", cfg), "Unset HVTI_DATA", fixed = TRUE)
   expect_error(write_analysis_set("eda", cfg), "registered data only", fixed = TRUE)
   expect_identical(sort(list.files(datasets, recursive = TRUE)), before)
+})
+
+legacy_entry <- function(cfg) {
+  mf <- file.path(cfg$root, "manifest.yaml")
+  m <- yaml::read_yaml(mf)
+  m$datasets <- .manifest_entries(mf)
+  i <- which(vapply(m$datasets, function(x) identical(x$file, cfg$built), logical(1)))
+  f <- hvtiRutilities::built_path(cfg)
+  m$datasets[[i]] <- list(file = cfg$built,
+                          sha256 = digest::digest(f, algo = "sha256", file = TRUE))
+  yaml::write_yaml(m, mf)
+}
+
+study_snapshot <- function(root) {
+  files <- sort(list.files(root, recursive = TRUE, all.files = TRUE))
+  stats::setNames(tools::md5sum(file.path(root, files)), files)
+}
+
+test_that("a parent with no dated version is refused before it is read, and nothing changes", {
+  cfg <- local_study(list(eda = eda_set()))
+  legacy_entry(cfg)
+  testthat::local_mocked_bindings(.is_interactive = function() TRUE, .package = "hvtiRutilities")
+  withr::local_envvar(HVTI_DATA = NA)
+  before <- study_snapshot(cfg$root)
+  msg <- tryCatch(write_analysis_set("eda", cfg), error = conditionMessage)
+  expect_match(msg, "has no registered version", fixed = TRUE)
+  expect_match(msg, "update_manifest()", fixed = TRUE)
+  expect_no_match(msg, "HVTI_DATA", fixed = TRUE)
+  expect_identical(study_snapshot(cfg$root), before)
+})
+
+test_that("a parent with no manifest entry names update_manifest()", {
+  cfg <- local_study(list(eda = eda_set()))
+  yaml::write_yaml(list(datasets = list()), file.path(cfg$root, "manifest.yaml"))
+  expect_error(write_analysis_set("eda", cfg), "update_manifest()", fixed = TRUE)
 })
 
 test_that("HVTI_DATA=working in a console session is refused end to end", {

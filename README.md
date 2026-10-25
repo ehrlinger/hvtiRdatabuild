@@ -156,7 +156,7 @@ session whose output is logged or shared.
 - `vignette("registered-datasets", package = "hvtiRutilities")`: for analysts running jobs on a study. What
   registering a dataset does, why its versions are named `<name>_YYYYMMDD_rN.parquet`, which version a job reads,
   and how a report says so. Registration lives in hvtiRutilities (`register_data()`, `update_manifest()`), so the
-  guide does too.
+  guide does too. It ships with hvtiRutilities 1.5.12 and later.
 
 ## Design
 
