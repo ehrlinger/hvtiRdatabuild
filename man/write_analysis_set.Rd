@@ -34,8 +34,11 @@ counts \code{n_events} (rows where it equals 1) and \code{n_censored}; an \code{
 either count needs that \code{event} key.
 
 The parent is read with \code{\link[hvtiRutilities:read_built]{hvtiRutilities::read_built()}}, and a working read is refused: an
-analysis set is built from registered data only. Under \code{HVTI_DATA=working}, or for a dataset
-with no dated version, it stops and names \code{update_manifest()}.
+analysis set is built from registered data only. A dataset with no dated version, including one
+registered before dated versions, stops before it is read and names \code{update_manifest()}. A
+registered dataset read as working because \code{HVTI_DATA=working} is set stops and says to unset
+\code{HVTI_DATA}. A study's own render gate in hvtiRutilities may refuse the read first, with its
+own message.
 }
 \examples{
 \donttest{

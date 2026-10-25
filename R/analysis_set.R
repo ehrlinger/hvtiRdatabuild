@@ -297,8 +297,11 @@
 #' either count needs that `event` key.
 #'
 #' The parent is read with [hvtiRutilities::read_built()], and a working read is refused: an
-#' analysis set is built from registered data only. Under `HVTI_DATA=working`, or for a dataset
-#' with no dated version, it stops and names `update_manifest()`.
+#' analysis set is built from registered data only. A dataset with no dated version, including one
+#' registered before dated versions, stops before it is read and names `update_manifest()`. A
+#' registered dataset read as working because `HVTI_DATA=working` is set stops and says to unset
+#' `HVTI_DATA`. A study's own render gate in hvtiRutilities may refuse the read first, with its
+#' own message.
 #'
 #' @param name Character(1). The set's name in `_study.yml`.
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
