@@ -419,7 +419,7 @@ test_that("a dataset registered before dated versions is identified by its sourc
     read_built = function(...) suppressMessages(real(...), classes = "hvtiRutilities_working_read"),
     .package = "hvtiRutilities"
   )
-  local_mocked_bindings(.parent_registered = function(cfg) TRUE)
+  local_mocked_bindings(.parent_registered = function(e) TRUE)
   write_analysis_set("eda", cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
   withr::local_envvar(HVTI_TEMPLATE_STRICT = NA)
@@ -509,6 +509,18 @@ test_that("a parent with no dated version is refused before it is read, and noth
   expect_match(msg, "has no registered version", fixed = TRUE)
   expect_match(msg, "update_manifest()", fixed = TRUE)
   expect_no_match(msg, "HVTI_DATA", fixed = TRUE)
+  expect_identical(study_snapshot(cfg$root), before)
+})
+
+test_that("a draft render of a job with a legacy parent is refused before the read too", {
+  cfg <- local_study(list(eda = eda_set()))
+  legacy_entry(cfg)
+  job <- file.path(hvtiRutilities::study_dir("datasets", cfg$root), "build", "build.qmd")
+  testthat::local_mocked_bindings(current_input = function(dir = FALSE) job, .package = "knitr")
+  withr::local_envvar(HVTI_DATA = "working", HVTI_TEMPLATE_STRICT = NA)
+  before <- study_snapshot(cfg$root)
+  msg <- tryCatch(write_analysis_set("eda", cfg), error = conditionMessage)
+  expect_match(msg, "update_manifest() and unset HVTI_DATA", fixed = TRUE)
   expect_identical(study_snapshot(cfg$root), before)
 })
 

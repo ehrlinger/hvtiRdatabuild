@@ -238,14 +238,11 @@
 # registering it does not make a set stale; jobs read nothing new. Otherwise it
 # is the source, whose stat catches a rewrite no read_built() call has recorded.
 # The parquet sits beside the source, which is where hvtiRutilities resolves it.
-.built_state <- function(cfg) {
-  e <- Filter(function(x) identical(x$file, cfg$built),
-              .manifest_entries(file.path(cfg$root, "manifest.yaml")))
-  if (!length(e) || is.null(e[[1L]]$sha256))
-    stop("manifest.yaml has no sha256 for ", cfg$built, ". Run ",
-         "hvtiRutilities::register_data() or read_built() first.",
+.built_state <- function(cfg, e = .parent_entry(cfg)) {
+  if (is.null(e) || is.null(e$sha256))
+    stop("manifest.yaml has no sha256 for ", cfg$built, ". Register it with ",
+         "hvtiRutilities::update_manifest() first.",
          call. = FALSE)
-  e <- e[[1L]]
   versioned <- .entry_versioned(e)
   src <- hvtiRutilities::built_path(cfg)
   p <- if (versioned) file.path(dirname(src), e$parquet) else src
@@ -264,11 +261,14 @@
   is.character(e$parquet) && length(e$parquet) == 1L && !is.na(e$parquet) && nzchar(e$parquet)
 }
 
-.parent_registered <- function(cfg) {
+# The study dataset's manifest entry, or NULL when the manifest has none.
+.parent_entry <- function(cfg) {
   e <- Filter(function(x) identical(x$file, cfg$built),
               .manifest_entries(file.path(cfg$root, "manifest.yaml")))
-  length(e) > 0L && .entry_versioned(e[[1L]])
+  if (length(e)) e[[1L]]
 }
+
+.parent_registered <- function(e) !is.null(e) && .entry_versioned(e)
 
 .same_built_state <- function(a, b) {
   fields <- c("file", "sha256", "size", "mtime")
@@ -354,13 +354,16 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   # downstream would then read draft rows that look registered.
   # A dataset with no dated version is refused before read_built(), whose legacy cache would
   # otherwise write a parquet and rewrite the manifest entry before the working read is signalled.
-  unregistered <- paste0(
-    "analysis set `", name, "`: ", cfg$built, " has no registered version, and an analysis set ",
-    "is built from registered data only. Nothing was written. Register it with ",
-    "hvtiRutilities::update_manifest(), then run write_analysis_set(\"", name, "\") again."
-  )
-  if (!.parent_registered(cfg)) stop(unregistered, call. = FALSE)
-  parent_before <- .built_state(cfg)
+  entry <- .parent_entry(cfg)
+  if (!.parent_registered(entry)) {
+    stop("analysis set `", name, "`: ", cfg$built, " has no registered version, and an analysis ",
+         "set is built from registered data only. Nothing was written. Register it with ",
+         "hvtiRutilities::update_manifest()",
+         if (nzchar(Sys.getenv("HVTI_DATA"))) " and unset HVTI_DATA",
+         ", then run write_analysis_set(\"", name, "\") again.",
+         call. = FALSE)
+  }
+  parent_before <- .built_state(cfg, entry)
   d <- withCallingHandlers(
     hvtiRutilities::read_built(cfg),
     hvtiRutilities_working_read = function(m) {
