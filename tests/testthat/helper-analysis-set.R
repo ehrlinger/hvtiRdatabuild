@@ -26,7 +26,7 @@ local_study <- function(sets = list(), env = parent.frame()) {
   )
   suppressMessages(invisible(hvtiRutilities::register_data(
     root,
-    built = "built.csv"
+    file = "built.csv"
   )))
   if (length(sets)) {
     yml <- file.path(root, "_study.yml")

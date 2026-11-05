@@ -1,3 +1,17 @@
+# hvtiRdatabuild 0.3.4
+
+* `backfill_corrections()`, `propose_correction()` and `decide_correction()` are
+  deprecated. Corrections to master datasets move to the HVTR registry, and
+  hvtiRdatabuild will read corrected data from it rather than record corrections
+  itself. The functions still work and warn on every call with class
+  `deprecatedWarning`; set `options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)`
+  to silence the warning (#101).
+
+* The `write_analysis_set()` and `read_analysis_set()` examples, and the test
+  helper, call `hvtiRutilities::register_data(file =)` rather than the
+  deprecated `built =`, so they no longer warn. The `hvtiRutilities` floor
+  rises to 1.5.20, the first release with `file =`.
+
 # hvtiRdatabuild 0.3.3
 
 * `write_analysis_set()` builds a set from registered data only, because an analysis set is

@@ -1,8 +1,8 @@
 Package: hvtiRdatabuild
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
-Version: 0.3.3
-Date: 2026-10-24
+Version: 0.3.4
+Date: 2026-11-05
 Authors@R: c(
     person(
       "John", "Ehrlinger",
@@ -26,7 +26,7 @@ Imports:
     dplyr,
     filelock,
     haven,
-    hvtiRutilities (>= 1.5.3),
+    hvtiRutilities (>= 1.5.20),
     tools,
     utils,
     yaml
