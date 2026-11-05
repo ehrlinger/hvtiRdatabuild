@@ -18,7 +18,21 @@ library(hvtiRdatabuild)
   requireNamespace("tidyselect", quietly = TRUE) &&
   requireNamespace("dplyr", quietly = TRUE) &&
   requireNamespace("withr", quietly = TRUE)
+# The corrections exports are deprecated (see the note below); their warning is
+# silenced here so the walkthrough reads cleanly.
+options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)
 ```
+
+::: {.callout-warning}
+## The corrections functions are deprecated
+
+`backfill_corrections()`, `propose_correction()` and `decide_correction()` are deprecated.
+Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read
+corrected data from it rather than record corrections itself. They still work, and warn on
+every call; this vignette silences the warning so the walkthrough reads cleanly. The design
+they implement is carried forward as input to the registry
+([#101](https://github.com/ehrlinger/hvtiRdatabuild/issues/101)).
+:::
 
 ## What a master is, and why a view
 

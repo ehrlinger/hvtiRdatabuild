@@ -67,6 +67,11 @@ value: an unmatched or ambiguous key is reported by count only, and an
 over-width or uncastable value is reported by column and limit only.
 }
 \details{
+\strong{Deprecated.} Corrections to master datasets are owned by the HVTR registry,
+and hvtiRdatabuild will read corrected data from it rather than record
+corrections itself. This function still works and warns on every call; set
+\code{options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)} to silence it.
+
 By default, \code{key_values} must name exactly the master's primary key
 columns, each a single non-missing value. When \code{alt_key} is given instead,
 \code{key_values} must name exactly that alternate key's columns, none may be
