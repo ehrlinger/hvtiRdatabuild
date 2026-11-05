@@ -29,6 +29,11 @@ match several, or cannot be read are reported by reason and line number and
 never recorded.
 }
 \details{
+\strong{Deprecated.} Corrections to master datasets are owned by the HVTR registry,
+and hvtiRdatabuild will read corrected data from it rather than record
+corrections itself. This function still works and warns on every call; set
+\code{options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)} to silence it.
+
 Requires a passing parity record from \code{\link[=lift_master]{lift_master()}}. A dry run, the
 default, parses and resolves and writes nothing.
 }

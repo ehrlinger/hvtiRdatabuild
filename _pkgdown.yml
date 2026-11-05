@@ -68,11 +68,17 @@ reference:
   - withdraw_dataset_release
 
 - title: Master datasets
-  desc: Snapshot, lift and correct the master datasets studies read.
+  desc: Snapshot and lift the master datasets studies read.
   contents:
   - read_master_config
   - snapshot_master
   - lift_master
+
+- title: Deprecated
+  desc: >
+    Corrections to master datasets move to the HVTR registry; this package will
+    read corrected data from it. These still work and warn on every call.
+  contents:
   - backfill_corrections
   - propose_correction
   - decide_correction

@@ -11,6 +11,35 @@ EVIDENCE_TYPES <- c( # nolint: object_name_linter. Legacy constant name, preserv
 )
 DECISIONS <- c("accept", "reject", "supersede", "bake") # nolint: object_name_linter.
 
+#' Signal that a corrections export is deprecated
+#'
+#' Corrections to master datasets are owned by the HVTR registry; this package
+#' reads corrected data and no longer records corrections. Each call warns with
+#' class `deprecatedWarning`, unless the option
+#' `hvtiRdatabuild.warn_deprecated_corrections` is `FALSE`.
+#'
+#' @param old Character. The deprecated function's name.
+#'
+#' @return `NULL`, invisibly.
+#'
+#' @keywords internal
+#' @noRd
+.deprecate_correction_api <- function(old) {
+  if (isFALSE(getOption("hvtiRdatabuild.warn_deprecated_corrections"))) {
+    return(invisible(NULL))
+  }
+  .Deprecated(
+    msg = paste0(
+      "'", old, "()' is deprecated. Corrections to master datasets move to the HVTR ",
+      "registry, and hvtiRdatabuild will read corrected data from it. ",
+      "See https://github.com/ehrlinger/hvtiRdatabuild/issues/101."
+    ),
+    package = "hvtiRdatabuild",
+    old = old
+  )
+  invisible(NULL)
+}
+
 #' A value's checked text form for a corrections column
 #'
 #' Refuses a factor outright, then round-trips the value through
@@ -54,6 +83,11 @@ DECISIONS <- c("accept", "reject", "supersede", "bake") # nolint: object_name_li
 #' view and its stale view. Fixes that change a key column, match no record,
 #' match several, or cannot be read are reported by reason and line number and
 #' never recorded.
+#'
+#' **Deprecated.** Corrections to master datasets are owned by the HVTR registry,
+#' and hvtiRdatabuild will read corrected data from it rather than record
+#' corrections itself. This function still works and warns on every call; set
+#' `options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence it.
 #'
 #' Requires a passing parity record from [lift_master()]. A dry run, the
 #' default, parses and resolves and writes nothing.
@@ -102,6 +136,7 @@ DECISIONS <- c("accept", "reject", "supersede", "bake") # nolint: object_name_li
 #'
 #' @export
 backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql") {
+  .deprecate_correction_api("backfill_corrections")
   if (!requireNamespace("digest", quietly = TRUE)) {
     stop("Package 'digest' is required.", call. = FALSE)
   }
@@ -187,6 +222,11 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' value: an unmatched or ambiguous key is reported by count only, and an
 #' over-width or uncastable value is reported by column and limit only.
 #'
+#' **Deprecated.** Corrections to master datasets are owned by the HVTR registry,
+#' and hvtiRdatabuild will read corrected data from it rather than record
+#' corrections itself. This function still works and warns on every call; set
+#' `options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence it.
+#'
 #' By default, `key_values` must name exactly the master's primary key
 #' columns, each a single non-missing value. When `alt_key` is given instead,
 #' `key_values` must name exactly that alternate key's columns, none may be
@@ -266,6 +306,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 propose_correction <- function(config, con, key_values, variable, expected_prior, new_value,
                                evidence_type, evidence_ref, asserted_by, alt_key = NULL,
                                dry_run = FALSE, dialect = "mssql") {
+  .deprecate_correction_api("propose_correction")
   if (!requireNamespace("digest", quietly = TRUE)) {
     stop("Package 'digest' is required.", call. = FALSE)
   }
@@ -424,6 +465,11 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 #' applies only when its latest decision is `"accept"`. `dry_run = TRUE`
 #' validates and returns the row that would be written, without writing it.
 #'
+#' **Deprecated.** Corrections to master datasets are owned by the HVTR registry,
+#' and hvtiRdatabuild will read corrected data from it rather than record
+#' corrections itself. This function still works and warns on every call; set
+#' `options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence it.
+#'
 #' @details Requires the master's corrections tables, which
 #'   [backfill_corrections()] creates.
 #'
@@ -483,6 +529,7 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 #' @export
 decide_correction <- function(config, con, correction_id, decision, decided_by,
                               reason = NA_character_, dry_run = FALSE, dialect = "mssql") {
+  .deprecate_correction_api("decide_correction")
   if (!requireNamespace("digest", quietly = TRUE)) {
     stop("Package 'digest' is required.", call. = FALSE)
   }

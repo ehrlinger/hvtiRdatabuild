@@ -45,6 +45,11 @@ applies only when its latest decision is \code{"accept"}. \code{dry_run = TRUE}
 validates and returns the row that would be written, without writing it.
 }
 \details{
+\strong{Deprecated.} Corrections to master datasets are owned by the HVTR registry,
+and hvtiRdatabuild will read corrected data from it rather than record
+corrections itself. This function still works and warns on every call; set
+\code{options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)} to silence it.
+
 Requires the master's corrections tables, which
 \code{\link[=backfill_corrections]{backfill_corrections()}} creates.
 }
