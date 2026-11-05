@@ -40,6 +40,13 @@ Invisibly, a list of counts: `dry_run`, `facts`, `resolved`,
 
 ## Details
 
+**Deprecated.** Corrections to master datasets are owned by the HVTR
+registry, and hvtiRdatabuild will read corrected data from it rather
+than record corrections itself. This function still works and warns on
+every call; set
+`options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence
+it.
+
 Requires a passing parity record from
 [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md).
 A dry run, the default, parses and resolves and writes nothing.
@@ -82,7 +89,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmptjfN7m/duckdb
+#> ℹ /tmp/RtmpFO8VHr/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -94,6 +101,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> parity pass: row count match; 0 of 2 columns mismatch; 0 of 2 sampled columns mismatch
 #> parity_full: 0 of 2 columns mismatch
 #> view master_demo -> master_demo_base_built_demo
+#> Warning: 'backfill_corrections()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
 #> legacy: 1 facts parsed; 1 resolved; 0 unresolved
 #> recorded 1; 0 stale corrections
 # }

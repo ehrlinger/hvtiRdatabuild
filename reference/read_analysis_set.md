@@ -82,6 +82,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
   print(attr(d, "attrition"))
   unlink(root, recursive = TRUE)
 }
+#> Warning: register_data(built =) is now register_data(file =). built = still works and will be removed in a later release.
 #> [1] 5 3
 #>   rule   reason n_before n_excluded n_after
 #> 1    1 Under 18        6          1       5

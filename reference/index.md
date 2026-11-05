@@ -93,7 +93,7 @@ release without changing its bytes.
 
 ## Master datasets
 
-Snapshot, lift and correct the master datasets studies read.
+Snapshot and lift the master datasets studies read.
 
 - [`read_master_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.md)
   : Read a master dataset's configuration
@@ -101,6 +101,13 @@ Snapshot, lift and correct the master datasets studies read.
   : Snapshot a master dataset to parquet, with its lineage
 - [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
   : Lift a master's parquet snapshot into the warehouse as a view
+
+## Deprecated
+
+Corrections to master datasets move to the HVTR registry; this package
+will read corrected data from it. These still work and warn on every
+call.
+
 - [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md)
   : Backfill a master's corrections from its SAS build, and regenerate
   its view

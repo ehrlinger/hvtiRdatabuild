@@ -95,6 +95,13 @@ correction to `variable`, meaning the view should be regenerated), and
 
 ## Details
 
+**Deprecated.** Corrections to master datasets are owned by the HVTR
+registry, and hvtiRdatabuild will read corrected data from it rather
+than record corrections itself. This function still works and warns on
+every call; set
+`options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence
+it.
+
 By default, `key_values` must name exactly the master's primary key
 columns, each a single non-missing value. When `alt_key` is given
 instead, `key_values` must name exactly that alternate key's columns,
@@ -150,7 +157,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmptjfN7m/duckdb
+#> ℹ /tmp/RtmpFO8VHr/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -162,8 +169,10 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> parity pass: row count match; 0 of 2 columns mismatch; 0 of 2 sampled columns mismatch
 #> parity_full: 0 of 2 columns mismatch
 #> view master_demo -> master_demo_base_built_demo
+#> Warning: 'backfill_corrections()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
 #> legacy: 0 facts parsed; 0 resolved; 0 unresolved
 #> recorded 0; 0 stale corrections
-#> Correction c1b0d396c10fe0067 appended. First correction to this variable: regenerate the view.
+#> Warning: 'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
+#> Correction c019ca25e5d1f82a6 appended. First correction to this variable: regenerate the view.
 # }
 ```

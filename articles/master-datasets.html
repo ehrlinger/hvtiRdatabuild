@@ -72,7 +72,13 @@
 
 
 
-    <section class="level2"><h2 id="what-a-master-is-and-why-a-view">What a master is, and why a view<a class="anchor" aria-label="anchor" href="#what-a-master-is-and-why-a-view"></a>
+    <div>
+<blockquote>
+<p><strong>The corrections functions are deprecated</strong></p>
+<p><code><a href="../reference/backfill_corrections.html">backfill_corrections()</a></code>, <code><a href="../reference/propose_correction.html">propose_correction()</a></code> and <code><a href="../reference/decide_correction.html">decide_correction()</a></code> are deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it rather than record corrections itself. They still work, and warn on every call; this vignette silences the warning so the walkthrough reads cleanly. The design they implement is carried forward as input to the registry (<a href="https://github.com/ehrlinger/hvtiRdatabuild/issues/101" class="external-link">#101</a>).</p>
+</blockquote>
+</div>
+<section class="level2"><h2 id="what-a-master-is-and-why-a-view">What a master is, and why a view<a class="anchor" aria-label="anchor" href="#what-a-master-is-and-why-a-view"></a>
 </h2>
 <p>A study build does not read <code>bd.data.master.sas</code> fresh every time; it reads a big rollup dataset, such as the cardiac-surgery or mitral master, that some earlier program already built and that dozens of downstream studies share. That sharing is exactly what makes a fix to it valuable and dangerous at the same time: a chart-review correction found by one study should reach every study reading that master, but a hand-edit to the SAS build program reaches only the next person who happens to rerun it. A warehouse view solves this the way a view usually does, by giving every reader the same query instead of the same file: <code>master_cardiac</code> sits over a frozen base table, corrections apply inside the view definition, and the day the corrections table gains a new accepted row, every study reading the view sees it without anyone touching their own code. The design that worked this out, including why the corrections model lives here rather than waiting for a future warehouse-wide layer, is <code>dev/specs/2026-09-23-cardiac-master-view-design.md</code>.</p>
 </section><section class="level2"><h2 id="master-yml">
@@ -161,7 +167,7 @@
 <span>             <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="st">"build_program: "</span>, <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">dir</span>, <span class="st">"bd.sas"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>, <span class="va">cfg_path</span><span class="op">)</span></span>
 <span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; duckdb keeps downloaded extensions and secrets in a temporary directory:</span></span>
-<span><span class="co">#&gt; ℹ /tmp/RtmpafpSGQ/duckdb</span></span>
+<span><span class="co">#&gt; ℹ /tmp/RtmpCamZxt/duckdb</span></span>
 <span><span class="co">#&gt; This is removed when the R session ends.</span></span>
 <span><span class="co">#&gt; • Extensions are re-downloaded each session.</span></span>
 <span><span class="co">#&gt; • Secrets are lost.</span></span>
@@ -170,7 +176,7 @@
 <span><span class="co">#&gt; ℹ See ?duckdb_storage for details and alternatives.</span></span>
 <span><span class="va">dry</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/lift_master.html">lift_master</a></span><span class="op">(</span><span class="fu"><a href="../reference/read_master_config.html">read_master_config</a></span><span class="op">(</span><span class="va">cfg_path</span><span class="op">)</span>, <span class="va">con</span>, <span class="va">pq</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; key id                               unique     rows 2, null key parts 0, duplicates 0</span></span>
-<span><span class="co">#&gt; dry run: DDL for master_demo2_base_built_demo written to /tmp/RtmpafpSGQ/master206e35b9d9cb/built_demo.parquet.ddl.sql</span></span>
+<span><span class="co">#&gt; dry run: DDL for master_demo2_base_built_demo written to /tmp/RtmpCamZxt/master21cb5d3b223d/built_demo.parquet.ddl.sql</span></span>
 <span><span class="va">dry</span><span class="op">$</span><span class="va">dry_run</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
@@ -251,7 +257,7 @@
 <span>                           key_values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>emrn <span class="op">=</span> <span class="st">"E3"</span><span class="op">)</span>, alt_key <span class="op">=</span> <span class="st">"epic"</span>, variable <span class="op">=</span> <span class="st">"age"</span>,</span>
 <span>                           expected_prior <span class="op">=</span> <span class="fl">70</span>, new_value <span class="op">=</span> <span class="fl">71</span>, evidence_type <span class="op">=</span> <span class="st">"chart_review"</span>,</span>
 <span>                           evidence_ref <span class="op">=</span> <span class="st">"invented"</span>, asserted_by <span class="op">=</span> <span class="st">"tester"</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Correction ccb3a1d5c7e43a91f appended.</span></span>
+<span><span class="co">#&gt; Correction c504a12cb11910c6b appended.</span></span>
 <span><span class="va">prop</span><span class="op">$</span><span class="va">verdict</span></span>
 <span><span class="co">#&gt; [1] "appended"</span></span></code></pre></div>
 </div>
@@ -259,7 +265,7 @@
 <div class="cell">
 <div class="sourceCode cell-code" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/decide_correction.html">decide_correction</a></span><span class="op">(</span><span class="va">cfg2</span>, <span class="va">con</span>, <span class="va">prop</span><span class="op">$</span><span class="va">correction_id</span>, <span class="st">"accept"</span>, <span class="st">"tester"</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Decision ddd306763a892062b (accept) recorded on ccb3a1d5c7e43a91f.</span></span>
+<span><span class="co">#&gt; Decision d9ed5799bd5b38fc5 (accept) recorded on c504a12cb11910c6b.</span></span>
 <span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQuery.html" class="external-link">dbGetQuery</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SELECT age FROM master_c WHERE emrn = 'E3'"</span><span class="op">)</span></span>
 <span><span class="co">#&gt;   age</span></span>
 <span><span class="co">#&gt; 1  71</span></span></code></pre></div>
@@ -290,7 +296,8 @@
           return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
       }
       // Inspect non-navigation links and adorn them if external
-     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      window.quartoDecorateExternalLinks = function (root) {
+     var links = (root || window.document).querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
       for (var i=0; i<links.length; i++) {
         const link = links[i];
         if (!isInternal(link.href)) {
@@ -299,8 +306,69 @@
           if (link.dataset.originalHref !== undefined) {
             link.href = link.dataset.originalHref;
           }
+          if (!link.classList.contains('no-external-icon')) {
+          }
         }
       }
+      };
+      window.quartoDecorateExternalLinks(window.document);
+    // Esc closes the popup (WCAG 1.4.13) and focus leaving both trigger and
+    // popup closes it (WCAG 2.4.11); tippy handles neither for interactive popups.
+    const hideOnEscAndFocusOut = {
+      name: 'hideOnEscAndFocusOut',
+      defaultValue: true,
+      fn(instance) {
+        const dismiss = () => {
+          // A show scheduled by the trigger delay would otherwise reopen it
+          instance.clearDelayTimeouts();
+          instance.hide();
+        };
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') {
+            return;
+          }
+          // Keep Esc from also reaching page handlers (e.g. reveal.js overview),
+          // except an open reveal.js slide menu, which Esc should close too.
+          // The menu handles keys only when its keyboard option is on.
+          const menuHandlesEsc = window.Reveal?.getPlugin?.('menu')?.isOpen() &&
+            window.Reveal.getConfig().menu?.keyboard !== false;
+          if (!menuHandlesEsc) {
+            event.stopPropagation();
+          }
+          if (instance.popper.contains(window.document.activeElement)) {
+            // Disabled while refocusing so the focus trigger does not reopen it
+            instance.disable();
+            instance.reference.focus();
+            instance.enable();
+          }
+          dismiss();
+        };
+        const onFocusOut = (event) => {
+          const target = event.relatedTarget;
+          if (target && !instance.reference.contains(target) &&
+              !instance.popper.contains(target)) {
+            dismiss();
+          }
+        };
+        // On the trigger too: a click trigger (code-annotations: select) has no
+        // blur handling. Attached for the instance's lifetime so leaving the
+        // trigger also cancels a show still pending on the trigger delay.
+        instance.reference.addEventListener('focusout', onFocusOut);
+        return {
+          onShow() {
+            window.document.addEventListener('keydown', onKeyDown, true);
+            instance.popper.addEventListener('focusout', onFocusOut);
+          },
+          onHide() {
+            window.document.removeEventListener('keydown', onKeyDown, true);
+            instance.popper.removeEventListener('focusout', onFocusOut);
+          },
+          onDestroy() {
+            instance.reference.removeEventListener('focusout', onFocusOut);
+          },
+        };
+      },
+    };
     function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
       const config = {
         allowHTML: true,
@@ -314,6 +382,7 @@
         interactiveBorder: 10,
         theme: 'light-border',
         placement: 'bottom-start',
+        plugins: [hideOnEscAndFocusOut],
       };
       if (contentFn) {
         config.content = contentFn;

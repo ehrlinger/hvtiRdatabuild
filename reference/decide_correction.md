@@ -63,6 +63,13 @@ would be appended).
 
 ## Details
 
+**Deprecated.** Corrections to master datasets are owned by the HVTR
+registry, and hvtiRdatabuild will read corrected data from it rather
+than record corrections itself. This function still works and warns on
+every call; set
+`options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)` to silence
+it.
+
 Requires the master's corrections tables, which
 [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md)
 creates.
@@ -109,7 +116,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmptjfN7m/duckdb
+#> ℹ /tmp/RtmpFO8VHr/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -121,9 +128,12 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> parity pass: row count match; 0 of 2 columns mismatch; 0 of 2 sampled columns mismatch
 #> parity_full: 0 of 2 columns mismatch
 #> view master_demo -> master_demo_base_built_demo
+#> Warning: 'backfill_corrections()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
 #> legacy: 0 facts parsed; 0 resolved; 0 unresolved
 #> recorded 0; 0 stale corrections
-#> Correction ce1c6dcc8332e2c1e appended. First correction to this variable: regenerate the view.
-#> Decision de6be49e34815f9fb (accept) recorded on ce1c6dcc8332e2c1e.
+#> Warning: 'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
+#> Correction cbc89767368c4c488 appended. First correction to this variable: regenerate the view.
+#> Warning: 'decide_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
+#> Decision dd7d1691a2be805fa (accept) recorded on cbc89767368c4c488.
 # }
 ```

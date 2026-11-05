@@ -148,7 +148,11 @@ correction to <code>variable</code>, meaning the view should be regenerated), an
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p>By default, <code>key_values</code> must name exactly the master's primary key
+    <p><strong>Deprecated.</strong> Corrections to master datasets are owned by the HVTR registry,
+and hvtiRdatabuild will read corrected data from it rather than record
+corrections itself. This function still works and warns on every call; set
+<code>options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)</code> to silence it.</p>
+<p>By default, <code>key_values</code> must name exactly the master's primary key
 columns, each a single non-missing value. When <code>alt_key</code> is given instead,
 <code>key_values</code> must name exactly that alternate key's columns, none may be
 missing, and it must match exactly one row in the master's current base
@@ -200,7 +204,7 @@ can quote a data value.</p>
 <span class="r-in"><span>  <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmptjfN7m/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpFO8VHr/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>
@@ -212,9 +216,11 @@ can quote a data value.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> parity pass: row count match; 0 of 2 columns mismatch; 0 of 2 sampled columns mismatch</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> parity_full: 0 of 2 columns mismatch</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> view master_demo -&gt; master_demo_base_built_demo</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>'backfill_corrections()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> legacy: 0 facts parsed; 0 resolved; 0 unresolved</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> recorded 0; 0 stale corrections</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Correction c1b0d396c10fe0067 appended. First correction to this variable: regenerate the view.</span>
+<span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Correction c019ca25e5d1f82a6 appended. First correction to this variable: regenerate the view.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
