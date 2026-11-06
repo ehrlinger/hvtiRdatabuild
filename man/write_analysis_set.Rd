@@ -59,7 +59,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, built = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(
