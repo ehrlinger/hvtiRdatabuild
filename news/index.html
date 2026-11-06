@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,11 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.4" id="hvtirdatabuild-034">hvtiRdatabuild 0.3.4<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-034"></a></h2>
+<ul><li><p><code><a href="../reference/backfill_corrections.html">backfill_corrections()</a></code>, <code><a href="../reference/propose_correction.html">propose_correction()</a></code> and <code><a href="../reference/decide_correction.html">decide_correction()</a></code> are deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it rather than record corrections itself. The functions still work and warn on every call with class <code>deprecatedWarning</code>; set <code>options(hvtiRdatabuild.warn_deprecated_corrections = FALSE)</code> to silence the warning (<a href="https://github.com/ehrlinger/hvtiRdatabuild/issues/101" class="external-link">#101</a>).</p></li>
+<li><p>The <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> and <code><a href="../reference/read_analysis_set.html">read_analysis_set()</a></code> examples, and the test helper, call <code>hvtiRutilities::register_data(file =)</code> rather than the deprecated <code>built =</code>, so they no longer warn. The <code>hvtiRutilities</code> floor rises to 1.5.20, the first release with <code>file =</code>.</p></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.3" id="hvtirdatabuild-033">hvtiRdatabuild 0.3.3<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-033"></a></h2>
 <ul><li>

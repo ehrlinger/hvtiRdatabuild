@@ -72,7 +72,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, built = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(
@@ -85,7 +85,6 @@ if (requireNamespace("arrow", quietly = TRUE)) {
   print(side$counts)
   unlink(root, recursive = TRUE)
 }
-#> Warning: register_data(built =) is now register_data(file =). built = still works and will be removed in a later release.
 #> $n
 #> [1] 5
 #> 
