@@ -639,3 +639,31 @@ test_that("write_analysis_set() takes the study's manifest lock", {
   expect_error(write_analysis_set("eda", cfg), "write_analysis_set\\(\\): .*lock")
   expect_false(file.exists(p$parquet))
 })
+
+test_that("read_analysis_set() holds the manifest lock while it verifies and reads", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  testthat::skip_on_os("windows")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  lock_path <- paste0(.set_paths("eda", cfg)$manifest, ".lock")
+  real_read <- arrow::read_parquet
+  writer_got_lock <- NA
+  # At the hash/read boundary, a writer in a fresh R process tries the lock.
+  # A fork would not do: it inherits filelock's record of this process's lock.
+  local_mocked_bindings(
+    read_parquet = function(...) {
+      code <- sprintf(
+        "l <- filelock::lock('%s', timeout = 200); cat(!is.null(l))", lock_path
+      )
+      out <- system2(file.path(R.home("bin"), "Rscript"), c("-e", shQuote(code)),
+                     stdout = TRUE)
+      writer_got_lock <<- as.logical(utils::tail(out, 1L))
+      real_read(...)
+    },
+    .package = "arrow"
+  )
+  d <- read_analysis_set("eda", cfg)
+  expect_equal(nrow(d), 18L)
+  expect_false(writer_got_lock)
+})

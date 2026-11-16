@@ -314,7 +314,7 @@
 #' The write holds the study's manifest lock (`manifest.yaml.lock`), so two
 #' writers at once cannot leave one writer's parquet beside the other's
 #' sidecar. The sidecar records the parquet's sha256, and
-#' [read_analysis_set()] checks it.
+#' [read_analysis_set()] checks it while holding the same lock, shared.
 #'
 #' The parent is read with [hvtiRutilities::read_built()], and a working read is refused: an
 #' analysis set is built from registered data only. A dataset with no dated version, including one
@@ -574,6 +574,16 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   fix <- paste0('Run write_analysis_set("', name, '").')
   if (!file.exists(p$parquet) || !file.exists(p$sidecar))
     stop("analysis set `", name, "` has not been written. ", fix, call. = FALSE)
+  # A shared hold on the lock write_analysis_set() takes exclusively: the
+  # sidecar, the manifest entry, the parquet's hash and the parquet read are one
+  # generation, and a writer cannot replace the parquet between hash and read.
+  lock <- filelock::lock(paste0(p$manifest, ".lock"), exclusive = FALSE,
+                         timeout = .lock_timeout_ms())
+  if (is.null(lock)) {
+    stop("read_analysis_set(): timed out waiting for the study's manifest lock (",
+         basename(p$manifest), ".lock); another job is writing. Try again.", call. = FALSE)
+  }
+  on.exit(filelock::unlock(lock), add = TRUE)
   side <- yaml::read_yaml(p$sidecar)
 
   now <- .built_state(cfg)

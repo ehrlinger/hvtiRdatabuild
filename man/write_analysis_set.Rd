@@ -40,7 +40,7 @@ subtraction. An \code{expect} on any of these counts needs that \code{event} key
 The write holds the study's manifest lock (\code{manifest.yaml.lock}), so two
 writers at once cannot leave one writer's parquet beside the other's
 sidecar. The sidecar records the parquet's sha256, and
-\code{\link[=read_analysis_set]{read_analysis_set()}} checks it.
+\code{\link[=read_analysis_set]{read_analysis_set()}} checks it while holding the same lock, shared.
 
 The parent is read with \code{\link[hvtiRutilities:read_built]{hvtiRutilities::read_built()}}, and a working read is refused: an
 analysis set is built from registered data only. A dataset with no dated version, including one

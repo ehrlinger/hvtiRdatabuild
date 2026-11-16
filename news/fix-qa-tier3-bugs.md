@@ -23,3 +23,8 @@
   `trust_certificate = TRUE` is a stop-gap only.
 * The analysis-set examples call `hvtiRutilities::register_data(file = , root = )`, and
   exclusions pass `patient_id_col` to `hvtiPlotR::hv_consort_start()`.
+* `compare_built()` writes numeric ids losslessly, so two distinct doubles never become one id,
+  and it refuses whole-number ids beyond 2^53, which a double cannot hold exactly.
+* `read_analysis_set()` holds the study's manifest lock, shared, while it verifies the sidecar,
+  the manifest entry and the parquet's hash and reads the parquet, so a writer cannot replace the
+  parquet between the check and the read.
