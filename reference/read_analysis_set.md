@@ -82,6 +82,8 @@ if (requireNamespace("arrow", quietly = TRUE)) {
   print(attr(d, "attrition"))
   unlink(root, recursive = TRUE)
 }
+#> Warning: register_data(): `root` is now the last argument. A first argument, unnamed, that is a directory is read as the root for one more release; pass root = by name.
+#> Warning: hv_consort_start(): an unquoted `patient_id` column is deprecated; pass its name as a string, `patient_id_col = "..."`. The old form works until hvtiPlotR 2.9.0. This warning is shown once per session.
 #> [1] 5 3
 #>   rule   reason n_before n_excluded n_after
 #> 1    1 Under 18        6          1       5
