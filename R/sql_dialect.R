@@ -93,6 +93,9 @@ sql_timestamp_literal <- function(ts, dialect) {
 #' @noRd
 run_step <- function(name, expr) {
   tryCatch(expr, error = function(e) {
+    # The package's own classed errors carry no driver text; let them through
+    # so a caller can catch them by class.
+    if (inherits(e, "hvtiRdatabuild_error")) stop(e)
     stop("Step '", name, "' failed (", class(e)[[1]],
          "). The driver's message is withheld because ",
          "it can contain a data value; rerun the step ",

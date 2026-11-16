@@ -16,8 +16,12 @@ backfill_corrections(config, con, dry_run = TRUE, dialect = "mssql")
 \item{dialect}{\code{"mssql"} or \code{"duckdb"}.}
 }
 \value{
-Invisibly, a list of counts: \code{dry_run}, \code{facts}, \code{resolved},
-\code{unresolved}, \code{appended} and \code{stale}.
+Invisibly, a list: \code{dry_run}, the counts \code{facts}, \code{resolved},
+\code{unresolved}, \code{unparsed}, \code{appended} and \code{stale}, and the build-program
+line numbers \code{unresolved_lines} and \code{unparsed_lines}. When any fact is
+unresolved or any statement unparsed, it also warns with class
+\code{hvtiRdatabuild_incomplete_backfill}, giving counts and line numbers but
+no key or value. The warning is not silenced by \code{hvti.quiet}.
 }
 \description{
 Creates the master's corrections and decisions tables if absent, reads the

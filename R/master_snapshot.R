@@ -20,12 +20,13 @@
 #' Nothing printed carries a key or a value.
 #'
 #' @param config A `master_config` from [read_master_config()].
-#' @param out_dir Directory to write the parquet snapshots and their sidecars.
+#' @param dir Directory to write the parquet snapshots and their sidecars.
 #' @param which `"current"`, `"history"`, or both.
 #' @param chunk_rows Rows per chunk, passed to [snapshot_oracle()].
 #' @param expect Optional validation for the current build, passed to
 #'   [snapshot_oracle()]. Historical builds are not validated, because their
 #'   logs are rarely retained.
+#' @param out_dir Deprecated; use `dir`.
 #'
 #' A snapshot that already exists is skipped only when its sidecar is complete
 #' and, for the current build, records the source's current checksum. The
@@ -36,7 +37,10 @@
 #' @return Invisibly, a data frame with one row per dataset: `file`, `status`
 #'   (`"written"`, `"skipped"` or `"failed"`), `n_rows`, `n_cols`, `sha256`,
 #'   `source_sha256`, `parent_release`, `parent_source` (`"log"`, `"program"`,
-#'   `"declared"`, `"unknown"` or `"none"`) and `key_verdict`.
+#'   `"declared"`, `"unknown"` or `"none"`) and `key_verdict`. If any
+#'   historical snapshot failed, it also warns with class
+#'   `hvtiRdatabuild_snapshot_failed`, naming the files. The warning is not
+#'   silenced by `hvti.quiet`.
 #'
 #' @seealso [read_master_config()], [lift_master()]
 #'
@@ -62,8 +66,12 @@
 #' }
 #'
 #' @export
-snapshot_master <- function(config, out_dir, which = c("current", "history"),
-                            chunk_rows = 1e5, expect = NULL) {
+snapshot_master <- function(config, dir, which = c("current", "history"),
+                            chunk_rows = 1e5, expect = NULL, out_dir) {
+  if (!missing(out_dir)) {
+    dir <- .renamed_arg("snapshot_master", "out_dir", "dir", out_dir, !missing(dir))
+  }
+  out_dir <- dir
   for (p in c("arrow", "jsonlite", "tidyselect")) {
     if (!requireNamespace(p, quietly = TRUE)) {
       stop("Package '", p, "' is required to snapshot a master. ",
@@ -93,12 +101,12 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
                       stringsAsFactors = FALSE)
     if (file.exists(out)) {
       if (!.snapshot_complete(out)) {
-        message(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
+        .hvti_inform(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
         .clean_partial(out)
       } else if (is_current && !.snapshot_source_current(out, sas)) {
         # The current master keeps a fixed file name, so a rebuild shows up
         # only as a new source checksum.
-        message(sprintf("rebuilding %s: its source has changed", basename(out)))
+        .hvti_inform(sprintf("rebuilding %s: its source has changed", basename(out)))
         .clean_partial(out)
       } else {
         return(row)
@@ -110,13 +118,21 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
       .snapshot_one(sas, config, out, is_current, chunk_rows, expect, row),
       error = function(e) {
         .clean_partial(out)
-        message(sprintf("FAILED  %s: %s", basename(sas), class(e)[[1]]))
+        .hvti_inform(sprintf("FAILED  %s: %s", basename(sas), class(e)[[1]]))
         row$status <- "failed"
         row
       }
     )
   })
-  invisible(do.call(rbind, rows))
+  res <- do.call(rbind, rows)
+  failed <- res$file[res$status %in% "failed"]
+  if (length(failed)) {
+    .warn("snapshot_failed",
+      "snapshot_master(): ", length(failed), " historical snapshot(s) failed and were ",
+      "not written: ", paste(failed, collapse = ", "), "."
+    )
+  }
+  invisible(res)
 }
 
 #' Snapshot one dataset and record its lineage and key verdicts
@@ -160,9 +176,9 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
   row$parent_release <- lineage$release
   row$parent_source <- lineage$source
   row$key_verdict <- verdicts[["key"]]
-  message(sprintf("%-40s %s rows x %s columns; key %s; parent %s (%s)",
-                  basename(sas), info$n_rows, info$n_cols, verdicts[["key"]],
-                  lineage$release, lineage$source))
+  .hvti_inform(sprintf("%-40s %s rows x %s columns; key %s; parent %s (%s)",
+                       basename(sas), info$n_rows, info$n_cols, verdicts[["key"]],
+                       lineage$release, lineage$source))
   row
 }
 

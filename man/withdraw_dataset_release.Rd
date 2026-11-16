@@ -7,9 +7,10 @@
 withdraw_dataset_release(
   dataset_id,
   release_id,
-  datasets_dir,
+  dir,
   reason,
-  replacement_release_id = NULL
+  replacement_release_id = NULL,
+  datasets_dir
 )
 }
 \arguments{
@@ -17,13 +18,15 @@ withdraw_dataset_release(
 
 \item{release_id}{Character. Exact release identifier to withdraw.}
 
-\item{datasets_dir}{Character. Existing directory that owns the published
+\item{dir}{Character. Existing directory that owns the published
 files and \code{dataset-catalog.yml}.}
 
 \item{reason}{Character. Non-empty reason for withdrawal.}
 
 \item{replacement_release_id}{Optional character release identifier from the
 same logical dataset.}
+
+\item{datasets_dir}{Deprecated; use \code{dir}.}
 }
 \value{
 Invisibly, the release record with \code{status = "withdrawn"},

@@ -8,14 +8,16 @@ pull_master(
   con,
   master,
   cohort,
-  columns,
-  study_config,
+  var_cols,
+  path,
   mrn_col = "mrn",
   date_col = "encounter_date",
   dialect = c("mssql", "duckdb"),
   applied_view = paste0(master, "_corrections_applied"),
   deployment_view = paste0(master, "_deployment"),
-  parity_view = paste0(master, "_parity")
+  parity_view = paste0(master, "_parity"),
+  columns,
+  study_config
 )
 }
 \arguments{
@@ -27,9 +29,9 @@ pull_master(
 \item{cohort}{A \code{\link[=cohort_query]{cohort_query()}}, or a \code{\link[=new_cohort_record]{new_cohort_record()}} built on
 \code{\link[=cohort_unit_id]{cohort_unit_id()}} units (\code{patient_id_col = "cohort_unit"}).}
 
-\item{columns}{Character. The study's columns, besides the key.}
+\item{var_cols}{Character. The study's columns, besides the key.}
 
-\item{study_config}{Character. Path to the study configuration file that defines this
+\item{path}{Character. Path to the study configuration file that defines this
 pull. Its checksum is recorded in the provenance.}
 
 \item{mrn_col, date_col}{Character. The master's key columns.}
@@ -38,14 +40,21 @@ pull. Its checksum is recorded in the provenance.}
 
 \item{applied_view, deployment_view, parity_view}{Character. The master's
 applied-corrections, deployment and parity-verdict views.}
+
+\item{columns}{Deprecated; use \code{var_cols}.}
+
+\item{study_config}{Deprecated; use \code{path}.}
 }
 \value{
 An object of class \code{master_pull}: a list with \code{data} (one row per active
-unit: the key columns, \code{columns} and \code{cohort_unit}), \code{cohort} (the cohort record,
-ending with the \code{in_master} stage) and \code{provenance} (\code{master}, \code{sql_commit},
-\code{applied_correction_ids}, \code{corrections_in_effect}, \code{parity_verified_at}, \code{read_at},
-\code{columns}, \code{cohort_definition}, \code{study_config_sha256}, \code{n_cohort}, \code{n_matched},
-\code{n_unmatched}).
+unit: the key columns, \code{var_cols} and \code{cohort_unit}), \code{cohort} (the cohort record,
+ending with the \code{in_master} stage) and \code{meta}: the family's provenance record
+(\code{package}, \code{version}, \code{sha}, \code{method}, \code{seed}, \code{rng_kind}, \code{time}), then \code{master},
+\code{sql_commit}, \code{applied_correction_ids}, \code{corrections_in_effect},
+\code{parity_verified_at}, \code{read_at}, \code{columns}, \code{cohort_definition},
+\code{study_config_sha256}, \code{n_cohort}, \code{n_matched} and \code{n_unmatched}. The same pull
+fields without the provenance record are also in \code{provenance}, which is deprecated
+and goes in the next release; read \code{meta}.
 \code{corrections_in_effect} holds every correction id applied anywhere in the master in
 the same snapshot, including any that changed who qualified.
 }
@@ -95,8 +104,8 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   config <- tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull_master(con, "master_demo", q, columns = "age", study_config = config,
-                      dialect = "duckdb")
+  pull_master(con, "master_demo", q, var_cols = "age", path = config,
+              dialect = "duckdb")
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 }

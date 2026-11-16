@@ -70,9 +70,10 @@
     params = list(commit)
   ))
   if (!nrow(verdicts) || !identical(as.character(verdicts$verdict[[1]]), "pass")) {
-    stop("The master has not passed its parity gate at the deployed SQL commit: ",
-         nrow(verdicts), " verdict(s) recorded for it, the latest not a pass. ",
-         "Nothing was pulled.", call. = FALSE)
+    .abort("parity_gate",
+           "pull_master(): The master has not passed its parity gate at the deployed SQL ",
+           "commit: ", nrow(verdicts), " verdict(s) recorded for it, the latest not a pass. ",
+           "Nothing was pulled.")
   }
   format(as.POSIXct(verdicts$verified_at[[1]], tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ",
          tz = "UTC")
@@ -173,20 +174,25 @@
 #'   (`"dbo.master_cardiac"`).
 #' @param cohort A [cohort_query()], or a [new_cohort_record()] built on
 #'   [cohort_unit_id()] units (`patient_id_col = "cohort_unit"`).
-#' @param columns Character. The study's columns, besides the key.
-#' @param study_config Character. Path to the study configuration file that defines this
+#' @param var_cols Character. The study's columns, besides the key.
+#' @param path Character. Path to the study configuration file that defines this
 #'   pull. Its checksum is recorded in the provenance.
 #' @param mrn_col,date_col Character. The master's key columns.
 #' @param dialect `"mssql"` (the warehouse) or `"duckdb"` (tests).
 #' @param applied_view,deployment_view,parity_view Character. The master's
 #'   applied-corrections, deployment and parity-verdict views.
+#' @param columns Deprecated; use `var_cols`.
+#' @param study_config Deprecated; use `path`.
 #'
 #' @return An object of class `master_pull`: a list with `data` (one row per active
-#'   unit: the key columns, `columns` and `cohort_unit`), `cohort` (the cohort record,
-#'   ending with the `in_master` stage) and `provenance` (`master`, `sql_commit`,
-#'   `applied_correction_ids`, `corrections_in_effect`, `parity_verified_at`, `read_at`,
-#'   `columns`, `cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`,
-#'   `n_unmatched`).
+#'   unit: the key columns, `var_cols` and `cohort_unit`), `cohort` (the cohort record,
+#'   ending with the `in_master` stage) and `meta`: the family's provenance record
+#'   (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, `time`), then `master`,
+#'   `sql_commit`, `applied_correction_ids`, `corrections_in_effect`,
+#'   `parity_verified_at`, `read_at`, `columns`, `cohort_definition`,
+#'   `study_config_sha256`, `n_cohort`, `n_matched` and `n_unmatched`. The same pull
+#'   fields without the provenance record are also in `provenance`, which is deprecated
+#'   and goes in the next release; read `meta`.
 #'   `corrections_in_effect` holds every correction id applied anywhere in the master in
 #'   the same snapshot, including any that changed who qualified.
 #'
@@ -212,31 +218,37 @@
 #'   config <- tempfile(fileext = ".yaml")
 #'   writeLines("study: st0000", config)
 #'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-#'   pull_master(con, "master_demo", q, columns = "age", study_config = config,
-#'                       dialect = "duckdb")
+#'   pull_master(con, "master_demo", q, var_cols = "age", path = config,
+#'               dialect = "duckdb")
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
 #' }
 #' }
 #'
 #' @export
-pull_master <- function(con, master, cohort, columns, study_config, mrn_col = "mrn",
+pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
                         date_col = "encounter_date", dialect = c("mssql", "duckdb"),
                         applied_view = paste0(master, "_corrections_applied"),
                         deployment_view = paste0(master, "_deployment"),
-                        parity_view = paste0(master, "_parity")) {
+                        parity_view = paste0(master, "_parity"), columns, study_config) {
+  if (!missing(columns)) {
+    var_cols <- .renamed_arg("pull_master", "columns", "var_cols", columns, !missing(var_cols))
+  }
+  if (!missing(study_config)) {
+    path <- .renamed_arg("pull_master", "study_config", "path", study_config, !missing(path))
+  }
   dialect <- match.arg(dialect)
-  if (missing(study_config) || !is.character(study_config) || length(study_config) != 1L ||
-        is.na(study_config) || !file.exists(study_config)) {
-    stop("'study_config' must be the path of an existing study configuration file.",
+  if (missing(path) || !is.character(path) || length(path) != 1L ||
+        is.na(path) || !file.exists(path)) {
+    stop("pull_master(): `path` must be the path of an existing study configuration file.",
          call. = FALSE)
   }
-  config_sha256 <- digest::digest(study_config, algo = "sha256", file = TRUE)
-  if (!is.character(columns) || !length(columns) || anyNA(columns) ||
-        any(!nzchar(columns))) {
-    stop("'columns' must name at least one column.", call. = FALSE)
+  config_sha256 <- digest::digest(path, algo = "sha256", file = TRUE)
+  if (!is.character(var_cols) || !length(var_cols) || anyNA(var_cols) ||
+        any(!nzchar(var_cols))) {
+    stop("pull_master(): `var_cols` must name at least one column.", call. = FALSE)
   }
-  if (anyDuplicated(columns)) {
-    stop("'columns' contains a duplicate name.", call. = FALSE)
+  if (anyDuplicated(var_cols)) {
+    stop("pull_master(): `var_cols` contains a duplicate name.", call. = FALSE)
   }
   is_query <- inherits(cohort, "cohort_query")
   if (!is_query && !inherits(cohort, "cohort_record")) {
@@ -247,7 +259,7 @@ pull_master <- function(con, master, cohort, columns, study_config, mrn_col = "m
   q <- quoter(dialect)
   tmp <- .cohort_temp(dialect)
   master_q <- .qualified_name(master, dialect)
-  cols <- unique(c(mrn_col, date_col, columns))
+  cols <- unique(c(mrn_col, date_col, var_cols))
   select_sql <- paste0("m.", vapply(cols, q, character(1)), collapse = ", ")
   join_sql <- sprintf("m.%s = c.mrn AND m.%s = c.encounter_date", q(mrn_col), q(date_col))
   if (is_query && identical(cohort$prior, "exclude")) {
@@ -329,29 +341,45 @@ pull_master <- function(con, master, cohort, columns, study_config, mrn_col = "m
   data <- read$data[read$data$cohort_unit %in% active[found], , drop = FALSE]
   row.names(data) <- NULL
 
+  fields <- list(
+    master = master,
+    sql_commit = read$commit,
+    applied_correction_ids = read$applied,
+    corrections_in_effect = read$in_effect,
+    parity_verified_at = read$parity_at,
+    read_at = read_at,
+    columns = var_cols,
+    cohort_definition = if (is_query) {
+      list(qualifying = cohort$qualifying, epoch = format(cohort$epoch),
+           index = cohort$index, prior = cohort$prior)
+    } else {
+      "supplied cohort_record"
+    },
+    study_config_sha256 = config_sha256,
+    n_cohort = length(active),
+    n_matched = sum(found),
+    n_unmatched = sum(!found)
+  )
+  # `provenance` is the pre-rubric element, kept for one release; `meta` leads
+  # with the family's seven-field provenance record.
   structure(list(
     data = data,
     cohort = final,
-    provenance = list(
-      master = master,
-      sql_commit = read$commit,
-      applied_correction_ids = read$applied,
-      corrections_in_effect = read$in_effect,
-      parity_verified_at = read$parity_at,
-      read_at = read_at,
-      columns = columns,
-      cohort_definition = if (is_query) {
-        list(qualifying = cohort$qualifying, epoch = format(cohort$epoch),
-             index = cohort$index, prior = cohort$prior)
-      } else {
-        "supplied cohort_record"
-      },
-      study_config_sha256 = config_sha256,
-      n_cohort = length(active),
-      n_matched = sum(found),
-      n_unmatched = sum(!found)
-    )
+    meta = c(.provenance_record("pull_master"), fields),
+    provenance = fields
   ), class = "master_pull")
+}
+
+#' A pull's metadata: `$meta`, or `$provenance` for a pull made before `$meta`
+#'
+#' @param pull A `master_pull`.
+#'
+#' @return A list.
+#'
+#' @keywords internal
+#' @noRd
+.pull_meta <- function(pull) {
+  if (is.null(pull$meta)) pull$provenance else pull$meta
 }
 
 #' Print a master pull
@@ -365,7 +393,7 @@ pull_master <- function(con, master, cohort, columns, study_config, mrn_col = "m
 #'
 #' @export
 print.master_pull <- function(x, ...) {
-  p <- x$provenance
+  p <- .pull_meta(x)
   cat("Master pull from ", p$master, " at SQL commit ", p$sql_commit, "\n", sep = "")
   cat("  cohort units: ", p$n_cohort, "; matched: ", p$n_matched,
       "; unmatched: ", p$n_unmatched, "\n", sep = "")

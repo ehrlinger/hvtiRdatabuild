@@ -33,6 +33,11 @@ validating it against a CA chain. \code{FALSE}, the default, validates it.}
 }
 \value{
 A \link[DBI:DBIConnection-class]{DBI::DBIConnection} object.
+A failed connection is an error of class \code{hvtiRdatabuild_connection_failed}
+whose \code{kind} field says what failed: \code{"driver"} (the ODBC driver or DSN
+would not load), \code{"network"} (the server name did not resolve or nothing
+answered), \code{"tls"}, \code{"login"} or \code{"unknown"}. The driver's own message is
+never shown, because it may carry a credential.
 }
 \description{
 Resolves credentials through the ladder documented in the design spec and

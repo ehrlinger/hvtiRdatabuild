@@ -86,7 +86,7 @@ test_that("a configuration changed between pull and freeze stops the freeze", {
   f <- local_freeze_setup()
   config <- withr::local_tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
-  pull <- pull_demo(f$con, demo_query(), study_config = config)
+  pull <- pull_demo(f$con, demo_query(), path = config)
   writeLines("study: st0000\nepoch_end: 2025-01-01", config)
 
   expect_error(freeze_study_pull(pull, config, f$dir, "st0000_pull",

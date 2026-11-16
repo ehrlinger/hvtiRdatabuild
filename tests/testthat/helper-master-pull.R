@@ -60,8 +60,8 @@ demo_config <- local({
   path
 })
 
-pull_demo <- function(con, cohort, columns = "age", study_config = demo_config) {
-  pull_master(con, "master_demo", cohort, columns = columns, study_config = study_config,
+pull_demo <- function(con, cohort, var_cols = "age", path = demo_config) {
+  pull_master(con, "master_demo", cohort, var_cols = var_cols, path = path,
               dialect = "duckdb")
 }
 

@@ -10,7 +10,9 @@ read_pull_provenance(path)
 \item{path}{Character. A parquet file written by \code{\link[=freeze_study_pull]{freeze_study_pull()}}.}
 }
 \value{
-A list: \code{schema}, \code{master}, \code{sql_commit}, \code{applied_correction_ids},
+A list: \code{schema}; for a pull frozen with the provenance record, that record
+(\code{package}, \code{version}, \code{sha}, \code{method}, \code{seed}, \code{rng_kind}, and \code{time} as ISO 8601
+text); then \code{master}, \code{sql_commit}, \code{applied_correction_ids},
 \code{corrections_in_effect}, \code{parity_verified_at}, \code{read_at}, \code{columns},
 \code{cohort_definition}, \code{study_config_sha256}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched}
 and \code{cohort_stages}.

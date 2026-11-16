@@ -21,9 +21,11 @@
 #' the same rules as the built dataset, never in a repository.
 #'
 #' @param pull A `master_pull` from [pull_master()].
-#' @param study_config Character. Path to the study configuration file given to
+#' @param path Character. Path to the study configuration file given to
 #'   [pull_master()]; it must be unchanged since the pull.
-#' @param datasets_dir,dataset_id,extract_date As for [publish_dataset()].
+#' @param dir,dataset_id,extract_date As for [publish_dataset()].
+#' @param study_config Deprecated; use `path`.
+#' @param datasets_dir Deprecated; use `dir`.
 #'
 #' @return Invisibly, the release, as returned by [publish_dataset()].
 #'
@@ -48,7 +50,7 @@
 #'   config <- tempfile(fileext = ".yaml")
 #'   writeLines("study: st0000", config)
 #'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-#'   pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+#'   pull <- pull_master(con, "master_demo", q, var_cols = "age", path = config,
 #'                       dialect = "duckdb")
 #'   published <- tempfile("published-")
 #'   dir.create(published)
@@ -60,8 +62,18 @@
 #' }
 #'
 #' @export
-freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
-                              extract_date = Sys.Date()) {
+freeze_study_pull <- function(pull, path, dir, dataset_id,
+                              extract_date = Sys.Date(), study_config, datasets_dir) {
+  if (!missing(study_config)) {
+    path <- .renamed_arg("freeze_study_pull", "study_config", "path", study_config,
+                         !missing(path))
+  }
+  if (!missing(datasets_dir)) {
+    dir <- .renamed_arg("freeze_study_pull", "datasets_dir", "dir", datasets_dir,
+                        !missing(dir))
+  }
+  study_config <- path
+  datasets_dir <- dir
   if (!inherits(pull, "master_pull")) {
     stop("'pull' must be a master_pull from pull_master().", call. = FALSE)
   }
@@ -70,19 +82,21 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
   }
   if (!is.character(study_config) || length(study_config) != 1L ||
         !file.exists(study_config)) {
-    stop("'study_config' must be the path of an existing study configuration file.",
+    stop("freeze_study_pull(): `path` must be the path of an existing study configuration file.",
          call. = FALSE)
   }
   if (!identical(digest::digest(study_config, algo = "sha256", file = TRUE),
-                 pull$provenance$study_config_sha256)) {
+                 .pull_meta(pull)$study_config_sha256)) {
     stop("The study configuration has changed since the pull. Pull again with the ",
          "current configuration. Nothing was published.", call. = FALSE)
   }
 
   stages <- cohort_summary(pull$cohort)$stages
+  meta <- .pull_meta(pull)
+  if (inherits(meta$time, "POSIXct")) meta$time <- .iso_time(meta$time)
   prov <- c(
     list(schema = 1L),
-    pull$provenance,
+    meta,
     list(cohort_stages = as.list(stages[c("stage_id", "n_in", "n_excluded", "n_remaining")]))
   )
   table <- arrow::arrow_table(pull$data)
@@ -97,7 +111,7 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
   release <- publish_dataset(
     draft, dataset_id, datasets_dir, extract_date = extract_date,
     source = sprintf("pull_master() from %s at SQL commit %s",
-                     pull$provenance$master, pull$provenance$sql_commit)
+                     meta$master, meta$sql_commit)
   )
   invisible(release)
 }
@@ -106,7 +120,9 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
 #'
 #' @param path Character. A parquet file written by [freeze_study_pull()].
 #'
-#' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`,
+#' @return A list: `schema`; for a pull frozen with the provenance record, that record
+#'   (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, and `time` as ISO 8601
+#'   text); then `master`, `sql_commit`, `applied_correction_ids`,
 #'   `corrections_in_effect`, `parity_verified_at`, `read_at`, `columns`,
 #'   `cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`, `n_unmatched`
 #'   and `cohort_stages`.

@@ -60,14 +60,14 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   })
   res <- suppressMessages(lift_master(cfg, con, pq, dry_run = FALSE))
   expect_equal(res$verdict, "pass")
-  suppressMessages(backfill_corrections(cfg, con, dry_run = FALSE))
+  backfill_quietly(backfill_corrections(cfg, con, dry_run = FALSE))
 
   # A writer dry run validates and touches nothing.
   n0 <- DBI::dbGetQuery(con, paste0("SELECT COUNT(*) AS n FROM [", name, "_corrections]"))$n
   dry <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
-    variable = "age", expected_prior = 1 / 3, new_value = 2 / 3,
+    var_col = "age", expected_prior = 1 / 3, new_value = 2 / 3,
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dry_run = TRUE
   ))
@@ -80,11 +80,11 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   r <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
-    variable = "age", expected_prior = 1 / 3, new_value = 2 / 3,
+    var_col = "age", expected_prior = 1 / 3, new_value = 2 / 3,
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester"
   ))
   suppressMessages(decide_correction(cfg, con, r$correction_id, "accept", "tester"))
-  suppressMessages(backfill_corrections(cfg, con, dry_run = FALSE))
+  backfill_quietly(backfill_corrections(cfg, con, dry_run = FALSE))
   v <- DBI::dbGetQuery(con, paste0("SELECT age FROM [", name, "] WHERE ccfid = 'K2'"))
   expect_equal(v$age, 2 / 3)
 
@@ -92,7 +92,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   alt <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(emrn = "E1"), alt_key = "epic",
-    variable = "surgeon", expected_prior = "s1", new_value = "s9",
+    var_col = "surgeon", expected_prior = "s1", new_value = "s9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester"
   ))
   row <- DBI::dbGetQuery(con, sprintf(

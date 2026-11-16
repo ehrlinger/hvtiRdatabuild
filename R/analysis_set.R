@@ -328,7 +328,12 @@
 #'
 #' @return The sidecar contents, invisibly: a list with `set`, `parent`,
 #'   `declaration_sha256`, `parquet_sha256`, `written`, `counts`, `n_cols`,
-#'   `attrition` and `packages`.
+#'   `attrition`, `packages` and `provenance`. `written` is ISO 8601 local time
+#'   with its UTC offset (`"2026-11-16T14:40:00-0500"`), which
+#'   `as.POSIXct(written, format = "%Y-%m-%dT%H:%M:%S%z")` reads back.
+#'   `provenance` is the hvtiR family's record: `package`, `version`, `sha`,
+#'   `method`, `seed`, `rng_kind` and `time`
+#'   (a `POSIXct` here, the same ISO text in the sidecar file).
 #'
 #' @examples
 #' \donttest{
@@ -379,22 +384,23 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   # otherwise write a parquet and rewrite the manifest entry before the working read is signalled.
   entry <- .parent_entry(cfg)
   if (!.parent_registered(entry)) {
-    stop("analysis set `", name, "`: ", cfg$built, " has no registered version, and an analysis ",
-         "set is built from registered data only. Nothing was written. Register it with ",
-         "hvtiRutilities::update_manifest()",
-         if (nzchar(Sys.getenv("HVTI_DATA"))) " and unset HVTI_DATA",
-         ", then run write_analysis_set(\"", name, "\") again.",
-         call. = FALSE)
+    .abort("unregistered_parent",
+           "write_analysis_set(): analysis set `", name, "`: ", cfg$built,
+           " has no registered version, and an analysis ",
+           "set is built from registered data only. Nothing was written. Register it with ",
+           "hvtiRutilities::update_manifest()",
+           if (nzchar(Sys.getenv("HVTI_DATA"))) " and unset HVTI_DATA",
+           ", then run write_analysis_set(\"", name, "\") again.")
   }
   parent_before <- .built_state(cfg, entry)
   d <- withCallingHandlers(
     hvtiRutilities::read_built(cfg),
     hvtiRutilities_working_read = function(m) {
-      stop("analysis set `", name, "`: its parent was read from the working file, not the ",
-           "registered version, because HVTI_DATA asks for the working file. An analysis set ",
-           "is built from registered data only. Nothing was written. Unset HVTI_DATA, then run ",
-           "write_analysis_set(\"", name, "\") again.",
-           call. = FALSE)
+      .abort("unregistered_parent",
+             "write_analysis_set(): analysis set `", name, "`: its parent was read from the ",
+             "working file, not the registered version, because HVTI_DATA asks for the ",
+             "working file. An analysis set is built from registered data only. Nothing was ",
+             "written. Unset HVTI_DATA, then run write_analysis_set(\"", name, "\") again.")
     }
   )
   parent_after <- .built_state(cfg)
@@ -428,8 +434,9 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   }
   for (k in names(b$expect)) {
     if (!isTRUE(counts[[k]] == b$expect[[k]]))
-      stop("analysis set `", name, "`: expected ", k, " = ", b$expect[[k]], ", got ",
-           counts[[k]], ". Nothing was written.", call. = FALSE)
+      .abort("expect_failed",
+             "write_analysis_set(): analysis set `", name, "`: expected ", k, " = ",
+             b$expect[[k]], ", got ", counts[[k]], ". Nothing was written.")
   }
 
   p <- .set_paths(name, cfg)
@@ -437,12 +444,13 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   # yaml::write_yaml() writes a data frame column-wise, which would scramble
   # rule/reason/count alignment. An empty attrition writes `attrition: []`.
   attrition <- unname(lapply(seq_len(nrow(ex$attrition)), function(i) as.list(ex$attrition[i, ])))
+  prov <- .provenance_record("write_analysis_set")
   side <- list(
     set = name,
     parent = parent_after,
     declaration_sha256 = .declaration_sha(raw),
     parquet_sha256 = NA_character_,
-    written = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
+    written = .iso_time(prov$time),
     counts = counts,
     n_cols = ncol(out),
     attrition = attrition,
@@ -450,18 +458,21 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
       hvtiRdatabuild = as.character(utils::packageVersion("hvtiRdatabuild")),
       hvtiRutilities = as.character(utils::packageVersion("hvtiRutilities")),
       arrow = as.character(utils::packageVersion("arrow"))
-    )
+    ),
+    provenance = prov
   )
   lock <- filelock::lock(paste0(p$manifest, ".lock"), timeout = .lock_timeout_ms())
   if (is.null(lock)) {
-    stop("write_analysis_set(): timed out waiting for the study's manifest lock (",
-         basename(p$manifest), ".lock); another job is writing. Nothing was written.",
-         call. = FALSE)
+    .abort("lock_timeout",
+           "write_analysis_set(): timed out waiting for the study's manifest lock (",
+           basename(p$manifest), ".lock); another job is writing. Nothing was written.")
   }
   on.exit(filelock::unlock(lock), add = TRUE)
   .atomic_write(p$parquet, function(tmp) arrow::write_parquet(out, tmp))
   side$parquet_sha256 <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
-  .atomic_write(p$sidecar, function(tmp) yaml::write_yaml(side, tmp))
+  on_disk <- side
+  on_disk$provenance$time <- .iso_time(prov$time)
+  .atomic_write(p$sidecar, function(tmp) yaml::write_yaml(on_disk, tmp))
   hvtiRutilities::update_manifest(
     file = p$parquet, manifest_path = p$manifest, n_rows = nrow(out),
     n_cols = ncol(out), source = paste0("analysis set ", name, " of ", cfg$built)
@@ -487,12 +498,14 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
                 '", hvtiRutilities::study_config()), ',
                 "review the attrition it prints, then render again.")
   if (.final_render()) {
-    stop("analysis set `", name, "`: ", why, " ", fix,
-         " A final render does not use a stale cut.", call. = FALSE)
+    .abort("stale_analysis_set", "read_analysis_set(): analysis set `", name, "`: ", why,
+           " ", fix, " A final render does not use a stale cut.")
   }
+  # The hvtiRutilities class follows the package's own for one release (T3-D5):
+  # hvtiRtemplates catches the old class.
   message(structure(
-    class = c("hvtiRutilities_stale_analysis_set", "hvtiRutilities_out_of_date",
-              "message", "condition"),
+    class = c("hvtiRdatabuild_stale_analysis_set", "hvtiRutilities_stale_analysis_set",
+              "hvtiRutilities_out_of_date", "message", "condition"),
     list(message = paste0("analysis set `", name, "`: ", why,
                           " This draft used the older cut. ", fix, "\n"),
          call = NULL)
@@ -508,8 +521,10 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #' declaration in `_study.yml` has changed. A stale set is never rebuilt
 #' silently: its exclusions are decisions, and a changed attrition should be
 #' looked at. In a draft render it is read, with a message of class
-#' `hvtiRutilities_stale_analysis_set` giving the [write_analysis_set()] call
-#' that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
+#' `hvtiRdatabuild_stale_analysis_set` giving the [write_analysis_set()] call
+#' that updates it. The message also carries the old class,
+#' `hvtiRutilities_stale_analysis_set`, for one release; catch the new one.
+#' In a final render (`HVTI_TEMPLATE_STRICT` set, as
 #' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
 #' text. A parquet that no longer matches its manifest entry always stops, and
 #' so does a sidecar whose recorded parquet sha256 is not the parquet's. A
@@ -573,15 +588,17 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   p <- .set_paths(name, cfg)
   fix <- paste0('Run write_analysis_set("', name, '").')
   if (!file.exists(p$parquet) || !file.exists(p$sidecar))
-    stop("analysis set `", name, "` has not been written. ", fix, call. = FALSE)
+    .abort("analysis_set_not_written",
+           "read_analysis_set(): analysis set `", name, "` has not been written. ", fix)
   # A shared hold on the lock write_analysis_set() takes exclusively: the
   # sidecar, the manifest entry, the parquet's hash and the parquet read are one
   # generation, and a writer cannot replace the parquet between hash and read.
   lock <- filelock::lock(paste0(p$manifest, ".lock"), exclusive = FALSE,
                          timeout = .lock_timeout_ms())
   if (is.null(lock)) {
-    stop("read_analysis_set(): timed out waiting for the study's manifest lock (",
-         basename(p$manifest), ".lock); another job is writing. Try again.", call. = FALSE)
+    .abort("lock_timeout",
+           "read_analysis_set(): timed out waiting for the study's manifest lock (",
+           basename(p$manifest), ".lock); another job is writing. Try again.")
   }
   on.exit(filelock::unlock(lock), add = TRUE)
   side <- yaml::read_yaml(p$sidecar)
@@ -605,15 +622,17 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   e <- Filter(function(x) identical(x$file, basename(p$parquet)), .manifest_entries(p$manifest))
   actual_sha <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
   if (!length(e) || !same(e[[1L]]$sha256, actual_sha)) {
-    stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",
-         "manifest entry. ", fix, call. = FALSE)
+    .abort("analysis_set_integrity",
+           "read_analysis_set(): analysis set `", name, "`: ", basename(p$parquet),
+           " does not match its manifest entry. ", fix)
   }
   # A sidecar written before sidecars recorded the parquet's sha256 cannot be
   # checked; rewriting the set adds the check.
   if (!is.null(side$parquet_sha256) && !same(side$parquet_sha256, actual_sha)) {
-    stop("read_analysis_set(): analysis set `", name, "`: its sidecar does not describe ",
-         basename(p$parquet), " (the sidecar records a different parquet sha256), so its ",
-         "counts and attrition cannot be trusted. ", fix, call. = FALSE)
+    .abort("analysis_set_integrity",
+           "read_analysis_set(): analysis set `", name, "`: its sidecar does not describe ",
+           basename(p$parquet), " (the sidecar records a different parquet sha256), so its ",
+           "counts and attrition cannot be trusted. ", fix)
   }
 
   d <- as.data.frame(arrow::read_parquet(p$parquet))

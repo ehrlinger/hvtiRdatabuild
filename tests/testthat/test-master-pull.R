@@ -8,9 +8,9 @@ test_that("a supplied cohort pulls only its encounters and the study's columns",
   expect_s3_class(res, "master_pull")
   expect_setequal(names(res$data), c("mrn", "encounter_date", "age", "cohort_unit"))
   expect_identical(nrow(res$data), 2L)
-  expect_identical(res$provenance$n_cohort, 3L)
-  expect_identical(res$provenance$n_matched, 2L)
-  expect_identical(res$provenance$n_unmatched, 1L)
+  expect_identical(res$meta$n_cohort, 3L)
+  expect_identical(res$meta$n_matched, 2L)
+  expect_identical(res$meta$n_unmatched, 1L)
 })
 
 test_that("a unit with no master row is excluded at the in_master stage", {
@@ -103,10 +103,10 @@ test_that("a change committed during the pull is invisible to it", {
     real_read(...)
   })
 
-  res <- pull_master(con, "master_demo", demo_query(index = "all"), columns = "age",
-                     study_config = demo_config, dialect = "duckdb")
+  res <- pull_master(con, "master_demo", demo_query(index = "all"), var_cols = "age",
+                     path = demo_config, dialect = "duckdb")
 
-  expect_identical(res$provenance$sql_commit, "abc1234")
+  expect_identical(res$meta$sql_commit, "abc1234")
   expect_false("SYN103|2018-02-02" %in% res$data$cohort_unit)
   expect_false("SYN103|2018-02-02" %in% res$cohort$members$patient_id)
 })
@@ -115,9 +115,9 @@ test_that("the pull records the deployment and only its own cohort's corrections
   con <- local_master_db()
   res <- pull_demo(con, unit_cohort(c("SYN101", "SYN102"), c("2010-03-01", "2012-07-15")))
 
-  expect_identical(res$provenance$sql_commit, "abc1234")
-  expect_identical(res$provenance$applied_correction_ids, "C1")
-  expect_match(res$provenance$read_at,
+  expect_identical(res$meta$sql_commit, "abc1234")
+  expect_identical(res$meta$applied_correction_ids, "C1")
+  expect_match(res$meta$read_at,
                "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$")
 })
 
@@ -166,15 +166,15 @@ test_that("a cohort not built on encounter units, or not a cohort, is refused", 
 
 test_that("bad column requests are refused before any query", {
   con <- local_master_db()
-  expect_error(pull_demo(con, demo_query(), columns = character(0)), "at least one")
-  expect_error(pull_demo(con, demo_query(), columns = c("age", "age")), "duplicate")
+  expect_error(pull_demo(con, demo_query(), var_cols = character(0)), "at least one")
+  expect_error(pull_demo(con, demo_query(), var_cols = c("age", "age")), "duplicate")
 })
 
 test_that("a database error is withheld", {
   con <- local_master_db()
   err <- tryCatch(
-    pull_master(con, "no_such_master", demo_query(), columns = "age",
-                study_config = demo_config, dialect = "duckdb"),
+    pull_master(con, "no_such_master", demo_query(), var_cols = "age",
+                path = demo_config, dialect = "duckdb"),
     error = conditionMessage
   )
   expect_match(err, "withheld")
@@ -196,16 +196,16 @@ test_that("corrections in effect cover rows outside the cohort", {
                             "VALUES ('C9', 'SYN102', DATE '2012-07-15')"))
   res <- pull_demo(con, demo_query())
 
-  expect_false("C9" %in% res$provenance$applied_correction_ids)
-  expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2", "C9"))
+  expect_false("C9" %in% res$meta$applied_correction_ids)
+  expect_setequal(res$meta$corrections_in_effect, c("C1", "C2", "C9"))
 })
 
 test_that("an excluded prior encounter's corrections are not attributed to the pull", {
   con <- local_master_db()
   res <- pull_demo(con, demo_query(prior = "exclude"))
 
-  expect_identical(res$provenance$applied_correction_ids, "C2")
-  expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2"))
+  expect_identical(res$meta$applied_correction_ids, "C2")
+  expect_setequal(res$meta$corrections_in_effect, c("C1", "C2"))
 })
 
 test_that("a master without a parity pass for its deployed commit is not pulled", {
@@ -227,7 +227,7 @@ test_that("the latest verdict for the deployed commit decides the gate", {
 
   add_parity(con, "abc1234", "pass", "2026-11-03 12:00:00")
   res <- pull_demo(con, demo_query())
-  expect_identical(res$provenance$parity_verified_at, "2026-11-03T12:00:00Z")
+  expect_identical(res$meta$parity_verified_at, "2026-11-03T12:00:00Z")
 })
 
 test_that("the gate's refusal names no commit and pulls nothing", {
@@ -241,7 +241,7 @@ test_that("the gate's refusal names no commit and pulls nothing", {
 test_that("the pull records the study configuration's checksum when it runs", {
   con <- local_master_db()
   res <- pull_demo(con, demo_query())
-  expect_identical(res$provenance$study_config_sha256,
+  expect_identical(res$meta$study_config_sha256,
                    digest::digest(demo_config, algo = "sha256", file = TRUE))
-  expect_error(pull_demo(con, demo_query(), study_config = tempfile()), "study_config")
+  expect_error(pull_demo(con, demo_query(), path = tempfile()), "`path`")
 })

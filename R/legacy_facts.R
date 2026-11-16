@@ -68,7 +68,7 @@
 #' Parse a master's inline SAS fixes into legacy facts
 #'
 #' @param lines Character. The SAS source lines.
-#' @param key_var Character. The SAS variable name of the base key used in the
+#' @param key_col Character. The SAS variable name of the base key used in the
 #'   inline `if` conditions.
 #'
 #' @return A list with `facts` (a data frame of `line`, `key_value`,
@@ -77,10 +77,16 @@
 #'
 #' @keywords internal
 #' @noRd
-parse_legacy_facts <- function(lines, key_var = "ccfid") {
+parse_legacy_facts <- function(lines, key_col, key_var) {
+  if (!missing(key_var)) {
+    key_col <- .renamed_arg("parse_legacy_facts", "key_var", "key_col", key_var,
+                            !missing(key_col))
+  } else if (missing(key_col)) {
+    key_col <- .deprecated_default("parse_legacy_facts", "key_col", "ccfid")
+  }
   st <- .statements(lines)
   grab <- function(p, s) regmatches(s, regexec(p, s, perl = TRUE, ignore.case = TRUE))[[1]]
-  k <- key_var
+  k <- key_col
   p_simple <- paste0("^if\\s*\\(?\\s*", k, "\\s*(?:=|eq)\\s*", .lit_pattern,
                      "\\s*\\)?\\s*then\\s+", .var_pattern, "\\s*=\\s*", .lit_pattern, "$")
   p_in <- paste0("^if\\s*\\(?\\s*", k, "\\s+in\\s*\\(([^)]*)\\)\\s*\\)?\\s*then\\s+",

@@ -178,13 +178,49 @@ test_that("a history dataset that fails to snapshot is recorded failed, and othe
   m <- make_master()
   writeLines("not sas", file.path(m$dir, "2023", "built_2023bad.sas7bdat"))
   out <- withr::local_tempdir()
-  res <- snapshot_master(m$cfg, out, which = "history")
+  res <- suppressMessages(suppressWarnings(
+    snapshot_master(m$cfg, out, which = "history"),
+    classes = "hvtiRdatabuild_snapshot_failed"
+  ))
   bad <- res[res$file == "built_2023bad.sas7bdat", ]
   good <- res[res$file == "built_2023jan.sas7bdat", ]
   expect_equal(bad$status, "failed")
   expect_equal(good$status, "written")
   expect_false(file.exists(file.path(out, "built_2023bad.parquet")))
   expect_false(file.exists(file.path(out, "built_2023bad.meta.json")))
+})
+
+test_that("a failed historical snapshot warns in quiet mode too, naming files only", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  for (quiet in c(FALSE, TRUE)) {
+    withr::local_options(hvti.quiet = quiet)
+    m <- make_master()
+    writeLines("not sas", file.path(m$dir, "2023", "built_2023bad.sas7bdat"))
+    w <- NULL
+    res <- withCallingHandlers(
+      suppressMessages(snapshot_master(m$cfg, withr::local_tempdir(), which = "history")),
+      hvtiRdatabuild_snapshot_failed = function(c) {
+        w <<- c
+        invokeRestart("muffleWarning")
+      }
+    )
+    expect_s3_class(w, "warning")
+    expect_match(conditionMessage(w), "built_2023bad.sas7bdat", fixed = TRUE)
+    expect_false(grepl("built_2023jan", conditionMessage(w), fixed = TRUE))
+    expect_equal(sum(res$status == "failed"), 1L)
+  }
+})
+
+test_that("a history run with no failure does not warn", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  expect_no_warning(suppressMessages(
+    snapshot_master(m$cfg, withr::local_tempdir(), which = "history")
+  ))
 })
 
 test_that("history lineage does not pick up the current build's log", {

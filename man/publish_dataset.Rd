@@ -7,10 +7,11 @@
 publish_dataset(
   draft,
   dataset_id,
-  datasets_dir,
+  dir,
   extract_date = Sys.Date(),
   source = NULL,
-  file_stem = dataset_id
+  file_stem = dataset_id,
+  datasets_dir
 )
 }
 \arguments{
@@ -19,7 +20,7 @@ publish_dataset(
 \item{dataset_id}{Character. Stable logical dataset identifier, using
 lower-case letters, digits, and underscores.}
 
-\item{datasets_dir}{Character. Existing directory that owns the published
+\item{dir}{Character. Existing directory that owns the published
 files and \code{dataset-catalog.yml}.}
 
 \item{extract_date}{A \code{Date} or \code{YYYY-MM-DD} string. Defaults to today.}
@@ -28,6 +29,8 @@ files and \code{dataset-catalog.yml}.}
 
 \item{file_stem}{Character. Safe basename stem for dated release files.
 Defaults to \code{dataset_id}.}
+
+\item{datasets_dir}{Deprecated; use \code{dir}.}
 }
 \value{
 Invisibly, a named list containing \code{release_id}, \code{sequence}, \code{file},
@@ -78,7 +81,7 @@ write.csv(
 release <- publish_dataset(
   draft,
   dataset_id = "example_cohort",
-  datasets_dir = published,
+  dir = published,
   extract_date = "2026-09-21",
   source = "Synthetic documentation example"
 )

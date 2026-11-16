@@ -4,7 +4,7 @@
 \alias{compare_built}
 \title{Compare an R-built dataset against a SAS oracle}
 \usage{
-compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
+compare_built(oracle, r, id_col, tolerance = 1e-08, id)
 }
 \arguments{
 \item{oracle}{Data frame read from the parquet oracle. See
@@ -12,13 +12,16 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
 
 \item{r}{Data frame produced by the R pipeline.}
 
-\item{id}{Name of the identifier column present in both. Must be unique
-within each.}
+\item{id_col}{Name of the identifier column present in both. Must be unique
+within each. Required: it has no default, because a study's identifier is
+not a package default.}
 
 \item{tolerance}{Numeric. \strong{Absolute} numeric differences at or below
 this are reported as \code{"within_tolerance"}. A single absolute threshold
 cannot serve columns of very different magnitude; see the "Coming from
 SAS" vignette for how to read \code{max_rel_diff} alongside it.}
+
+\item{id}{Deprecated; use \code{id_col}.}
 }
 \value{
 An object of class \code{built_comparison}: a data frame with one row per
@@ -49,7 +52,7 @@ BMI as underweight where R yields \code{NA}. Record such cases as
 \examples{
 o <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70))
 r <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 71))
-compare_built(o, r, id = "ccfidu")
+compare_built(o, r, id_col = "ccfidu")
 
 }
 \seealso{
