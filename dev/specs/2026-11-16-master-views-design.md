@@ -109,8 +109,53 @@ the generated view, the stale reasons) with two changes from #101:
   correction's value: retired automatically with a `bake` decision) and
   `filled_upstream_disagrees` (a different value: to the conflicts view).
 
-G2 (no self-acceptance, a named deciding role) is enforced at intake (§5.3). G3, G5 and G6
-remain registry design input and are out of scope here.
+G2 (no self-acceptance, a named deciding role) is enforced at the decision step (§3.4). G5
+gets an interim helper (§3.5). G3 and G6 remain registry design input and are out of scope
+here.
+
+### 3.4 Adding a correction as it is found
+
+Because the master is a view, **a correction is live on the next query once it is accepted.**
+Nothing is rebuilt or re-released. The path:
+
+1. **Found.** A statistical programmer, fellow or chart reviewer finds a wrong or missing
+   source value.
+2. **Submitted** in a fixed template (G4), one row per cell: source view, that view's full
+   key including the encounter date, column, `expected_prior` (with its missing flag),
+   `new_value` (with its missing flag), evidence type and reference, and who asserts it. A
+   row without the full key is refused here, not discovered later.
+3. **Validated.** `propose_corrections(file, dry_run = TRUE)` returns a verdict per row:
+   `appendable`, `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact` or
+   `derived_variable`. It prints verdicts and counts, never values.
+4. **Appended.** The same call with `dry_run = FALSE` appends the whole file to
+   `corrections` in one transaction, and refuses the whole file if any row fails. Proposed
+   corrections do not apply.
+5. **Decided.** `decide_corrections()` records `accept`, `reject`, `supersede` or `bake`
+   with decider, date and reason. The deciding role is named per master in `master.yml`, and
+   a decider who asserted the correction is refused (`self_accepted`, G2).
+6. **Live.** The next query of `<master>` applies it. A study that already froze keeps its
+   pull until it re-pulls, and its freeze record (§6) names the corrections watermark it saw.
+
+A model may help reshape a messy submission into the template, only on institutionally
+approved tooling because the sheet carries identifiers. The loader then validates every row;
+nothing a model writes reaches the table unvalidated.
+
+**These are interim write tools in a package that is otherwise a reader.** They contradict
+the 2026-11-05 decision only for as long as the registry has no intake of its own, and they
+ship **already marked as superseded by it**: their help says so, and the registry takes over
+the template and the tables unchanged. The existing single-cell `propose_correction()` and
+`decide_correction()` stay deprecated; the batch functions replace them for the interim.
+
+### 3.5 Study-side fixes travel up (G5, interim)
+
+A fix made in a study's code leaves the study out of step with the master and every other
+study. `study_correction_candidates()` compares a study's corrected analysis data with the
+master view at the study's `as_of`, on the cohort key, and writes each differing source-column
+cell as a row of the §3.4 template, with the study as evidence reference. It writes a file
+for a human to review and submit. It never appends, and it prints counts, never values.
+
+A difference in a derived column is listed separately, as a candidate derivation, not a
+correction (§3.2).
 
 ## 4. Ownership
 
@@ -121,7 +166,7 @@ remain registry design input and are out of scope here.
   `models/marts`. Data engineering deploys from it, and it moves into the registry later. A
   small deploy step turns each file into `CREATE OR ALTER VIEW`.
 - **hvtiRdatabuild:** the study build (§5, §6), the parity gate (§7), and the correction
-  intake validator (§5.3).
+  interim correction intake (§3.4, §3.5).
 
 ## 5. Study builds from the master views
 
@@ -219,6 +264,9 @@ A master whose gate has not passed is not offered to study builds.
 - **Correction resolution** keeps its R reference implementation in hvtiRdatabuild's
   testthat suite, checked against the generated SQL on the same synthetic cases, now
   including G1 conflicts and the two G7 fill-in outcomes.
+- **Correction intake:** every verdict on a synthetic template, whole-file refusal when one
+  row fails, `self_accepted`, and `study_correction_candidates()` separating source-column
+  candidates from derived-column ones.
 - **Study builds:** the cohort temp-table join, index `first` and `all`, the pre-epoch stage,
   and duplicate-match failure, on duckdb with synthetic data.
 - **Real data:** gated, shape and verdicts only, every failure message checked for what it
@@ -239,7 +287,7 @@ A master whose gate has not passed is not offered to study builds.
 
 ## 11. Out of scope
 
-- Corrections gaps G3, G5 and G6, which are registry design input.
+- Corrections gaps G3 and G6, which are registry design input.
 - Masters with no warehouse source (external systems, submission files, REDCap registries).
 - Whether to adopt dbt (a cost/benefit evaluation for the registry work), and the move to
   the registry's engine.
