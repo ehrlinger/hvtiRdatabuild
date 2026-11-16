@@ -13,7 +13,8 @@
 #' which is the failure this package exists to prevent.
 #'
 #' @param config A `study_config` from [read_study_config()].
-#' @param conn A [DBI::DBIConnection-class], typically from [dw_connect()].
+#' @param con A [DBI::DBIConnection-class], typically from [dw_connect()].
+#' @param conn Deprecated; use `con`.
 #'
 #' @return An object of class `pull_result`: a list with `tables`, a named
 #'   list of data frames keyed by each module's `output` name, and `manifest`,
@@ -29,7 +30,10 @@
 #' }
 #'
 #' @export
-dw_pull <- function(config, conn) {
+dw_pull <- function(config, con, conn) {
+  if (!missing(conn)) {
+    con <- .renamed_arg("dw_pull", "conn", "con", conn, !missing(con))
+  }
   if (!inherits(config, "study_config")) {
     stop("'config' must be a study_config from read_study_config().",
          call. = FALSE)
@@ -64,7 +68,7 @@ dw_pull <- function(config, conn) {
     sql  <- .module_sql(m, config)
 
     d <- tryCatch(
-      DBI::dbGetQuery(conn, sql),
+      DBI::dbGetQuery(con, sql),
       error = function(e) {
         # The SQL is withheld: it names warehouse objects, and an error
         # message is exactly the artefact that ends up pasted into a ticket.

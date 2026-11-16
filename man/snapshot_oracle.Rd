@@ -5,17 +5,19 @@
 \title{Freeze a SAS-built dataset as a checksummed parquet oracle}
 \usage{
 snapshot_oracle(
-  sas_path,
-  out_path,
+  path,
+  file,
   expect = NULL,
   manifest = NULL,
-  chunk_rows = NULL
+  chunk_rows = NULL,
+  sas_path,
+  out_path
 )
 }
 \arguments{
-\item{sas_path}{Path to the SAS dataset (\code{.sas7bdat}).}
+\item{path}{Path to the SAS dataset (\code{.sas7bdat}).}
 
-\item{out_path}{Path to write the parquet file. Must not already exist.}
+\item{file}{Path to write the parquet file. Must not already exist.}
 
 \item{expect}{Optional named list validating the conversion, with any of
 \code{n_rows}, \code{n_cols}, and \code{variables}. Supply values read from SAS-side
@@ -32,6 +34,10 @@ snapshotted. A chunk whose schema differs from the first chunk's is an
 error, and the partial file is removed. The chunked file reads back
 identical to an unchunked one, but its bytes and checksum differ, because
 its row groups differ.}
+
+\item{sas_path}{Deprecated; use \code{path}.}
+
+\item{out_path}{Deprecated; use \code{file}.}
 }
 \value{
 Invisibly, a list with elements \code{path}, \code{n_rows}, \code{n_cols},

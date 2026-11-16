@@ -14,7 +14,10 @@ write_analysis_set(name, cfg = hvtiRutilities::study_config())
 \value{
 The sidecar contents, invisibly: a list with \code{set}, \code{parent},
 \code{declaration_sha256}, \code{parquet_sha256}, \code{written}, \code{counts}, \code{n_cols},
-\code{attrition} and \code{packages}.
+\code{attrition}, \code{packages} and \code{provenance}. \code{written} is ISO 8601 UTC text
+(\code{"2026-11-16T19:40:00Z"}), which \code{as.POSIXct(written, tz = "UTC", format = "\%Y-\%m-\%dT\%H:\%M:\%SZ")} reads back. \code{provenance} is the hvtiR family's
+record: \code{package}, \code{version}, \code{sha}, \code{method}, \code{seed}, \code{rng_kind} and \code{time}
+(a \code{POSIXct} here, the same ISO text in the sidecar file).
 }
 \description{
 Cuts the analysis set \code{name}, declared under \verb{analysis_sets:} in the study's

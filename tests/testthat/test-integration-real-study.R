@@ -41,7 +41,7 @@ test_that("a real dataset compared against itself is wholly identical", {
   skip_if(anyDuplicated(d[[id]]) > 0,
           paste0("Identifier '", id, "' is not unique in this study."))
 
-  res <- compare_built(d, d, id = id)
+  res <- compare_built(d, d, id_col = id)
 
   # Report counts, never values, so a failure leaks nothing.
   offending <- sum(res$verdict != "identical")
@@ -63,7 +63,7 @@ test_that("real-study output carries no identifiers by default", {
   skip_if(anyDuplicated(d[[id]]) > 0, "Identifier is not unique.")
 
   half <- d[seq_len(max(1, floor(nrow(d) / 2))), , drop = FALSE]
-  res  <- compare_built(d, half, id = id)
+  res  <- compare_built(d, half, id_col = id)
   out  <- paste(capture.output(print(res)), collapse = "\n")
 
   dropped <- attr(res, "rows")$only_oracle
@@ -121,7 +121,7 @@ test_that("real-study output carries no identifiers by default", {
                   "self-compare on a single key."))
     }
 
-    res <- compare_built(d, d, id = id)
+    res <- compare_built(d, d, id_col = id)
     offending <- sum(res$verdict != "identical")
     assign(stem, "compared", envir = .pull_module_log)
 
@@ -160,7 +160,7 @@ test_that("row-set drift is reported apart from value differences", {
 
   # Simulate the live-warehouse case: the R side has rows the oracle lacks.
   fewer <- d[seq_len(nrow(d) - 2L), , drop = FALSE]
-  res   <- compare_built(fewer, d, id = id)
+  res   <- compare_built(fewer, d, id_col = id)
 
   # Every shared row still matches on value; the difference is row-set only.
   expect_equal(sum(res$verdict != "identical"), 0L)

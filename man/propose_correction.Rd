@@ -8,7 +8,7 @@ propose_correction(
   config,
   con,
   key_values,
-  variable,
+  var_col,
   expected_prior,
   new_value,
   evidence_type,
@@ -16,7 +16,8 @@ propose_correction(
   asserted_by,
   alt_key = NULL,
   dry_run = FALSE,
-  dialect = "mssql"
+  dialect = "mssql",
+  variable
 )
 }
 \arguments{
@@ -27,7 +28,7 @@ propose_correction(
 \item{key_values}{A named list of key values identifying the record: the
 primary key by default, or \code{alt_key}'s columns when \code{alt_key} is given.}
 
-\item{variable}{Character. The column to correct; must not be a key or
+\item{var_col}{Character. The column to correct; must not be a key or
 alternate-key column.}
 
 \item{expected_prior}{The value the record is expected to currently hold,
@@ -50,6 +51,8 @@ primary key.}
 The default, \code{FALSE}, writes it.}
 
 \item{dialect}{\code{"mssql"} or \code{"duckdb"}.}
+
+\item{variable}{Deprecated; use \code{var_col}.}
 }
 \value{
 Invisibly, a list with \code{verdict} (\code{"appended"}, or \code{"validated"} on
@@ -113,7 +116,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   con <- DBI::dbConnect(duckdb::duckdb())
   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
-  propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+  propose_correction(cfg, con, key_values = list(id = "K1"), var_col = "age",
                      expected_prior = 60, new_value = 61, evidence_type = "chart_review",
                      evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
   DBI::dbDisconnect(con, shutdown = TRUE)

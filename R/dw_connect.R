@@ -74,16 +74,16 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
     tryCatch(
       do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
       error = function(e) {
-        stop("dw_connect(): Could not connect to the warehouse. The driver reported a ",
-             "failure; the connection string is not shown because it may ",
-             "carry a credential. Check the DSN, server, and database.",
-             if (isTRUE(encrypt) && !isTRUE(trust_certificate)) paste0(
-               " The server's TLS certificate was checked against this machine's CA ",
-               "chain. If the certificate does not verify, install the institutional CA ",
-               "chain (ask the server's administrator). `trust_certificate = TRUE` connects ",
-               "without checking it, as a stop-gap only: it accepts any server's certificate."
-             ),
-             call. = FALSE)
+        .abort("connection_failed",
+               "dw_connect(): Could not connect to the warehouse. The driver reported a ",
+               "failure; the connection string is not shown because it may ",
+               "carry a credential. Check the DSN, server, and database.",
+               if (isTRUE(encrypt) && !isTRUE(trust_certificate)) paste0(
+                 " The server's TLS certificate was checked against this machine's CA ",
+                 "chain. If the certificate does not verify, install the institutional CA ",
+                 "chain (ask the server's administrator). `trust_certificate = TRUE` connects ",
+                 "without checking it, as a stop-gap only: it accepts any server's certificate."
+               ))
       }
     ),
     warning = function(w) {

@@ -187,7 +187,7 @@ str.derive_result <- function(object, ...) {
             call. = FALSE)
   }
   if (diagnostics$message) {
-    message("Study derivation callback message(s) occurred; details suppressed.")
+    .hvti_inform("Study derivation callback message(s) occurred; details suppressed.")
   }
 }
 

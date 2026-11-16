@@ -147,7 +147,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
   types <- run_step("read column types", table_types(con, base))
 
   parsed <- parse_legacy_facts(readLines(config[["build_program"]], warn = FALSE),
-    key_var = config[["key"]][[1]]
+    key_col = config[["key"]][[1]]
   )
   alt_cols <- intersect(unique(unlist(config[["alt_keys"]], use.names = FALSE)), names(types))
   base_keys <- run_step("read base keys", DBI::dbGetQuery(con, sprintf(
@@ -159,24 +159,24 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
     basename(config[["build_program"]])
   )
   n_res <- NROW(rows$corrections)
-  message(
+  .hvti_inform(
     "legacy: ", nrow(parsed$facts), " facts parsed; ", n_res, " resolved; ",
     nrow(rows$unresolved), " unresolved"
   )
   if (nrow(rows$unresolved)) {
     tab <- table(rows$unresolved$reason)
-    message("  unresolved by reason: ", paste(names(tab), tab, sep = " ", collapse = ", "))
-    message("  at lines: ", paste(sort(unique(rows$unresolved$line)), collapse = ", "))
+    .hvti_inform("  unresolved by reason: ", paste(names(tab), tab, sep = " ", collapse = ", "))
+    .hvti_inform("  at lines: ", paste(sort(unique(rows$unresolved$line)), collapse = ", "))
   }
   if (length(parsed$unparsed)) {
-    message("  unparsed statements at lines: ", paste(parsed$unparsed, collapse = ", "))
+    .hvti_inform("  unparsed statements at lines: ", paste(parsed$unparsed, collapse = ", "))
   }
   out <- list(
     dry_run = dry_run, facts = nrow(parsed$facts), resolved = n_res,
     unresolved = nrow(rows$unresolved), appended = 0L, stale = NA_integer_
   )
   if (dry_run) {
-    message("dry run: nothing written")
+    .hvti_inform("dry run: nothing written")
     return(invisible(out))
   }
 
@@ -208,7 +208,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
     "SELECT COUNT(*) AS n FROM %s",
     q(tabs$stale)
   )))$n)
-  message("recorded ", out$appended, "; ", out$stale, " stale corrections")
+  .hvti_inform("recorded ", out$appended, "; ", out$stale, " stale corrections")
   invisible(out)
 }
 
@@ -245,7 +245,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' @param con A DBI connection.
 #' @param key_values A named list of key values identifying the record: the
 #'   primary key by default, or `alt_key`'s columns when `alt_key` is given.
-#' @param variable Character. The column to correct; must not be a key or
+#' @param var_col Character. The column to correct; must not be a key or
 #'   alternate-key column.
 #' @param expected_prior The value the record is expected to currently hold,
 #'   or `NA` when it is expected to be missing.
@@ -260,6 +260,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' @param dry_run If `TRUE`, validate and return the row without writing it.
 #'   The default, `FALSE`, writes it.
 #' @param dialect `"mssql"` or `"duckdb"`.
+#' @param variable Deprecated; use `var_col`.
 #'
 #' @return Invisibly, a list with `verdict` (`"appended"`, or `"validated"` on
 #'   a dry run), `correction_id`, `new_variable` (whether this is the first
@@ -295,7 +296,7 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
 #'   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
-#'   propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+#'   propose_correction(cfg, con, key_values = list(id = "K1"), var_col = "age",
 #'                      expected_prior = 60, new_value = 61, evidence_type = "chart_review",
 #'                      evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
@@ -303,10 +304,15 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
 #' }
 #'
 #' @export
-propose_correction <- function(config, con, key_values, variable, expected_prior, new_value,
+propose_correction <- function(config, con, key_values, var_col, expected_prior, new_value,
                                evidence_type, evidence_ref, asserted_by, alt_key = NULL,
-                               dry_run = FALSE, dialect = "mssql") {
+                               dry_run = FALSE, dialect = "mssql", variable) {
   .deprecate_correction_api("propose_correction")
+  if (!missing(variable)) {
+    var_col <- .renamed_arg("propose_correction", "variable", "var_col", variable,
+                            !missing(var_col))
+  }
+  variable <- var_col
   if (!requireNamespace("digest", quietly = TRUE)) {
     stop("Package 'digest' is required.", call. = FALSE)
   }
@@ -442,14 +448,14 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 
   new_variable <- as.integer(seen) == 0L
   if (dry_run) {
-    message("Correction ", id, " validated; nothing written.")
+    .hvti_inform("Correction ", id, " validated; nothing written.")
     return(invisible(list(
       verdict = "validated", correction_id = id,
       new_variable = new_variable, row = row
     )))
   }
   run_step("append correction", DBI::dbAppendTable(con, tabs$corrections, row))
-  message(
+  .hvti_inform(
     "Correction ", id, " appended.",
     if (new_variable) " First correction to this variable: regenerate the view."
   )
@@ -517,7 +523,7 @@ propose_correction <- function(config, con, key_values, variable, expected_prior
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
 #'   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
-#'   prop <- propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+#'   prop <- propose_correction(cfg, con, key_values = list(id = "K1"), var_col = "age",
 #'                              expected_prior = 60, new_value = 61,
 #'                              evidence_type = "chart_review", evidence_ref = "invented",
 #'                              asserted_by = "tester", dialect = "duckdb")
@@ -569,11 +575,11 @@ decide_correction <- function(config, con, correction_id, decision, decided_by,
     stringsAsFactors = FALSE
   )
   if (dry_run) {
-    message("Decision ", did, " (", decision, ") validated; nothing written.")
+    .hvti_inform("Decision ", did, " (", decision, ") validated; nothing written.")
     return(invisible(list(verdict = "validated", decision_id = did, row = row)))
   }
   run_step("append decision", DBI::dbAppendTable(con, tabs$decisions, row))
-  message("Decision ", did, " (", decision, ") recorded on ", correction_id, ".")
+  .hvti_inform("Decision ", did, " (", decision, ") recorded on ", correction_id, ".")
   invisible(list(verdict = "recorded", decision_id = did, row = row))
 }
 

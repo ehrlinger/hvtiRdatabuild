@@ -14,7 +14,7 @@ test_that("parse_legacy_facts reads inline if/then fixes, and flags what it cann
            "if age < 0 then age = .;",                      # 12 a rule, not a fact
            "run;")                                          # 13
 
-  p <- parse_legacy_facts(sas)
+  p <- parse_legacy_facts(sas, key_col = "ccfid")
   f <- p$facts
   expect_true(nrow(f) == 6L, label = "six facts parsed")
   expect_true(identical(p$unparsed, 10L),
@@ -38,7 +38,7 @@ test_that("parse_legacy_facts distinguishes a key-if's else from an unrelated ru
     "if age > 1 then x = 1;",                      # 3  a rule with no key: no fact
     "else if ccfid = 2002 then age = 71;",         # 4  else mentions the key: unparsed
     "if ccfid = 2003 then note = 'a;b';"           # 5  fact; ';' inside quotes
-  ))
+  ), key_col = "ccfid")
   f2 <- p2$facts
   expect_true("2001" %in% f2$key_value, label = "the 2001 fact parses")
   expect_true(2L %in% p2$unparsed, label = "line 2 is unparsed (else after a key-if)")
@@ -59,7 +59,7 @@ test_that("legacy_rows resolves facts to corrections, baked, with no known prior
            "  dt_dis = '15JAN2020'd;",
            "end;",
            "if ccfid in (1004, 1005) then age = 70;")
-  f <- parse_legacy_facts(sas)$facts
+  f <- parse_legacy_facts(sas, key_col = "ccfid")$facts
 
   base_keys <- data.frame(
     ccfid = c(1001, 1002, 1003, 1004, 1004),

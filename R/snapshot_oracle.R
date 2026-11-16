@@ -16,8 +16,8 @@
 #'
 #' Writing the sidecar needs \pkg{jsonlite}.
 #'
-#' @param sas_path Path to the SAS dataset (`.sas7bdat`).
-#' @param out_path Path to write the parquet file. Must not already exist.
+#' @param path Path to the SAS dataset (`.sas7bdat`).
+#' @param file Path to write the parquet file. Must not already exist.
 #' @param expect Optional named list validating the conversion, with any of
 #'   `n_rows`, `n_cols`, and `variables`. Supply values read from SAS-side
 #'   `PROC CONTENTS`. A mismatch is an error.
@@ -31,6 +31,8 @@
 #'   error, and the partial file is removed. The chunked file reads back
 #'   identical to an unchunked one, but its bytes and checksum differ, because
 #'   its row groups differ.
+#' @param sas_path Deprecated; use `path`.
+#' @param out_path Deprecated; use `file`.
 #'
 #' @return Invisibly, a list with elements `path`, `n_rows`, `n_cols`,
 #'   `variables`, `sha256` (of the parquet file), `source_sha256` (of the SAS
@@ -51,8 +53,16 @@
 #' }
 #'
 #' @export
-snapshot_oracle <- function(sas_path, out_path, expect = NULL,
-                            manifest = NULL, chunk_rows = NULL) {
+snapshot_oracle <- function(path, file, expect = NULL,
+                            manifest = NULL, chunk_rows = NULL, sas_path, out_path) {
+  if (!missing(sas_path)) {
+    path <- .renamed_arg("snapshot_oracle", "sas_path", "path", sas_path, !missing(path))
+  }
+  if (!missing(out_path)) {
+    file <- .renamed_arg("snapshot_oracle", "out_path", "file", out_path, !missing(file))
+  }
+  sas_path <- path
+  out_path <- file
   if (!requireNamespace("arrow", quietly = TRUE)) {
     stop("Package 'arrow' is required to write oracle snapshots. ",
          "Install it with install.packages('arrow').", call. = FALSE)

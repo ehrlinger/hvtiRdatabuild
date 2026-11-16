@@ -6,19 +6,25 @@
 \usage{
 freeze_study_pull(
   pull,
-  study_config,
-  datasets_dir,
+  path,
+  dir,
   dataset_id,
-  extract_date = Sys.Date()
+  extract_date = Sys.Date(),
+  study_config,
+  datasets_dir
 )
 }
 \arguments{
 \item{pull}{A \code{master_pull} from \code{\link[=pull_master]{pull_master()}}.}
 
-\item{study_config}{Character. Path to the study configuration file given to
+\item{path}{Character. Path to the study configuration file given to
 \code{\link[=pull_master]{pull_master()}}; it must be unchanged since the pull.}
 
-\item{datasets_dir, dataset_id, extract_date}{As for \code{\link[=publish_dataset]{publish_dataset()}}.}
+\item{dir, dataset_id, extract_date}{As for \code{\link[=publish_dataset]{publish_dataset()}}.}
+
+\item{study_config}{Deprecated; use \code{path}.}
+
+\item{datasets_dir}{Deprecated; use \code{dir}.}
 }
 \value{
 Invisibly, the release, as returned by \code{\link[=publish_dataset]{publish_dataset()}}.
@@ -62,7 +68,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   config <- tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+  pull <- pull_master(con, "master_demo", q, var_cols = "age", path = config,
                       dialect = "duckdb")
   published <- tempfile("published-")
   dir.create(published)

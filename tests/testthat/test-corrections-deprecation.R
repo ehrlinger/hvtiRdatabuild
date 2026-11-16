@@ -2,7 +2,7 @@ deprecated_calls <- list(
   backfill_corrections = function() backfill_corrections(config = NULL, con = NULL),
   propose_correction = function() {
     propose_correction(
-      config = NULL, con = NULL, key_values = list(), variable = "x",
+      config = NULL, con = NULL, key_values = list(), var_col = "x",
       expected_prior = NA, new_value = 1, evidence_type = "chart_review",
       evidence_ref = "invented", asserted_by = "tester"
     )

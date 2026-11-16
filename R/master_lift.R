@@ -88,17 +88,17 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   base <- .base_table_name(config, parquet, meta$parquet_sha256)
 
   kv <- key_verdict(parquet, config[["key"]])
-  message(format_key_verdict(kv))
+  .hvti_inform(format_key_verdict(kv))
   if (kv$verdict != "unique") {
-    stop("The primary key is not unique in the snapshot; nothing was created.",
-         call. = FALSE)
+    .abort("key_not_unique",
+           "lift_master(): The primary key is not unique in the snapshot; nothing was created.")
   }
 
   ddl <- master_ddl(parquet, base)
   ddl_path <- paste0(parquet, ".ddl.sql")
   if (dry_run) {
     writeLines(ddl$sql, ddl_path)
-    message("dry run: DDL for ", base, " written to ", ddl_path)
+    .hvti_inform("dry run: DDL for ", base, " written to ", ddl_path)
     return(invisible(list(dry_run = TRUE, base_table = base, ddl_path = ddl_path,
                           verdict = NA_character_)))
   }
@@ -125,20 +125,20 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   }
   r <- run_step("load", load_parquet(con, parquet, base,
                                      sha256 = as.character(meta$parquet_sha256)))
-  message("load: ", r$loaded, " row groups loaded, ", r$skipped, " already present")
+  .hvti_inform("load: ", r$loaded, " row groups loaded, ", r$skipped, " already present")
 
   res <- run_step("parity check", parity_check(con, base, parquet, config[["key"]],
                                                dialect = dialect))
-  message(parity_summary(res))
+  .hvti_inform(parity_summary(res))
   full <- if (res$verdict == "pass") {
     run_step("full parity check", parity_full(con, base, parquet, config[["key"]],
                                               dialect = dialect))
   } else {
     NULL
   }
-  if (!is.null(full)) message(full_summary(full))
+  if (!is.null(full)) .hvti_inform(full_summary(full))
   if (res$verdict != "pass" || any(full$verdict != "match")) {
-    stop("Parity failed; the view was not created.", call. = FALSE)
+    .abort("parity_failed", "lift_master(): Parity failed; the view was not created.")
   }
 
   parity_row <- data.frame(base_table = base, parquet_sha256 = as.character(meta$parquet_sha256),
@@ -150,7 +150,7 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   run_step("write metadata", DBI::dbWriteTable(con, tabs$meta, as.data.frame(meta$columns),
                                                overwrite = TRUE))
   .publish_views(config, con, base, dialect)
-  message("view ", config[["name"]], " -> ", base)
+  .hvti_inform("view ", config[["name"]], " -> ", base)
   invisible(list(dry_run = FALSE, base_table = base, ddl_path = NA_character_,
                  verdict = "pass"))
 }
@@ -197,9 +197,9 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
   }
   src <- file.path(config[["snapshots"]], config[["current"]])
   if (file.exists(src) && !identical(.file_sha256(src), as.character(meta$source_sha256))) {
-    stop("lift_master(): the snapshot is stale; ", config[["current"]], " has been rebuilt ",
-         "since it was taken. Re-run snapshot_master() and lift the new snapshot.",
-         call. = FALSE)
+    .abort("stale_snapshot",
+           "lift_master(): the snapshot is stale; ", config[["current"]], " has been rebuilt ",
+           "since it was taken. Re-run snapshot_master() and lift the new snapshot.")
   }
   invisible(NULL)
 }

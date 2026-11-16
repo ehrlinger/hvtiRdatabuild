@@ -87,7 +87,7 @@ test_that("a proposal found by alternate key is stored against the primary key",
   suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
-    key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
+    key_values = list(emrn = "E3"), alt_key = "epic", var_col = "age",
     expected_prior = 70, new_value = 71, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ))
@@ -106,7 +106,7 @@ test_that("a primary-key proposal also carries the base row's alternate-key colu
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K3", dt_surg = as.Date("2020-01-03")),
-    variable = "age", expected_prior = 70, new_value = 72, evidence_type = "chart_review",
+    var_col = "age", expected_prior = 70, new_value = 72, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ))
   row <- DBI::dbGetQuery(f$con, sprintf(
@@ -121,13 +121,13 @@ test_that("a primary-key proposal must name exactly the key columns, each one va
   suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
-    key_values = list(ccfid = "K1"), variable = "age", expected_prior = 65.5, new_value = 66,
+    key_values = list(ccfid = "K1"), var_col = "age", expected_prior = 65.5, new_value = 66,
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "primary key columns")
   expect_error(propose_correction(
     f$cfg, f$con,
-    key_values = list(ccfid = "K1", dt_surg = NA), variable = "age", expected_prior = 65.5,
+    key_values = list(ccfid = "K1", dt_surg = NA), var_col = "age", expected_prior = 65.5,
     new_value = 66, evidence_type = "chart_review", evidence_ref = "invented",
     asserted_by = "tester", dialect = "duckdb"
   ), "primary key columns")
@@ -140,7 +140,7 @@ test_that("an alternate-key column cannot be corrected through the primary-key p
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "emrn", expected_prior = "E1", new_value = "E9",
+    var_col = "emrn", expected_prior = "E1", new_value = "E9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "key column")
@@ -157,7 +157,7 @@ test_that("a failing warehouse call during propose is reported by step, without 
   msg <- tryCatch(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "age", expected_prior = 65.5, new_value = 66, evidence_type = "chart_review",
+    var_col = "age", expected_prior = 65.5, new_value = 66, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ), error = conditionMessage)
   expect_match(msg, "Step 'read column types' failed")
@@ -171,7 +171,7 @@ test_that("a failing warehouse call during decide is reported by step, without a
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "S9",
+    var_col = "surgeon", expected_prior = "S1", new_value = "S9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ))
@@ -194,7 +194,7 @@ test_that("an alternate key with a null part or no match stops without a value",
   msg <- tryCatch(
     propose_correction(
       f$cfg, f$con,
-      key_values = list(emrn = "E404"), alt_key = "epic", variable = "age",
+      key_values = list(emrn = "E404"), alt_key = "epic", var_col = "age",
       expected_prior = 70, new_value = 71, evidence_type = "chart_review",
       evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
     ),
@@ -204,7 +204,7 @@ test_that("an alternate key with a null part or no match stops without a value",
   expect_false(grepl("E404", msg))
   expect_error(propose_correction(
     f$cfg, f$con,
-    key_values = list(emrn = NA), alt_key = "epic", variable = "age",
+    key_values = list(emrn = NA), alt_key = "epic", var_col = "age",
     expected_prior = 70, new_value = 71, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ), "null")
@@ -218,7 +218,7 @@ test_that("writer dry runs return the row and leave both tables unchanged", {
   r <- propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K3", dt_surg = as.Date("2020-01-03")),
-    variable = "age", expected_prior = 70, new_value = 71, evidence_type = "chart_review",
+    var_col = "age", expected_prior = 70, new_value = 71, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dry_run = TRUE, dialect = "duckdb"
   )
   expect_equal(r$verdict, "validated")
@@ -248,7 +248,7 @@ test_that("a valid correction is appended, flags the first correction, stores th
         ccfid = "K1",
         dt_surg = as.Date("2020-01-01")
       ),
-      variable = "surgeon", expected_prior = "S1", new_value = "S9",
+      var_col = "surgeon", expected_prior = "S1", new_value = "S9",
       evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
       dialect = "duckdb"
     ), list(...))
@@ -281,7 +281,7 @@ test_that("a missing prior is flagged in the verdict and stored with the flag", 
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
-    variable = "age", expected_prior = NA, new_value = 71, evidence_type = "chart_review",
+    var_col = "age", expected_prior = NA, new_value = 71, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ))
   expect_equal(r$verdict, "appended")
@@ -303,7 +303,7 @@ test_that("a colliding correction id is refused", {
   args <- list(
     config = f$cfg, con = f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "S9",
+    var_col = "surgeon", expected_prior = "S1", new_value = "S9",
     evidence_type = "chart_review", evidence_ref = "invented",
     asserted_by = "tester", dialect = "duckdb"
   )
@@ -318,7 +318,7 @@ test_that("an unknown variable is an error", {
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "height", expected_prior = 1, new_value = 2, evidence_type = "chart_review",
+    var_col = "height", expected_prior = 1, new_value = 2, evidence_type = "chart_review",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ), "metadata")
 })
@@ -330,7 +330,7 @@ test_that("a key column cannot be corrected through this path", {
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "ccfid", expected_prior = "K1", new_value = "K9",
+    var_col = "ccfid", expected_prior = "K1", new_value = "K9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "key column")
@@ -343,7 +343,7 @@ test_that("an unknown evidence type is an error", {
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "age", expected_prior = 65.5, new_value = 66, evidence_type = "hunch",
+    var_col = "age", expected_prior = 65.5, new_value = 66, evidence_type = "hunch",
     evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
   ), "evidence")
 })
@@ -356,7 +356,7 @@ test_that("a primary key matching 0 rows is an error, with no value in the messa
     propose_correction(
       f$cfg, f$con,
       key_values = list(ccfid = "K9", dt_surg = as.Date("2020-01-01")),
-      variable = "age", expected_prior = 1, new_value = 2, evidence_type = "chart_review",
+      var_col = "age", expected_prior = 1, new_value = 2, evidence_type = "chart_review",
       evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb"
     ),
     error = conditionMessage
@@ -372,7 +372,7 @@ test_that("a value that does not cast is an error", {
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "age", expected_prior = 65.5, new_value = "abc",
+    var_col = "age", expected_prior = 65.5, new_value = "abc",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "does not cast")
@@ -385,7 +385,7 @@ test_that("a factor value is refused", {
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "age", expected_prior = 65.5, new_value = factor("66"),
+    var_col = "age", expected_prior = 65.5, new_value = factor("66"),
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "does not cast")
@@ -402,7 +402,7 @@ test_that("an over-width value is rejected, and a factor still fails the cast ch
   msg_wide <- tryCatch(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "way too long",
+    var_col = "surgeon", expected_prior = "S1", new_value = "way too long",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), error = conditionMessage)
@@ -411,7 +411,7 @@ test_that("an over-width value is rejected, and a factor still fails the cast ch
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = factor("x"),
+    var_col = "surgeon", expected_prior = "S1", new_value = factor("x"),
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ), "does not cast")
@@ -424,7 +424,7 @@ test_that("no widths means no width check", {
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "a very long surgeon name indeed",
+    var_col = "surgeon", expected_prior = "S1", new_value = "a very long surgeon name indeed",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ))
@@ -438,7 +438,7 @@ test_that("a decision is recorded", {
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "S9",
+    var_col = "surgeon", expected_prior = "S1", new_value = "S9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ))
@@ -455,7 +455,7 @@ test_that("an unknown decision is an error", {
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
-    variable = "surgeon", expected_prior = "S1", new_value = "S9",
+    var_col = "surgeon", expected_prior = "S1", new_value = "S9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dialect = "duckdb"
   ))

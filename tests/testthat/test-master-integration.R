@@ -67,7 +67,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   dry <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
-    variable = "age", expected_prior = 1 / 3, new_value = 2 / 3,
+    var_col = "age", expected_prior = 1 / 3, new_value = 2 / 3,
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester",
     dry_run = TRUE
   ))
@@ -80,7 +80,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   r <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
-    variable = "age", expected_prior = 1 / 3, new_value = 2 / 3,
+    var_col = "age", expected_prior = 1 / 3, new_value = 2 / 3,
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester"
   ))
   suppressMessages(decide_correction(cfg, con, r$correction_id, "accept", "tester"))
@@ -92,7 +92,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   alt <- suppressMessages(propose_correction(
     cfg, con,
     key_values = list(emrn = "E1"), alt_key = "epic",
-    variable = "surgeon", expected_prior = "s1", new_value = "s9",
+    var_col = "surgeon", expected_prior = "s1", new_value = "s9",
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester"
   ))
   row <- DBI::dbGetQuery(con, sprintf(

@@ -427,13 +427,13 @@
   if (identical(release$status, "withdrawn")) {
     # Republishing withdrawn bytes would otherwise hand back the withdrawn
     # record, and a caller undoing a mistaken withdrawal would think it worked.
-    stop("publish_dataset(): these bytes are the withdrawn release ", release$release_id,
-         " (", request$dataset_id, ", extract date ", request$extract_date, "). ",
-         "Nothing was published. Reinstating a withdrawn release is a separate, ",
-         "deliberate act: set its `status` back to `published` and remove its withdrawal ",
-         "fields in ", basename(.publication_catalog_path(request$datasets_dir)),
-         " as a reviewed change. To publish corrected data, publish different bytes.",
-         call. = FALSE)
+    .abort("withdrawn_release",
+           "publish_dataset(): these bytes are the withdrawn release ", release$release_id,
+           " (", request$dataset_id, ", extract date ", request$extract_date, "). ",
+           "Nothing was published. Reinstating a withdrawn release is a separate, ",
+           "deliberate act: set its `status` back to `published` and remove its withdrawal ",
+           "fields in ", basename(.publication_catalog_path(request$datasets_dir)),
+           " as a reviewed change. To publish corrected data, publish different bytes.")
   }
   path <- file.path(request$datasets_dir, release$file)
   if (!file.exists(path)) {
@@ -517,12 +517,13 @@
 #' @param draft Character. Path to a mutable draft dataset.
 #' @param dataset_id Character. Stable logical dataset identifier, using
 #'   lower-case letters, digits, and underscores.
-#' @param datasets_dir Character. Existing directory that owns the published
+#' @param dir Character. Existing directory that owns the published
 #'   files and `dataset-catalog.yml`.
 #' @param extract_date A `Date` or `YYYY-MM-DD` string. Defaults to today.
 #' @param source Optional character string recording publisher provenance.
 #' @param file_stem Character. Safe basename stem for dated release files.
 #'   Defaults to `dataset_id`.
+#' @param datasets_dir Deprecated; use `dir`.
 #'
 #' @return Invisibly, a named list containing `release_id`, `sequence`, `file`,
 #'   `extract_date`, `revision`, `published_at`, `sha256`, `n_rows`, `n_cols`,
@@ -540,7 +541,7 @@
 #' release <- publish_dataset(
 #'   draft,
 #'   dataset_id = "example_cohort",
-#'   datasets_dir = published,
+#'   dir = published,
 #'   extract_date = "2026-09-21",
 #'   source = "Synthetic documentation example"
 #' )
@@ -548,9 +549,13 @@
 #' unlink(c(draft, published), recursive = TRUE)
 #'
 #' @export
-publish_dataset <- function(draft, dataset_id, datasets_dir,
+publish_dataset <- function(draft, dataset_id, dir,
                             extract_date = Sys.Date(), source = NULL,
-                            file_stem = dataset_id) {
+                            file_stem = dataset_id, datasets_dir) {
+  if (!missing(datasets_dir)) {
+    dir <- .renamed_arg("publish_dataset", "datasets_dir", "dir", datasets_dir, !missing(dir))
+  }
+  datasets_dir <- dir
   request <- .publication_validate_request(
     draft,
     dataset_id,
@@ -621,11 +626,12 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
 #'
 #' @param dataset_id Character. Stable logical dataset identifier.
 #' @param release_id Character. Exact release identifier to withdraw.
-#' @param datasets_dir Character. Existing directory that owns the published
+#' @param dir Character. Existing directory that owns the published
 #'   files and `dataset-catalog.yml`.
 #' @param reason Character. Non-empty reason for withdrawal.
 #' @param replacement_release_id Optional character release identifier from the
 #'   same logical dataset.
+#' @param datasets_dir Deprecated; use `dir`.
 #'
 #' @return Invisibly, the release record with `status = "withdrawn"`,
 #'   `withdrawal_reason`, and `replacement_release_id` when supplied.
@@ -653,8 +659,13 @@ publish_dataset <- function(draft, dataset_id, datasets_dir,
 #' unlink(c(draft, published), recursive = TRUE)
 #'
 #' @export
-withdraw_dataset_release <- function(dataset_id, release_id, datasets_dir,
-                                     reason, replacement_release_id = NULL) {
+withdraw_dataset_release <- function(dataset_id, release_id, dir,
+                                     reason, replacement_release_id = NULL, datasets_dir) {
+  if (!missing(datasets_dir)) {
+    dir <- .renamed_arg("withdraw_dataset_release", "datasets_dir", "dir", datasets_dir,
+                        !missing(dir))
+  }
+  datasets_dir <- dir
   if (!is.character(dataset_id) || length(dataset_id) != 1L ||
         is.na(dataset_id) || !grepl("^[a-z][a-z0-9_]*$", dataset_id)) {
     stop("`dataset_id` is invalid.", call. = FALSE)

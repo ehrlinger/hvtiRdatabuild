@@ -6,16 +6,17 @@
 \usage{
 snapshot_master(
   config,
-  out_dir,
+  dir,
   which = c("current", "history"),
   chunk_rows = 1e+05,
-  expect = NULL
+  expect = NULL,
+  out_dir
 )
 }
 \arguments{
 \item{config}{A \code{master_config} from \code{\link[=read_master_config]{read_master_config()}}.}
 
-\item{out_dir}{Directory to write the parquet snapshots and their sidecars.}
+\item{dir}{Directory to write the parquet snapshots and their sidecars.}
 
 \item{which}{\code{"current"}, \code{"history"}, or both.}
 
@@ -23,7 +24,9 @@ snapshot_master(
 
 \item{expect}{Optional validation for the current build, passed to
 \code{\link[=snapshot_oracle]{snapshot_oracle()}}. Historical builds are not validated, because their
-logs are rarely retained.
+logs are rarely retained.}
+
+\item{out_dir}{Deprecated; use \code{dir}.
 
 A snapshot that already exists is skipped only when its sidecar is complete
 and, for the current build, records the source's current checksum. The

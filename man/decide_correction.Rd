@@ -80,7 +80,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   con <- DBI::dbConnect(duckdb::duckdb())
   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
-  prop <- propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+  prop <- propose_correction(cfg, con, key_values = list(id = "K1"), var_col = "age",
                              expected_prior = 60, new_value = 61,
                              evidence_type = "chart_review", evidence_ref = "invented",
                              asserted_by = "tester", dialect = "duckdb")

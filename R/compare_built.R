@@ -17,12 +17,14 @@
 #' @param oracle Data frame read from the parquet oracle. See
 #'   [snapshot_oracle()].
 #' @param r Data frame produced by the R pipeline.
-#' @param id Name of the identifier column present in both. Must be unique
-#'   within each.
+#' @param id_col Name of the identifier column present in both. Must be unique
+#'   within each. Required: it has no default, because a study's identifier is
+#'   not a package default.
 #' @param tolerance Numeric. **Absolute** numeric differences at or below
 #'   this are reported as `"within_tolerance"`. A single absolute threshold
 #'   cannot serve columns of very different magnitude; see the "Coming from
 #'   SAS" vignette for how to read `max_rel_diff` alongside it.
+#' @param id Deprecated; use `id_col`.
 #'
 #' @return An object of class `built_comparison`: a data frame with one row per
 #'   variable and columns `variable`, `n_common`, `verdict`, `n_differ`,
@@ -38,10 +40,16 @@
 #' @examples
 #' o <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70))
 #' r <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 71))
-#' compare_built(o, r, id = "ccfidu")
+#' compare_built(o, r, id_col = "ccfidu")
 #'
 #' @export
-compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
+compare_built <- function(oracle, r, id_col, tolerance = 1e-8, id) {
+  if (!missing(id)) {
+    id_col <- .renamed_arg("compare_built", "id", "id_col", id, !missing(id_col))
+  } else if (missing(id_col)) {
+    id_col <- .deprecated_default("compare_built", "id_col", "ccfidu")
+  }
+  id <- id_col
   oracle <- as.data.frame(oracle)
   r      <- as.data.frame(r)
 

@@ -213,10 +213,10 @@ load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_
   log <- DBI::dbGetQuery(con, paste("SELECT * FROM", DBI::dbQuoteIdentifier(con, log_table)))
   if (nrow(log) && (!"parquet_sha256" %in% names(log) ||
                       any(is.na(log$parquet_sha256) | log$parquet_sha256 != sha256))) {
-    stop("lift_master(): target table ", table, " holds row groups loaded from a ",
-         "different parquet (or from a load log that records none); drop it and its ",
-         "load log before loading.",
-         call. = FALSE)
+    .abort("load_log_mismatch",
+           "lift_master(): target table ", table, " holds row groups loaded from a ",
+           "different parquet (or from a load log that records none); drop it and its ",
+           "load log before loading.")
   }
   done <- log$row_group
 
@@ -365,7 +365,7 @@ parity_check <- function(con, table, parquet, key, sample_n = 1000L, seed = 1L,
   make_id <- function(d) do.call(paste, c(lapply(d[key], as.character), sep = "\r"))
   pq_rows$.parity_key <- make_id(pq_rows)
   db_rows$.parity_key <- make_id(db_rows)
-  cmp <- compare_built(pq_rows, db_rows, id = ".parity_key")
+  cmp <- compare_built(pq_rows, db_rows, id_col = ".parity_key")
   rows <- attr(cmp, "rows")
   rows_complete <- length(rows$only_oracle) == 0L && length(rows$only_r) == 0L
   sample_ok <- cmp$verdict %in% c("identical", "within_tolerance") & rows_complete
@@ -422,7 +422,7 @@ parity_full <- function(con, table, parquet, key, dialect = "mssql") {
                                        paste(q(c(key, v)), collapse = ", "), q(table)))
     pq_v <- data.frame(.parity_key = make_id(pq), value = pq[[v]], stringsAsFactors = FALSE)
     db_v <- data.frame(.parity_key = make_id(db), value = db[[v]], stringsAsFactors = FALSE)
-    cmp <- compare_built(pq_v, db_v, id = ".parity_key")
+    cmp <- compare_built(pq_v, db_v, id_col = ".parity_key")
     keyed <- attr(cmp, "rows")
     rows_complete <- length(keyed$only_oracle) == 0L && length(keyed$only_r) == 0L
     ok <- isTRUE(cmp$verdict %in% c("identical", "within_tolerance")) && rows_complete

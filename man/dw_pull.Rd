@@ -4,12 +4,14 @@
 \alias{dw_pull}
 \title{Pull the enabled warehouse modules for a study}
 \usage{
-dw_pull(config, conn)
+dw_pull(config, con, conn)
 }
 \arguments{
 \item{config}{A \code{study_config} from \code{\link[=read_study_config]{read_study_config()}}.}
 
-\item{conn}{A \link[DBI:DBIConnection-class]{DBI::DBIConnection}, typically from \code{\link[=dw_connect]{dw_connect()}}.}
+\item{con}{A \link[DBI:DBIConnection-class]{DBI::DBIConnection}, typically from \code{\link[=dw_connect]{dw_connect()}}.}
+
+\item{conn}{Deprecated; use \code{con}.}
 }
 \value{
 An object of class \code{pull_result}: a list with \code{tables}, a named
