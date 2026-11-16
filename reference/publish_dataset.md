@@ -13,10 +13,11 @@ someone explicitly adopts the new one with
 publish_dataset(
   draft,
   dataset_id,
-  datasets_dir,
+  dir,
   extract_date = Sys.Date(),
   source = NULL,
-  file_stem = dataset_id
+  file_stem = dataset_id,
+  datasets_dir
 )
 ```
 
@@ -31,7 +32,7 @@ publish_dataset(
   Character. Stable logical dataset identifier, using lower-case
   letters, digits, and underscores.
 
-- datasets_dir:
+- dir:
 
   Character. Existing directory that owns the published files and
   `dataset-catalog.yml`.
@@ -48,6 +49,10 @@ publish_dataset(
 
   Character. Safe basename stem for dated release files. Defaults to
   `dataset_id`.
+
+- datasets_dir:
+
+  Deprecated; use `dir`.
 
 ## Value
 
@@ -97,7 +102,7 @@ write.csv(
 release <- publish_dataset(
   draft,
   dataset_id = "example_cohort",
-  datasets_dir = published,
+  dir = published,
   extract_date = "2026-09-21",
   source = "Synthetic documentation example"
 )

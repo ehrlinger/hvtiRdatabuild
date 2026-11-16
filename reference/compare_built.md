@@ -9,7 +9,7 @@ hides both.
 ## Usage
 
 ``` r
-compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
+compare_built(oracle, r, id_col, tolerance = 1e-08, id)
 ```
 
 ## Arguments
@@ -23,10 +23,11 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
 
   Data frame produced by the R pipeline.
 
-- id:
+- id_col:
 
   Name of the identifier column present in both. Must be unique within
-  each.
+  each. Required: it has no default, because a study's identifier is not
+  a package default.
 
 - tolerance:
 
@@ -34,6 +35,10 @@ compare_built(oracle, r, id = "ccfidu", tolerance = 1e-08)
   reported as `"within_tolerance"`. A single absolute threshold cannot
   serve columns of very different magnitude; see the "Coming from SAS"
   vignette for how to read `max_rel_diff` alongside it.
+
+- id:
+
+  Deprecated; use `id_col`.
 
 ## Value
 
@@ -68,7 +73,7 @@ missing BMI as underweight where R yields `NA`. Record such cases as
 ``` r
 o <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 70))
 r <- data.frame(ccfidu = c("A1", "A2"), age = c(65, 71))
-compare_built(o, r, id = "ccfidu")
+compare_built(o, r, id_col = "ccfidu")
 #> Dataset comparison
 #>   rows: 2 oracle, 2 R, 2 common
 #> 

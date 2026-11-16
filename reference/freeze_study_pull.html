@@ -69,10 +69,12 @@ release can never exist without it. Read it back with <code><a href="read_pull_p
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">freeze_study_pull</span><span class="op">(</span></span>
 <span>  <span class="va">pull</span>,</span>
-<span>  <span class="va">study_config</span>,</span>
-<span>  <span class="va">datasets_dir</span>,</span>
+<span>  <span class="va">path</span>,</span>
+<span>  <span class="va">dir</span>,</span>
 <span>  <span class="va">dataset_id</span>,</span>
-<span>  extract_date <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.Date</a></span><span class="op">(</span><span class="op">)</span></span>
+<span>  extract_date <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.Date</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  <span class="va">study_config</span>,</span>
+<span>  <span class="va">datasets_dir</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -84,13 +86,21 @@ release can never exist without it. Read it back with <code><a href="read_pull_p
 <dd><p>A <code>master_pull</code> from <code><a href="pull_master.html">pull_master()</a></code>.</p></dd>
 
 
-<dt id="arg-study-config">study_config<a class="anchor" aria-label="anchor" href="#arg-study-config"></a></dt>
+<dt id="arg-path">path<a class="anchor" aria-label="anchor" href="#arg-path"></a></dt>
 <dd><p>Character. Path to the study configuration file given to
 <code><a href="pull_master.html">pull_master()</a></code>; it must be unchanged since the pull.</p></dd>
 
 
-<dt id="arg-datasets-dir-dataset-id-extract-date">datasets_dir, dataset_id, extract_date<a class="anchor" aria-label="anchor" href="#arg-datasets-dir-dataset-id-extract-date"></a></dt>
+<dt id="arg-dir-dataset-id-extract-date">dir, dataset_id, extract_date<a class="anchor" aria-label="anchor" href="#arg-dir-dataset-id-extract-date"></a></dt>
 <dd><p>As for <code><a href="publish_dataset.html">publish_dataset()</a></code>.</p></dd>
+
+
+<dt id="arg-study-config">study_config<a class="anchor" aria-label="anchor" href="#arg-study-config"></a></dt>
+<dd><p>Deprecated; use <code>path</code>.</p></dd>
+
+
+<dt id="arg-datasets-dir">datasets_dir<a class="anchor" aria-label="anchor" href="#arg-datasets-dir"></a></dt>
+<dd><p>Deprecated; use <code>dir</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -131,7 +141,7 @@ the same rules as the built dataset, never in a repository.</p>
 <span class="r-in"><span>  <span class="va">config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="st">"study: st0000"</span>, <span class="va">config</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="cohort_query.html">cohort_query</a></span><span class="op">(</span><span class="st">"proc = 'CABG'"</span>, <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2000-01-01"</span>, <span class="st">"2024-07-31"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="va">pull</span> <span class="op">&lt;-</span> <span class="fu"><a href="pull_master.html">pull_master</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"master_demo"</span>, <span class="va">q</span>, columns <span class="op">=</span> <span class="st">"age"</span>, study_config <span class="op">=</span> <span class="va">config</span>,</span></span>
+<span class="r-in"><span>  <span class="va">pull</span> <span class="op">&lt;-</span> <span class="fu"><a href="pull_master.html">pull_master</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"master_demo"</span>, <span class="va">q</span>, var_cols <span class="op">=</span> <span class="st">"age"</span>, path <span class="op">=</span> <span class="va">config</span>,</span></span>
 <span class="r-in"><span>                      dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">published</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span><span class="st">"published-"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/files2.html" class="external-link">dir.create</a></span><span class="op">(</span><span class="va">published</span><span class="op">)</span></span></span>
@@ -141,7 +151,7 @@ the same rules as the built dataset, never in a repository.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">config</span>, <span class="va">published</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpKmfBo6/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmphjd9TA/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>

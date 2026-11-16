@@ -13,14 +13,16 @@ pull_master(
   con,
   master,
   cohort,
-  columns,
-  study_config,
+  var_cols,
+  path,
   mrn_col = "mrn",
   date_col = "encounter_date",
   dialect = c("mssql", "duckdb"),
   applied_view = paste0(master, "_corrections_applied"),
   deployment_view = paste0(master, "_deployment"),
-  parity_view = paste0(master, "_parity")
+  parity_view = paste0(master, "_parity"),
+  columns,
+  study_config
 )
 ```
 
@@ -47,11 +49,11 @@ pull_master(
   [`cohort_unit_id()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_unit_id.md)
   units (`patient_id_col = "cohort_unit"`).
 
-- columns:
+- var_cols:
 
   Character. The study's columns, besides the key.
 
-- study_config:
+- path:
 
   Character. Path to the study configuration file that defines this
   pull. Its checksum is recorded in the provenance.
@@ -69,17 +71,28 @@ pull_master(
   Character. The master's applied-corrections, deployment and
   parity-verdict views.
 
+- columns:
+
+  Deprecated; use `var_cols`.
+
+- study_config:
+
+  Deprecated; use `path`.
+
 ## Value
 
 An object of class `master_pull`: a list with `data` (one row per active
-unit: the key columns, `columns` and `cohort_unit`), `cohort` (the
-cohort record, ending with the `in_master` stage) and `provenance`
-(`master`, `sql_commit`, `applied_correction_ids`,
-`corrections_in_effect`, `parity_verified_at`, `read_at`, `columns`,
-`cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`,
-`n_unmatched`). `corrections_in_effect` holds every correction id
-applied anywhere in the master in the same snapshot, including any that
-changed who qualified.
+unit: the key columns, `var_cols` and `cohort_unit`), `cohort` (the
+cohort record, ending with the `in_master` stage) and `meta`: the
+family's provenance record (`package`, `version`, `sha`, `method`,
+`seed`, `rng_kind`, `time`), then `master`, `sql_commit`,
+`applied_correction_ids`, `corrections_in_effect`, `parity_verified_at`,
+`read_at`, `columns`, `cohort_definition`, `study_config_sha256`,
+`n_cohort`, `n_matched` and `n_unmatched`. The same pull fields without
+the provenance record are also in `provenance`, which is deprecated and
+goes in the next release; read `meta`. `corrections_in_effect` holds
+every correction id applied anywhere in the master in the same snapshot,
+including any that changed who qualified.
 
 ## Details
 
@@ -138,12 +151,12 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   config <- tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull_master(con, "master_demo", q, columns = "age", study_config = config,
-                      dialect = "duckdb")
+  pull_master(con, "master_demo", q, var_cols = "age", path = config,
+              dialect = "duckdb")
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpKmfBo6/duckdb
+#> ℹ /tmp/Rtmphjd9TA/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

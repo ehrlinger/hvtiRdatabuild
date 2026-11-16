@@ -96,8 +96,8 @@ library(hvtiRdatabuild)
 dw_modules()
 
 config <- read_study_config("study.yaml")
-conn   <- dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW")
-result <- dw_pull(config, conn)
+con    <- dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW")
+result <- dw_pull(config, con)
 
 result$tables    # named list of raw tables, keyed by each module's `output`
 result$manifest  # module, output, n_rows, n_cols, pulled_at
@@ -138,7 +138,7 @@ snapshot_oracle(
 
 # Compare an R rebuild against it.
 oracle <- arrow::read_parquet("oracle/st1234_built.parquet")
-compare_built(oracle, my_rebuild, id = "ccfidu")
+compare_built(oracle, my_rebuild, id_col = "ccfidu")
 ```
 
 There is no overall pass/fail. Read the table, and record a resolution

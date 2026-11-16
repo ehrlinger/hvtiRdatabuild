@@ -28,7 +28,12 @@ write_analysis_set(name, cfg = hvtiRutilities::study_config())
 
 The sidecar contents, invisibly: a list with `set`, `parent`,
 `declaration_sha256`, `parquet_sha256`, `written`, `counts`, `n_cols`,
-`attrition` and `packages`.
+`attrition`, `packages` and `provenance`. `written` is ISO 8601 local
+time with its UTC offset (`"2026-11-16T14:40:00-0500"`), which
+`as.POSIXct(written, format = "%Y-%m-%dT%H:%M:%S%z")` reads back.
+`provenance` is the hvtiR family's record: `package`, `version`, `sha`,
+`method`, `seed`, `rng_kind` and `time` (a `POSIXct` here, the same ISO
+text in the sidecar file).
 
 ## Details
 

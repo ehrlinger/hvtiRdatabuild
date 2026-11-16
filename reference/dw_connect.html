@@ -102,7 +102,12 @@ validating it against a CA chain. <code>FALSE</code>, the default, validates it.
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A <a href="https://dbi.r-dbi.org/reference/DBIConnection-class.html" class="external-link">DBI::DBIConnection</a> object.</p>
+    <p>A <a href="https://dbi.r-dbi.org/reference/DBIConnection-class.html" class="external-link">DBI::DBIConnection</a> object.
+A failed connection is an error of class <code>hvtiRdatabuild_connection_failed</code>
+whose <code>kind</code> field says what failed: <code>"driver"</code> (the ODBC driver or DSN
+would not load), <code>"network"</code> (the server name did not resolve or nothing
+answered), <code>"tls"</code>, <code>"login"</code> or <code>"unknown"</code>. The driver's own message is
+never shown, because it may carry a credential.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>

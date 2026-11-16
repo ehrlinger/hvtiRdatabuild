@@ -89,8 +89,12 @@ never recorded.</p>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>Invisibly, a list of counts: <code>dry_run</code>, <code>facts</code>, <code>resolved</code>,
-<code>unresolved</code>, <code>appended</code> and <code>stale</code>.</p>
+    <p>Invisibly, a list: <code>dry_run</code>, the counts <code>facts</code>, <code>resolved</code>,
+<code>unresolved</code>, <code>unparsed</code>, <code>appended</code> and <code>stale</code>, and the build-program
+line numbers <code>unresolved_lines</code> and <code>unparsed_lines</code>. When any fact is
+unresolved or any statement unparsed, it also warns with class
+<code>hvtiRdatabuild_incomplete_backfill</code>, giving counts and line numbers but
+no key or value. The warning is not silenced by <code>hvti.quiet</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -138,7 +142,7 @@ default, parses and resolves and writes nothing.</p>
 <span class="r-in"><span>  <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpKmfBo6/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmphjd9TA/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>

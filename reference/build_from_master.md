@@ -59,12 +59,14 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpKmfBo6/duckdb
+#> ℹ /tmp/Rtmphjd9TA/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
 #> ℹ Run duckdb(shared_home = TRUE) (or create ~/.duckdb) to keep them (suitable for most users).
 #> ℹ Run duckdb(shared_home = FALSE) to accept the temporary directory (and silence this message).
 #> ℹ See ?duckdb_storage for details and alternatives.
+#> Warning: pull_master(): `columns` is renamed `var_cols`. This will be an error in the next release.
+#> Warning: pull_master(): `study_config` is renamed `path`. This will be an error in the next release.
 # }
 ```

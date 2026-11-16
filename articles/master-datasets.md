@@ -170,7 +170,7 @@ writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpdYzYUo/duckdb
+#> ℹ /tmp/RtmpTUKcHZ/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -179,7 +179,7 @@ con <- DBI::dbConnect(duckdb::duckdb())
 #> ℹ See ?duckdb_storage for details and alternatives.
 dry <- lift_master(read_master_config(cfg_path), con, pq, dialect = "duckdb")
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/RtmpdYzYUo/master205e4a99f4a0/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/RtmpTUKcHZ/master1fc83cd22ef7/built_demo.parquet.ddl.sql
 dry$dry_run
 #> [1] TRUE
 ```
@@ -253,8 +253,9 @@ invisible(lift_master(cfg2, con, pq2, dry_run = FALSE, dialect = "duckdb"))
 #> view master_c -> master_c_base_built_t_c30b1f7ecad4
 backfill_corrections(cfg2, con, dialect = "duckdb")
 #> legacy: 2 facts parsed; 1 resolved; 1 unresolved
-#>   unresolved by reason: key_variable 1
-#>   at lines: 3
+#> Warning: backfill_corrections(): the legacy program has 1 unresolved fact(s)
+#> (key_variable 1) at line(s) 3 and 0 unparsed statement(s). These are not
+#> recorded as corrections.
 #> dry run: nothing written
 ```
 
@@ -269,8 +270,9 @@ master’s view is regenerated:
 
 backfill_corrections(cfg2, con, dry_run = FALSE, dialect = "duckdb")
 #> legacy: 2 facts parsed; 1 resolved; 1 unresolved
-#>   unresolved by reason: key_variable 1
-#>   at lines: 3
+#> Warning: backfill_corrections(): the legacy program has 1 unresolved fact(s)
+#> (key_variable 1) at line(s) 3 and 0 unparsed statement(s). These are not
+#> recorded as corrections.
 #> recorded 1; 0 stale corrections
 DBI::dbGetQuery(con, "SELECT decision FROM master_c_correction_decisions")
 #>   decision
@@ -291,7 +293,9 @@ prop <- propose_correction(cfg2, con,
                            key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
                            expected_prior = 70, new_value = 71, evidence_type = "chart_review",
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
-#> Correction cfad2ea84847f8a19 appended.
+#> Warning: propose_correction(): `variable` is renamed `var_col`. This will be an
+#> error in the next release.
+#> Correction c3d9877ae29e00224 appended.
 prop$verdict
 #> [1] "appended"
 ```
@@ -305,7 +309,7 @@ someone accepts it:
 ``` r
 
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
-#> Decision d3334c710c2949174 (accept) recorded on cfad2ea84847f8a19.
+#> Decision d0b0928d8c5622685 (accept) recorded on c3d9877ae29e00224.
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 #>   age
 #> 1  71

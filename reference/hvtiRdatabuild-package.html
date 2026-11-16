@@ -46,6 +46,18 @@
 
 
     <div class="section level2">
+    <h2 id="quiet-mode">Quiet mode<a class="anchor" aria-label="anchor" href="#quiet-mode"></a></h2>
+
+
+<p>Informational messages, such as the progress lines of <code><a href="snapshot_master.html">snapshot_master()</a></code> and
+<code><a href="lift_master.html">lift_master()</a></code>, follow the hvtiR family option <code>hvti.quiet</code>:
+<code>options(hvti.quiet = TRUE)</code> silences them. Warnings and errors are never
+silenced by it. A call that finishes with work left undone warns, so quiet
+mode cannot hide it: <code><a href="snapshot_master.html">snapshot_master()</a></code> when a historical snapshot fails,
+and <code><a href="backfill_corrections.html">backfill_corrections()</a></code> when a legacy fact is unresolved or a statement
+unparsed.</p>
+    </div>
+    <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
     <div class="dont-index"><p>Useful links:</p><ul><li><p><a href="https://github.com/ehrlinger/hvtiRdatabuild" class="external-link">https://github.com/ehrlinger/hvtiRdatabuild</a></p></li>
 <li><p><a href="https://ehrlinger.github.io/hvtiRdatabuild/">https://ehrlinger.github.io/hvtiRdatabuild/</a></p></li>

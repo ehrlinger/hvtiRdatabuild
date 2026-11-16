@@ -56,7 +56,12 @@ dw_connect(
 
 A
 [DBI::DBIConnection](https://dbi.r-dbi.org/reference/DBIConnection-class.html)
-object.
+object. A failed connection is an error of class
+`hvtiRdatabuild_connection_failed` whose `kind` field says what failed:
+`"driver"` (the ODBC driver or DSN would not load), `"network"` (the
+server name did not resolve or nothing answered), `"tls"`, `"login"` or
+`"unknown"`. The driver's own message is never shown, because it may
+carry a credential.
 
 ## Details
 

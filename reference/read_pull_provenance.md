@@ -17,10 +17,12 @@ read_pull_provenance(path)
 
 ## Value
 
-A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`,
-`corrections_in_effect`, `parity_verified_at`, `read_at`, `columns`,
-`cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`,
-`n_unmatched` and `cohort_stages`.
+A list: `schema`; for a pull frozen with the provenance record, that
+record (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, and
+`time` as ISO 8601 text); then `master`, `sql_commit`,
+`applied_correction_ids`, `corrections_in_effect`, `parity_verified_at`,
+`read_at`, `columns`, `cohort_definition`, `study_config_sha256`,
+`n_cohort`, `n_matched`, `n_unmatched` and `cohort_stages`.
 
 ## See also
 

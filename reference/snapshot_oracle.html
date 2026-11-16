@@ -53,11 +53,13 @@ parquet file.</p>
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">snapshot_oracle</span><span class="op">(</span></span>
-<span>  <span class="va">sas_path</span>,</span>
-<span>  <span class="va">out_path</span>,</span>
+<span>  <span class="va">path</span>,</span>
+<span>  <span class="va">file</span>,</span>
 <span>  expect <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  manifest <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  chunk_rows <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  chunk_rows <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">sas_path</span>,</span>
+<span>  <span class="va">out_path</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -65,11 +67,11 @@ parquet file.</p>
     <h2 id="arguments">Arguments<a class="anchor" aria-label="anchor" href="#arguments"></a></h2>
 
 
-<dl><dt id="arg-sas-path">sas_path<a class="anchor" aria-label="anchor" href="#arg-sas-path"></a></dt>
+<dl><dt id="arg-path">path<a class="anchor" aria-label="anchor" href="#arg-path"></a></dt>
 <dd><p>Path to the SAS dataset (<code>.sas7bdat</code>).</p></dd>
 
 
-<dt id="arg-out-path">out_path<a class="anchor" aria-label="anchor" href="#arg-out-path"></a></dt>
+<dt id="arg-file">file<a class="anchor" aria-label="anchor" href="#arg-file"></a></dt>
 <dd><p>Path to write the parquet file. Must not already exist.</p></dd>
 
 
@@ -93,6 +95,14 @@ snapshotted. A chunk whose schema differs from the first chunk's is an
 error, and the partial file is removed. The chunked file reads back
 identical to an unchunked one, but its bytes and checksum differ, because
 its row groups differ.</p></dd>
+
+
+<dt id="arg-sas-path">sas_path<a class="anchor" aria-label="anchor" href="#arg-sas-path"></a></dt>
+<dd><p>Deprecated; use <code>path</code>.</p></dd>
+
+
+<dt id="arg-out-path">out_path<a class="anchor" aria-label="anchor" href="#arg-out-path"></a></dt>
+<dd><p>Deprecated; use <code>file</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

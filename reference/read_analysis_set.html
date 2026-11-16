@@ -5,8 +5,10 @@ newer registered version than the one it was cut from, or when its
 declaration in _study.yml has changed. A stale set is never rebuilt
 silently: its exclusions are decisions, and a changed attrition should be
 looked at. In a draft render it is read, with a message of class
-hvtiRutilities_stale_analysis_set giving the write_analysis_set() call
-that updates it. In a final render (HVTI_TEMPLATE_STRICT set, as
+hvtiRdatabuild_stale_analysis_set giving the write_analysis_set() call
+that updates it. The message also carries the old class,
+hvtiRutilities_stale_analysis_set, for one release; catch the new one.
+In a final render (HVTI_TEMPLATE_STRICT set, as
 hvtiRtemplates::render_job(final = TRUE) sets it) it stops with the same
 text. A parquet that no longer matches its manifest entry always stops, and
 so does a sidecar whose recorded parquet sha256 is not the parquet's. A
@@ -21,8 +23,10 @@ newer registered version than the one it was cut from, or when its
 declaration in _study.yml has changed. A stale set is never rebuilt
 silently: its exclusions are decisions, and a changed attrition should be
 looked at. In a draft render it is read, with a message of class
-hvtiRutilities_stale_analysis_set giving the write_analysis_set() call
-that updates it. In a final render (HVTI_TEMPLATE_STRICT set, as
+hvtiRdatabuild_stale_analysis_set giving the write_analysis_set() call
+that updates it. The message also carries the old class,
+hvtiRutilities_stale_analysis_set, for one release; catch the new one.
+In a final render (HVTI_TEMPLATE_STRICT set, as
 hvtiRtemplates::render_job(final = TRUE) sets it) it stops with the same
 text. A parquet that no longer matches its manifest entry always stops, and
 so does a sidecar whose recorded parquet sha256 is not the parquet's. A
@@ -79,8 +83,10 @@ newer registered version than the one it was cut from, or when its
 declaration in <code>_study.yml</code> has changed. A stale set is never rebuilt
 silently: its exclusions are decisions, and a changed attrition should be
 looked at. In a draft render it is read, with a message of class
-<code>hvtiRutilities_stale_analysis_set</code> giving the <code><a href="write_analysis_set.html">write_analysis_set()</a></code> call
-that updates it. In a final render (<code>HVTI_TEMPLATE_STRICT</code> set, as
+<code>hvtiRdatabuild_stale_analysis_set</code> giving the <code><a href="write_analysis_set.html">write_analysis_set()</a></code> call
+that updates it. The message also carries the old class,
+<code>hvtiRutilities_stale_analysis_set</code>, for one release; catch the new one.
+In a final render (<code>HVTI_TEMPLATE_STRICT</code> set, as
 <code>hvtiRtemplates::render_job(final = TRUE)</code> sets it) it stops with the same
 text. A parquet that no longer matches its manifest entry always stops, and
 so does a sidecar whose recorded parquet sha256 is not the parquet's. A

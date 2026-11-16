@@ -16,7 +16,7 @@ propose_correction(
   config,
   con,
   key_values,
-  variable,
+  var_col,
   expected_prior,
   new_value,
   evidence_type,
@@ -24,7 +24,8 @@ propose_correction(
   asserted_by,
   alt_key = NULL,
   dry_run = FALSE,
-  dialect = "mssql"
+  dialect = "mssql",
+  variable
 )
 ```
 
@@ -44,7 +45,7 @@ propose_correction(
   A named list of key values identifying the record: the primary key by
   default, or `alt_key`'s columns when `alt_key` is given.
 
-- variable:
+- var_col:
 
   Character. The column to correct; must not be a key or alternate-key
   column.
@@ -85,6 +86,10 @@ propose_correction(
 - dialect:
 
   `"mssql"` or `"duckdb"`.
+
+- variable:
+
+  Deprecated; use `var_col`.
 
 ## Value
 
@@ -151,13 +156,13 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   con <- DBI::dbConnect(duckdb::duckdb())
   lift_master(cfg, con, pq, dry_run = FALSE, dialect = "duckdb")
   backfill_corrections(cfg, con, dry_run = FALSE, dialect = "duckdb")
-  propose_correction(cfg, con, key_values = list(id = "K1"), variable = "age",
+  propose_correction(cfg, con, key_values = list(id = "K1"), var_col = "age",
                      expected_prior = 60, new_value = 61, evidence_type = "chart_review",
                      evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpKmfBo6/duckdb
+#> ℹ /tmp/Rtmphjd9TA/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -173,6 +178,6 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> legacy: 0 facts parsed; 0 resolved; 0 unresolved
 #> recorded 0; 0 stale corrections
 #> Warning: 'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
-#> Correction c7300ddc2dff09b8a appended. First correction to this variable: regenerate the view.
+#> Correction cbf69e81552a0849a appended. First correction to this variable: regenerate the view.
 # }
 ```

@@ -64,9 +64,10 @@ withdrawal.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">withdraw_dataset_release</span><span class="op">(</span></span>
 <span>  <span class="va">dataset_id</span>,</span>
 <span>  <span class="va">release_id</span>,</span>
-<span>  <span class="va">datasets_dir</span>,</span>
+<span>  <span class="va">dir</span>,</span>
 <span>  <span class="va">reason</span>,</span>
-<span>  replacement_release_id <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  replacement_release_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  <span class="va">datasets_dir</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -82,7 +83,7 @@ withdrawal.</p>
 <dd><p>Character. Exact release identifier to withdraw.</p></dd>
 
 
-<dt id="arg-datasets-dir">datasets_dir<a class="anchor" aria-label="anchor" href="#arg-datasets-dir"></a></dt>
+<dt id="arg-dir">dir<a class="anchor" aria-label="anchor" href="#arg-dir"></a></dt>
 <dd><p>Character. Existing directory that owns the published
 files and <code>dataset-catalog.yml</code>.</p></dd>
 
@@ -94,6 +95,10 @@ files and <code>dataset-catalog.yml</code>.</p></dd>
 <dt id="arg-replacement-release-id">replacement_release_id<a class="anchor" aria-label="anchor" href="#arg-replacement-release-id"></a></dt>
 <dd><p>Optional character release identifier from the
 same logical dataset.</p></dd>
+
+
+<dt id="arg-datasets-dir">datasets_dir<a class="anchor" aria-label="anchor" href="#arg-datasets-dir"></a></dt>
+<dd><p>Deprecated; use <code>dir</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">

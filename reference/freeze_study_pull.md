@@ -17,10 +17,12 @@ covers it, and a release can never exist without it. Read it back with
 ``` r
 freeze_study_pull(
   pull,
-  study_config,
-  datasets_dir,
+  path,
+  dir,
   dataset_id,
-  extract_date = Sys.Date()
+  extract_date = Sys.Date(),
+  study_config,
+  datasets_dir
 )
 ```
 
@@ -31,16 +33,24 @@ freeze_study_pull(
   A `master_pull` from
   [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md).
 
-- study_config:
+- path:
 
   Character. Path to the study configuration file given to
   [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md);
   it must be unchanged since the pull.
 
-- datasets_dir, dataset_id, extract_date:
+- dir, dataset_id, extract_date:
 
   As for
   [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md).
+
+- study_config:
+
+  Deprecated; use `path`.
+
+- datasets_dir:
+
+  Deprecated; use `dir`.
 
 ## Value
 
@@ -88,7 +98,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   config <- tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+  pull <- pull_master(con, "master_demo", q, var_cols = "age", path = config,
                       dialect = "duckdb")
   published <- tempfile("published-")
   dir.create(published)
@@ -98,7 +108,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   unlink(c(config, published), recursive = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpKmfBo6/duckdb
+#> ℹ /tmp/Rtmphjd9TA/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

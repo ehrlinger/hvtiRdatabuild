@@ -13,9 +13,10 @@ while normal reads stop and report the withdrawal.
 withdraw_dataset_release(
   dataset_id,
   release_id,
-  datasets_dir,
+  dir,
   reason,
-  replacement_release_id = NULL
+  replacement_release_id = NULL,
+  datasets_dir
 )
 ```
 
@@ -29,7 +30,7 @@ withdraw_dataset_release(
 
   Character. Exact release identifier to withdraw.
 
-- datasets_dir:
+- dir:
 
   Character. Existing directory that owns the published files and
   `dataset-catalog.yml`.
@@ -41,6 +42,10 @@ withdraw_dataset_release(
 - replacement_release_id:
 
   Optional character release identifier from the same logical dataset.
+
+- datasets_dir:
+
+  Deprecated; use `dir`.
 
 ## Value
 

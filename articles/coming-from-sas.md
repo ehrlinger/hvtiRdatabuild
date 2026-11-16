@@ -30,7 +30,7 @@ change; changing a study-specific rule is a code change.
 | SAS | R |
 |----|----|
 | `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) |
-| `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, conn)` |
+| `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, con)` |
 | `tp.bd.data.master.sas` | `build_dataset(raw, config, cohort)` |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
 | `%macro skip; ... %mend skip;` | `modules:` / named shared `derive:` flags in `study.yaml` |
@@ -349,7 +349,7 @@ Build the variable in R, then compare against the oracle:
 oracle <- data.frame(ccfidu = c("A1", "A2", "A3"), age = c(65.5, 70.2, 58.0))
 mine   <- data.frame(ccfidu = c("A1", "A2", "A3"), age = c(65.5, 70.2, 58.5))
 
-compare_built(oracle, mine, id = "ccfidu")
+compare_built(oracle, mine, id_col = "ccfidu")
 #> Dataset comparison
 #>   rows: 3 oracle, 3 R, 3 common
 #> 

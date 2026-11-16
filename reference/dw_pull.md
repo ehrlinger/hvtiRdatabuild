@@ -7,7 +7,7 @@ the R port of `tp.stXXXX_dwpull.sas`.
 ## Usage
 
 ``` r
-dw_pull(config, conn)
+dw_pull(config, con, conn)
 ```
 
 ## Arguments
@@ -17,12 +17,16 @@ dw_pull(config, conn)
   A `study_config` from
   [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md).
 
-- conn:
+- con:
 
   A
   [DBI::DBIConnection](https://dbi.r-dbi.org/reference/DBIConnection-class.html),
   typically from
   [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md).
+
+- conn:
+
+  Deprecated; use `con`.
 
 ## Value
 

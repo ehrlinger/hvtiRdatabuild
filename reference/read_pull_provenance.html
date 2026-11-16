@@ -59,7 +59,9 @@
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A list: <code>schema</code>, <code>master</code>, <code>sql_commit</code>, <code>applied_correction_ids</code>,
+    <p>A list: <code>schema</code>; for a pull frozen with the provenance record, that record
+(<code>package</code>, <code>version</code>, <code>sha</code>, <code>method</code>, <code>seed</code>, <code>rng_kind</code>, and <code>time</code> as ISO 8601
+text); then <code>master</code>, <code>sql_commit</code>, <code>applied_correction_ids</code>,
 <code>corrections_in_effect</code>, <code>parity_verified_at</code>, <code>read_at</code>, <code>columns</code>,
 <code>cohort_definition</code>, <code>study_config_sha256</code>, <code>n_cohort</code>, <code>n_matched</code>, <code>n_unmatched</code>
 and <code>cohort_stages</code>.</p>

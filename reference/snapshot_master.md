@@ -11,10 +11,11 @@ was built from.
 ``` r
 snapshot_master(
   config,
-  out_dir,
+  dir,
   which = c("current", "history"),
   chunk_rows = 1e+05,
-  expect = NULL
+  expect = NULL,
+  out_dir
 )
 ```
 
@@ -25,7 +26,7 @@ snapshot_master(
   A `master_config` from
   [`read_master_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.md).
 
-- out_dir:
+- dir:
 
   Directory to write the parquet snapshots and their sidecars.
 
@@ -45,6 +46,10 @@ snapshot_master(
   Historical builds are not validated, because their logs are rarely
   retained.
 
+- out_dir:
+
+  Deprecated; use `dir`.
+
   A snapshot that already exists is skipped only when its sidecar is
   complete and, for the current build, records the source's current
   checksum. The current build keeps a fixed file name, so a rebuild is
@@ -57,6 +62,9 @@ Invisibly, a data frame with one row per dataset: `file`, `status`
 (`"written"`, `"skipped"` or `"failed"`), `n_rows`, `n_cols`, `sha256`,
 `source_sha256`, `parent_release`, `parent_source` (`"log"`,
 `"program"`, `"declared"`, `"unknown"` or `"none"`) and `key_verdict`.
+If any historical snapshot failed, it also warns with class
+`hvtiRdatabuild_snapshot_failed`, naming the files. The warning is not
+silenced by `hvti.quiet`.
 
 ## Details
 

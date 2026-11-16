@@ -55,7 +55,7 @@ problem from a miscomputed variable, and conflating the two hides both.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compare_built</span><span class="op">(</span><span class="va">oracle</span>, <span class="va">r</span>, id <span class="op">=</span> <span class="st">"ccfidu"</span>, tolerance <span class="op">=</span> <span class="fl">1e-08</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">compare_built</span><span class="op">(</span><span class="va">oracle</span>, <span class="va">r</span>, <span class="va">id_col</span>, tolerance <span class="op">=</span> <span class="fl">1e-08</span>, <span class="va">id</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -71,9 +71,10 @@ problem from a miscomputed variable, and conflating the two hides both.</p>
 <dd><p>Data frame produced by the R pipeline.</p></dd>
 
 
-<dt id="arg-id">id<a class="anchor" aria-label="anchor" href="#arg-id"></a></dt>
+<dt id="arg-id-col">id_col<a class="anchor" aria-label="anchor" href="#arg-id-col"></a></dt>
 <dd><p>Name of the identifier column present in both. Must be unique
-within each.</p></dd>
+within each. Required: it has no default, because a study's identifier is
+not a package default.</p></dd>
 
 
 <dt id="arg-tolerance">tolerance<a class="anchor" aria-label="anchor" href="#arg-tolerance"></a></dt>
@@ -81,6 +82,10 @@ within each.</p></dd>
 this are reported as <code>"within_tolerance"</code>. A single absolute threshold
 cannot serve columns of very different magnitude; see the "Coming from
 SAS" vignette for how to read <code>max_rel_diff</code> alongside it.</p></dd>
+
+
+<dt id="arg-id">id<a class="anchor" aria-label="anchor" href="#arg-id"></a></dt>
+<dd><p>Deprecated; use <code>id_col</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -113,7 +118,7 @@ BMI as underweight where R yields <code>NA</code>. Record such cases as
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="va">o</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>ccfidu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A1"</span>, <span class="st">"A2"</span><span class="op">)</span>, age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">65</span>, <span class="fl">70</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">r</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>ccfidu <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"A1"</span>, <span class="st">"A2"</span><span class="op">)</span>, age <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">65</span>, <span class="fl">71</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="fu">compare_built</span><span class="op">(</span><span class="va">o</span>, <span class="va">r</span>, id <span class="op">=</span> <span class="st">"ccfidu"</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="fu">compare_built</span><span class="op">(</span><span class="va">o</span>, <span class="va">r</span>, id_col <span class="op">=</span> <span class="st">"ccfidu"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Dataset comparison</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   rows: 2 oracle, 2 R, 2 common</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

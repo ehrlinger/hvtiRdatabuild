@@ -59,14 +59,16 @@ loads or deployments commit.</p>
 <span>  <span class="va">con</span>,</span>
 <span>  <span class="va">master</span>,</span>
 <span>  <span class="va">cohort</span>,</span>
-<span>  <span class="va">columns</span>,</span>
-<span>  <span class="va">study_config</span>,</span>
+<span>  <span class="va">var_cols</span>,</span>
+<span>  <span class="va">path</span>,</span>
 <span>  mrn_col <span class="op">=</span> <span class="st">"mrn"</span>,</span>
 <span>  date_col <span class="op">=</span> <span class="st">"encounter_date"</span>,</span>
 <span>  dialect <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"mssql"</span>, <span class="st">"duckdb"</span><span class="op">)</span>,</span>
 <span>  applied_view <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">master</span>, <span class="st">"_corrections_applied"</span><span class="op">)</span>,</span>
 <span>  deployment_view <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">master</span>, <span class="st">"_deployment"</span><span class="op">)</span>,</span>
-<span>  parity_view <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">master</span>, <span class="st">"_parity"</span><span class="op">)</span></span>
+<span>  parity_view <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste0</a></span><span class="op">(</span><span class="va">master</span>, <span class="st">"_parity"</span><span class="op">)</span>,</span>
+<span>  <span class="va">columns</span>,</span>
+<span>  <span class="va">study_config</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -88,11 +90,11 @@ loads or deployments commit.</p>
 <code><a href="cohort_unit_id.html">cohort_unit_id()</a></code> units (<code>patient_id_col = "cohort_unit"</code>).</p></dd>
 
 
-<dt id="arg-columns">columns<a class="anchor" aria-label="anchor" href="#arg-columns"></a></dt>
+<dt id="arg-var-cols">var_cols<a class="anchor" aria-label="anchor" href="#arg-var-cols"></a></dt>
 <dd><p>Character. The study's columns, besides the key.</p></dd>
 
 
-<dt id="arg-study-config">study_config<a class="anchor" aria-label="anchor" href="#arg-study-config"></a></dt>
+<dt id="arg-path">path<a class="anchor" aria-label="anchor" href="#arg-path"></a></dt>
 <dd><p>Character. Path to the study configuration file that defines this
 pull. Its checksum is recorded in the provenance.</p></dd>
 
@@ -109,15 +111,26 @@ pull. Its checksum is recorded in the provenance.</p></dd>
 <dd><p>Character. The master's
 applied-corrections, deployment and parity-verdict views.</p></dd>
 
+
+<dt id="arg-columns">columns<a class="anchor" aria-label="anchor" href="#arg-columns"></a></dt>
+<dd><p>Deprecated; use <code>var_cols</code>.</p></dd>
+
+
+<dt id="arg-study-config">study_config<a class="anchor" aria-label="anchor" href="#arg-study-config"></a></dt>
+<dd><p>Deprecated; use <code>path</code>.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>master_pull</code>: a list with <code>data</code> (one row per active
-unit: the key columns, <code>columns</code> and <code>cohort_unit</code>), <code>cohort</code> (the cohort record,
-ending with the <code>in_master</code> stage) and <code>provenance</code> (<code>master</code>, <code>sql_commit</code>,
-<code>applied_correction_ids</code>, <code>corrections_in_effect</code>, <code>parity_verified_at</code>, <code>read_at</code>,
-<code>columns</code>, <code>cohort_definition</code>, <code>study_config_sha256</code>, <code>n_cohort</code>, <code>n_matched</code>,
-<code>n_unmatched</code>).
+unit: the key columns, <code>var_cols</code> and <code>cohort_unit</code>), <code>cohort</code> (the cohort record,
+ending with the <code>in_master</code> stage) and <code>meta</code>: the family's provenance record
+(<code>package</code>, <code>version</code>, <code>sha</code>, <code>method</code>, <code>seed</code>, <code>rng_kind</code>, <code>time</code>), then <code>master</code>,
+<code>sql_commit</code>, <code>applied_correction_ids</code>, <code>corrections_in_effect</code>,
+<code>parity_verified_at</code>, <code>read_at</code>, <code>columns</code>, <code>cohort_definition</code>,
+<code>study_config_sha256</code>, <code>n_cohort</code>, <code>n_matched</code> and <code>n_unmatched</code>. The same pull
+fields without the provenance record are also in <code>provenance</code>, which is deprecated
+and goes in the next release; read <code>meta</code>.
 <code>corrections_in_effect</code> holds every correction id applied anywhere in the master in
 the same snapshot, including any that changed who qualified.</p>
     </div>
@@ -165,12 +178,12 @@ or in printed output names a patient.</p>
 <span class="r-in"><span>  <span class="va">config</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".yaml"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="st">"study: st0000"</span>, <span class="va">config</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">q</span> <span class="op">&lt;-</span> <span class="fu"><a href="cohort_query.html">cohort_query</a></span><span class="op">(</span><span class="st">"proc = 'CABG'"</span>, <span class="fu"><a href="https://rdrr.io/r/base/as.Date.html" class="external-link">as.Date</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"2000-01-01"</span>, <span class="st">"2024-07-31"</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu">pull_master</span><span class="op">(</span><span class="va">con</span>, <span class="st">"master_demo"</span>, <span class="va">q</span>, columns <span class="op">=</span> <span class="st">"age"</span>, study_config <span class="op">=</span> <span class="va">config</span>,</span></span>
-<span class="r-in"><span>                      dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu">pull_master</span><span class="op">(</span><span class="va">con</span>, <span class="st">"master_demo"</span>, <span class="va">q</span>, var_cols <span class="op">=</span> <span class="st">"age"</span>, path <span class="op">=</span> <span class="va">config</span>,</span></span>
+<span class="r-in"><span>              dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpKmfBo6/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmphjd9TA/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>

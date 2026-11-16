@@ -35,8 +35,12 @@ backfill_corrections(config, con, dry_run = TRUE, dialect = "mssql")
 
 ## Value
 
-Invisibly, a list of counts: `dry_run`, `facts`, `resolved`,
-`unresolved`, `appended` and `stale`.
+Invisibly, a list: `dry_run`, the counts `facts`, `resolved`,
+`unresolved`, `unparsed`, `appended` and `stale`, and the build-program
+line numbers `unresolved_lines` and `unparsed_lines`. When any fact is
+unresolved or any statement unparsed, it also warns with class
+`hvtiRdatabuild_incomplete_backfill`, giving counts and line numbers but
+no key or value. The warning is not silenced by `hvti.quiet`.
 
 ## Details
 
@@ -89,7 +93,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpKmfBo6/duckdb
+#> ℹ /tmp/Rtmphjd9TA/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

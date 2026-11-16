@@ -8,21 +8,23 @@ file.
 
 ``` r
 snapshot_oracle(
-  sas_path,
-  out_path,
+  path,
+  file,
   expect = NULL,
   manifest = NULL,
-  chunk_rows = NULL
+  chunk_rows = NULL,
+  sas_path,
+  out_path
 )
 ```
 
 ## Arguments
 
-- sas_path:
+- path:
 
   Path to the SAS dataset (`.sas7bdat`).
 
-- out_path:
+- file:
 
   Path to write the parquet file. Must not already exist.
 
@@ -50,6 +52,14 @@ snapshot_oracle(
   the partial file is removed. The chunked file reads back identical to
   an unchunked one, but its bytes and checksum differ, because its row
   groups differ.
+
+- sas_path:
+
+  Deprecated; use `path`.
+
+- out_path:
+
+  Deprecated; use `file`.
 
 ## Value
 

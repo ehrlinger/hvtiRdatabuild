@@ -61,10 +61,11 @@ adopts the new one with <code><a href="https://ehrlinger.github.io/hvtiRutilitie
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">publish_dataset</span><span class="op">(</span></span>
 <span>  <span class="va">draft</span>,</span>
 <span>  <span class="va">dataset_id</span>,</span>
-<span>  <span class="va">datasets_dir</span>,</span>
+<span>  <span class="va">dir</span>,</span>
 <span>  extract_date <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Sys.time.html" class="external-link">Sys.Date</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>  source <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  file_stem <span class="op">=</span> <span class="va">dataset_id</span></span>
+<span>  file_stem <span class="op">=</span> <span class="va">dataset_id</span>,</span>
+<span>  <span class="va">datasets_dir</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -81,7 +82,7 @@ adopts the new one with <code><a href="https://ehrlinger.github.io/hvtiRutilitie
 lower-case letters, digits, and underscores.</p></dd>
 
 
-<dt id="arg-datasets-dir">datasets_dir<a class="anchor" aria-label="anchor" href="#arg-datasets-dir"></a></dt>
+<dt id="arg-dir">dir<a class="anchor" aria-label="anchor" href="#arg-dir"></a></dt>
 <dd><p>Character. Existing directory that owns the published
 files and <code>dataset-catalog.yml</code>.</p></dd>
 
@@ -97,6 +98,10 @@ files and <code>dataset-catalog.yml</code>.</p></dd>
 <dt id="arg-file-stem">file_stem<a class="anchor" aria-label="anchor" href="#arg-file-stem"></a></dt>
 <dd><p>Character. Safe basename stem for dated release files.
 Defaults to <code>dataset_id</code>.</p></dd>
+
+
+<dt id="arg-datasets-dir">datasets_dir<a class="anchor" aria-label="anchor" href="#arg-datasets-dir"></a></dt>
+<dd><p>Deprecated; use <code>dir</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -143,7 +148,7 @@ filename are an integrity error and are never overwritten.</p>
 <span class="r-in"><span><span class="va">release</span> <span class="op">&lt;-</span> <span class="fu">publish_dataset</span><span class="op">(</span></span></span>
 <span class="r-in"><span>  <span class="va">draft</span>,</span></span>
 <span class="r-in"><span>  dataset_id <span class="op">=</span> <span class="st">"example_cohort"</span>,</span></span>
-<span class="r-in"><span>  datasets_dir <span class="op">=</span> <span class="va">published</span>,</span></span>
+<span class="r-in"><span>  dir <span class="op">=</span> <span class="va">published</span>,</span></span>
 <span class="r-in"><span>  extract_date <span class="op">=</span> <span class="st">"2026-09-21"</span>,</span></span>
 <span class="r-in"><span>  source <span class="op">=</span> <span class="st">"Synthetic documentation example"</span></span></span>
 <span class="r-in"><span><span class="op">)</span></span></span>

@@ -68,7 +68,7 @@ over-width or uncastable value is reported by column and limit only.</p>
 <span>  <span class="va">config</span>,</span>
 <span>  <span class="va">con</span>,</span>
 <span>  <span class="va">key_values</span>,</span>
-<span>  <span class="va">variable</span>,</span>
+<span>  <span class="va">var_col</span>,</span>
 <span>  <span class="va">expected_prior</span>,</span>
 <span>  <span class="va">new_value</span>,</span>
 <span>  <span class="va">evidence_type</span>,</span>
@@ -76,7 +76,8 @@ over-width or uncastable value is reported by column and limit only.</p>
 <span>  <span class="va">asserted_by</span>,</span>
 <span>  alt_key <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  dry_run <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  dialect <span class="op">=</span> <span class="st">"mssql"</span></span>
+<span>  dialect <span class="op">=</span> <span class="st">"mssql"</span>,</span>
+<span>  <span class="va">variable</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -97,7 +98,7 @@ over-width or uncastable value is reported by column and limit only.</p>
 primary key by default, or <code>alt_key</code>'s columns when <code>alt_key</code> is given.</p></dd>
 
 
-<dt id="arg-variable">variable<a class="anchor" aria-label="anchor" href="#arg-variable"></a></dt>
+<dt id="arg-var-col">var_col<a class="anchor" aria-label="anchor" href="#arg-var-col"></a></dt>
 <dd><p>Character. The column to correct; must not be a key or
 alternate-key column.</p></dd>
 
@@ -137,6 +138,10 @@ The default, <code>FALSE</code>, writes it.</p></dd>
 
 <dt id="arg-dialect">dialect<a class="anchor" aria-label="anchor" href="#arg-dialect"></a></dt>
 <dd><p><code>"mssql"</code> or <code>"duckdb"</code>.</p></dd>
+
+
+<dt id="arg-variable">variable<a class="anchor" aria-label="anchor" href="#arg-variable"></a></dt>
+<dd><p>Deprecated; use <code>var_col</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -198,13 +203,13 @@ can quote a data value.</p>
 <span class="r-in"><span>  <span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="lift_master.html">lift_master</a></span><span class="op">(</span><span class="va">cfg</span>, <span class="va">con</span>, <span class="va">pq</span>, dry_run <span class="op">=</span> <span class="cn">FALSE</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu"><a href="backfill_corrections.html">backfill_corrections</a></span><span class="op">(</span><span class="va">cfg</span>, <span class="va">con</span>, dry_run <span class="op">=</span> <span class="cn">FALSE</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu">propose_correction</span><span class="op">(</span><span class="va">cfg</span>, <span class="va">con</span>, key_values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>id <span class="op">=</span> <span class="st">"K1"</span><span class="op">)</span>, variable <span class="op">=</span> <span class="st">"age"</span>,</span></span>
+<span class="r-in"><span>  <span class="fu">propose_correction</span><span class="op">(</span><span class="va">cfg</span>, <span class="va">con</span>, key_values <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>id <span class="op">=</span> <span class="st">"K1"</span><span class="op">)</span>, var_col <span class="op">=</span> <span class="st">"age"</span>,</span></span>
 <span class="r-in"><span>                     expected_prior <span class="op">=</span> <span class="fl">60</span>, new_value <span class="op">=</span> <span class="fl">61</span>, evidence_type <span class="op">=</span> <span class="st">"chart_review"</span>,</span></span>
 <span class="r-in"><span>                     evidence_ref <span class="op">=</span> <span class="st">"invented"</span>, asserted_by <span class="op">=</span> <span class="st">"tester"</span>, dialect <span class="op">=</span> <span class="st">"duckdb"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpKmfBo6/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmphjd9TA/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>
@@ -220,7 +225,7 @@ can quote a data value.</p>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> legacy: 0 facts parsed; 0 resolved; 0 unresolved</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> recorded 0; 0 stale corrections</span>
 <span class="r-wrn co"><span class="r-pr">#&gt;</span> <span class="warning">Warning: </span>'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> Correction c7300ddc2dff09b8a appended. First correction to this variable: regenerate the view.</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> Correction cbf69e81552a0849a appended. First correction to this variable: regenerate the view.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>
 </code></pre></div>
