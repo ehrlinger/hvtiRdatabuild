@@ -71,3 +71,13 @@ test_that("provenance is read from the file's footer, not its data", {
   expect_identical(read_pull_provenance(file.path(f$dir, release$file))$sql_commit,
                    "abc1234")
 })
+
+test_that("a frozen prior-excluded pull records only its retained units' corrections", {
+  f <- local_freeze_setup()
+  release <- freeze_study_pull(pull_demo(f$con, demo_query(prior = "exclude")), f$config,
+                               f$dir, "st0000_pull", extract_date = "2026-11-16")
+  prov <- read_pull_provenance(file.path(f$dir, release$file))
+
+  expect_identical(unlist(prov$applied_correction_ids), "C2")
+  expect_setequal(unlist(prov$corrections_in_effect), c("C1", "C2"))
+})
