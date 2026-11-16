@@ -78,7 +78,7 @@ test_that("distinct numeric ids that print alike are never matched as one", {
   ids <- c(0.12345678901234561, 0.12345678901234568)
   o <- data.frame(ccfidu = ids, v = c(1, 2))
   r <- data.frame(ccfidu = ids, v = c(1, 999))
-  res <- compare_built(o, r, id = "ccfidu")
+  res <- compare_built(o, r, id_col = "ccfidu")
   expect_equal(attr(res, "rows")$n_common, 2L)
   expect_equal(res$verdict[res$variable == "v"], "differs")
   expect_equal(res$n_differ[res$variable == "v"], 1L)
@@ -87,14 +87,14 @@ test_that("distinct numeric ids that print alike are never matched as one", {
 test_that("integer and double ids match by value, and large doubles stay distinct", {
   big <- 2^52 + c(0, 1)
   o <- data.frame(ccfidu = big, v = c(1, 2))
-  res <- compare_built(o, o, id = "ccfidu")
+  res <- compare_built(o, o, id_col = "ccfidu")
   expect_equal(attr(res, "rows")$n_common, 2L)
   mixed <- compare_built(data.frame(ccfidu = c(1e15, 7), v = 1:2),
-                         data.frame(ccfidu = c(7L, 8L), v = 2:3), id = "ccfidu")
+                         data.frame(ccfidu = c(7L, 8L), v = 2:3), id_col = "ccfidu")
   expect_equal(attr(mixed, "rows")$n_common, 1L)
 })
 
 test_that("numeric ids beyond exact double precision are refused", {
   o <- data.frame(ccfidu = c(2^53 + 2, 1), v = 1:2)
-  expect_error(compare_built(o, o, id = "ccfidu"), "compare_built\\(\\): .*exactly")
+  expect_error(compare_built(o, o, id_col = "ccfidu"), "compare_built\\(\\): .*exactly")
 })
