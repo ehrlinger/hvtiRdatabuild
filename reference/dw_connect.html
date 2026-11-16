@@ -61,7 +61,7 @@ string is never echoed.</p>
 <span>  dsn <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  port <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  encrypt <span class="op">=</span> <span class="cn">TRUE</span>,</span>
-<span>  trust_certificate <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  trust_certificate <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  <span class="va">...</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -93,7 +93,7 @@ credentials and none enters R's memory.</p></dd>
 
 <dt id="arg-trust-certificate">trust_certificate<a class="anchor" aria-label="anchor" href="#arg-trust-certificate"></a></dt>
 <dd><p>Whether to trust the server certificate without
-validating it against a CA chain.</p></dd>
+validating it against a CA chain. <code>FALSE</code>, the default, validates it.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -106,15 +106,15 @@ validating it against a CA chain.</p></dd>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
-    <p><code>trust_certificate</code> defaults to <code>TRUE</code> for a specific reason. Microsoft
-changed the <code>Encrypt</code> default from <code>no</code> in <em>ODBC Driver 17 for SQL Server</em>
-to <code>yes</code> in driver 18. A connection string that worked under the older
-driver fails with a certificate error under 18 unless it either disables
-encryption or trusts the server certificate. The legacy SAS connection
-carried <code>TrustServerCertificate=Yes</code>, which is why the pull works today.
-Whether trusting the certificate is the right long-term posture, versus
-installing the institutional CA chain, is a question for whoever
-administers the DSN, but changing it silently would break every pull.</p>
+    <p><code>trust_certificate</code> defaults to <code>FALSE</code>: the warehouse server's TLS
+certificate is checked against the machine's CA chain, because the
+connection carries credentials. Microsoft changed the <code>Encrypt</code> default
+from <code>no</code> in <em>ODBC Driver 17 for SQL Server</em> to <code>yes</code> in driver 18, and the
+legacy SAS connection carried <code>TrustServerCertificate=Yes</code>. If a connection
+fails because the certificate does not verify, install the institutional CA
+chain on the machine (ask whoever administers the server or the DSN). Pass
+<code>trust_certificate = TRUE</code> only as a stop-gap: it accepts any certificate,
+so it does not protect the credentials from an impostor server.</p>
 <p>Set the <code>HVI_DW_KERBEROS</code> environment variable to enable the top rung of
 the credential ladder, Kerberos integrated authentication: no stored
 secret is used, and the connection relies on the caller's existing ticket

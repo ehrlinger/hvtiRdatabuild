@@ -72,9 +72,9 @@ different release published for the same extract date adds `_r2`, `_r3`,
 and so on. The catalog lock protects that sequence when two processes
 publish at once. Publishing the same bytes again for the same dataset
 and date is idempotent: it returns the existing release rather than
-creating a revision. If that release was withdrawn, it remains
-withdrawn; publication does not reactivate the bytes under a new release
-identity.
+creating a revision. If that release was withdrawn, publication is an
+error that names the withdrawn release: it neither reactivates the bytes
+nor publishes them under a new release identity.
 
 The release file moves into place before the catalog is replaced. If the
 catalog write fails, the file remains as an unregistered orphan. No

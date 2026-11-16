@@ -1,11 +1,12 @@
 # Lift a master's parquet snapshot into the warehouse as a view
 
-Checks the primary key, creates a base table named for the snapshot's
-release, loads it row group by row group, and proves it equal to the
-snapshot: counts, aggregates and a sampled compare first, then a full
-comparison of every column joined on the key. Only then is a parity
-record written and the master's view created. If the master already has
-a corrections table, the view is regenerated with corrections applied.
+Checks that the snapshot is current, checks the primary key, creates a
+base table named for the snapshot's release and checksum, loads it row
+group by row group, and proves it equal to the snapshot: counts,
+aggregates and a sampled compare first, then a full comparison of every
+column joined on the key. Only then is a parity record written and the
+master's view created. If the master already has a corrections table,
+the view is regenerated with corrections applied.
 
 ## Usage
 
@@ -47,6 +48,15 @@ Invisibly, a list with `dry_run`, `base_table`, `ddl_path` and `verdict`
 
 ## Details
 
+The snapshot is current when its sidecar's `source_sha256` matches the
+configuration's current build as it is now; a rebuilt build stops the
+lift until
+[`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md)
+has been re-run. Because the base table's name carries the first 12 hex
+digits of the parquet's sha256, re-lifting a rebuilt snapshot loads a
+new base table and moves the view to it. The earlier base table is left
+in place.
+
 A dry run, the default, writes the table's DDL next to the snapshot for
 a hand-off and touches nothing else. Warehouse errors are reported by
 step, with the driver's message withheld, because it can carry a data
@@ -83,7 +93,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmpkpabfv/duckdb
+#> ℹ /tmp/Rtmp3vZITC/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -91,6 +101,6 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> ℹ Run duckdb(shared_home = FALSE) to accept the temporary directory (and silence this message).
 #> ℹ See ?duckdb_storage for details and alternatives.
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo_base_built_demo written to /tmp/Rtmpkpabfv/lift1be02a52bc33/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo_base_built_demo_cec1958084d9 written to /tmp/Rtmp3vZITC/lift1b011ab762ea/built_demo.parquet.ddl.sql
 # }
 ```

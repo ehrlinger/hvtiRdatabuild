@@ -12,7 +12,9 @@ be looked at. In a draft render it is read, with a message of class
 call that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
 `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the
 same text. A parquet that no longer matches its manifest entry always
-stops.
+stops, and so does a sidecar whose recorded parquet sha256 is not the
+parquet's. A sidecar written before sidecars recorded that sha256 is not
+checked; rewriting the set adds the check.
 
 When the built dataset is registered as a dated parquet, "changed" means
 a newer version has been registered with
@@ -67,7 +69,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(
@@ -82,10 +84,8 @@ if (requireNamespace("arrow", quietly = TRUE)) {
   print(attr(d, "attrition"))
   unlink(root, recursive = TRUE)
 }
-#> Warning: register_data(): `root` is now the last argument. A first argument, unnamed, that is a directory is read as the root for one more release; pass root = by name.
-#> Warning: hv_consort_start(): an unquoted `patient_id` column is deprecated; pass its name as a string, `patient_id_col = "..."`. The old form works until hvtiPlotR 2.9.0. This warning is shown once per session.
 #> [1] 5 3
-#>   rule   reason n_before n_excluded n_after
-#> 1    1 Under 18        6          1       5
+#>   rule   reason n_before n_excluded n_after n_na_kept
+#> 1    1 Under 18        6          1       5         0
 # }
 ```

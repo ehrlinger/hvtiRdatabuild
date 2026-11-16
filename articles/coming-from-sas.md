@@ -164,8 +164,9 @@ every row, omit `exclude`; the `vars` list alone expresses its
 projection. `event` names the set’s own event column, which must be one
 of its `vars`; from it
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
-calculates `n_events` and `n_censored`, and only a set with an `event`
-may add expectations for them.
+counts each code: `n_censored` (0), `n_events` (1), `n_other_events`
+(any other code, such as a competing risk) and `n_event_missing` (`NA`).
+Only a set with an `event` may add expectations for them.
 
 Write the checkpoint explicitly after the built dataset is ready:
 

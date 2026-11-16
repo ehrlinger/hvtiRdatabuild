@@ -79,18 +79,26 @@ parent dataset and the attrition.</p>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>The sidecar contents, invisibly: a list with <code>set</code>, <code>parent</code>,
-<code>declaration_sha256</code>, <code>written</code>, <code>counts</code>, <code>n_cols</code>, <code>attrition</code> and
-<code>packages</code>.</p>
+<code>declaration_sha256</code>, <code>parquet_sha256</code>, <code>written</code>, <code>counts</code>, <code>n_cols</code>,
+<code>attrition</code> and <code>packages</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Nothing is written unless every check passes. Each <code>when</code> is R code evaluated
 against the data with only base R visible; a missing value counts as not
-excluded, as SAS <code>if &lt;missing&gt; then delete</code> does. The identifier column named
+excluded, as SAS <code>if &lt;missing&gt; then delete</code> does. Such a patient stays in the
+set and is counted in the attrition table's <code>n_na_kept</code> column, "NA on this
+rule (kept)", at each rule they reach. The identifier column named
 by <code>id</code> is used to track exclusions and is never written to the sidecar or
 the manifest. A set that names an <code>event</code> column, one of its <code>vars</code>, also
-counts <code>n_events</code> (rows where it equals 1) and <code>n_censored</code>; an <code>expect</code> on
-either count needs that <code>event</code> key.</p>
+counts each code explicitly: <code>n_censored</code> (rows where it equals 0),
+<code>n_events</code> (rows where it equals 1), <code>n_other_events</code> (any other code, such
+as a competing risk) and <code>n_event_missing</code> (<code>NA</code>). Nothing is inferred by
+subtraction. An <code>expect</code> on any of these counts needs that <code>event</code> key.</p>
+<p>The write holds the study's manifest lock (<code>manifest.yaml.lock</code>), so two
+writers at once cannot leave one writer's parquet beside the other's
+sidecar. The sidecar records the parquet's sha256, and
+<code><a href="read_analysis_set.html">read_analysis_set()</a></code> checks it while holding the same lock, shared.</p>
 <p>The parent is read with <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/read_built.html" class="external-link">hvtiRutilities::read_built()</a></code>, and a working read is refused: an
 analysis set is built from registered data only. A dataset with no dated version, including one
 registered before dated versions, stops before it is read and names <code>update_manifest()</code>. A
@@ -119,7 +127,7 @@ own message.</p>
 <span class="r-in"><span>    <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/study_dir.html" class="external-link">study_dir</a></span><span class="op">(</span><span class="st">"datasets"</span>, <span class="va">root</span><span class="op">)</span>, <span class="st">"built.csv"</span><span class="op">)</span>,</span></span>
 <span class="r-in"><span>    row.names <span class="op">=</span> <span class="cn">FALSE</span></span></span>
 <span class="r-in"><span>  <span class="op">)</span></span></span>
-<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/register_data.html" class="external-link">register_data</a></span><span class="op">(</span><span class="va">root</span>, file <span class="op">=</span> <span class="st">"built.csv"</span><span class="op">)</span><span class="op">)</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/message.html" class="external-link">suppressMessages</a></span><span class="op">(</span><span class="fu">hvtiRutilities</span><span class="fu">::</span><span class="fu"><a href="https://ehrlinger.github.io/hvtiRutilities/reference/register_data.html" class="external-link">register_data</a></span><span class="op">(</span>file <span class="op">=</span> <span class="st">"built.csv"</span>, root <span class="op">=</span> <span class="va">root</span><span class="op">)</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">yml</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="va">root</span>, <span class="st">"_study.yml"</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">y</span> <span class="op">&lt;-</span> <span class="fu">yaml</span><span class="fu">::</span><span class="fu"><a href="https://yaml.r-lib.org/reference/read_yaml.html" class="external-link">read_yaml</a></span><span class="op">(</span><span class="va">yml</span><span class="op">)</span></span></span>
 <span class="r-in"><span>  <span class="va">y</span><span class="op">$</span><span class="va">analysis_sets</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span>primary <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span></span>
@@ -140,6 +148,12 @@ own message.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $n_censored</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 3</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $n_other_events</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> $n_event_missing</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] 0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 <span class="r-in"><span></span></span>

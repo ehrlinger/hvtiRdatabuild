@@ -14,7 +14,7 @@ dw_connect(
   dsn = NULL,
   port = NULL,
   encrypt = TRUE,
-  trust_certificate = TRUE,
+  trust_certificate = FALSE,
   ...
 )
 ```
@@ -45,7 +45,7 @@ dw_connect(
 - trust_certificate:
 
   Whether to trust the server certificate without validating it against
-  a CA chain.
+  a CA chain. `FALSE`, the default, validates it.
 
 - ...:
 
@@ -60,16 +60,16 @@ object.
 
 ## Details
 
-`trust_certificate` defaults to `TRUE` for a specific reason. Microsoft
-changed the `Encrypt` default from `no` in *ODBC Driver 17 for SQL
-Server* to `yes` in driver 18. A connection string that worked under the
-older driver fails with a certificate error under 18 unless it either
-disables encryption or trusts the server certificate. The legacy SAS
-connection carried `TrustServerCertificate=Yes`, which is why the pull
-works today. Whether trusting the certificate is the right long-term
-posture, versus installing the institutional CA chain, is a question for
-whoever administers the DSN, but changing it silently would break every
-pull.
+`trust_certificate` defaults to `FALSE`: the warehouse server's TLS
+certificate is checked against the machine's CA chain, because the
+connection carries credentials. Microsoft changed the `Encrypt` default
+from `no` in *ODBC Driver 17 for SQL Server* to `yes` in driver 18, and
+the legacy SAS connection carried `TrustServerCertificate=Yes`. If a
+connection fails because the certificate does not verify, install the
+institutional CA chain on the machine (ask whoever administers the
+server or the DSN). Pass `trust_certificate = TRUE` only as a stop-gap:
+it accepts any certificate, so it does not protect the credentials from
+an impostor server.
 
 Set the `HVI_DW_KERBEROS` environment variable to enable the top rung of
 the credential ladder, Kerberos integrated authentication: no stored

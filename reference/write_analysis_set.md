@@ -27,19 +27,29 @@ write_analysis_set(name, cfg = hvtiRutilities::study_config())
 ## Value
 
 The sidecar contents, invisibly: a list with `set`, `parent`,
-`declaration_sha256`, `written`, `counts`, `n_cols`, `attrition` and
-`packages`.
+`declaration_sha256`, `parquet_sha256`, `written`, `counts`, `n_cols`,
+`attrition` and `packages`.
 
 ## Details
 
 Nothing is written unless every check passes. Each `when` is R code
 evaluated against the data with only base R visible; a missing value
-counts as not excluded, as SAS `if <missing> then delete` does. The
-identifier column named by `id` is used to track exclusions and is never
-written to the sidecar or the manifest. A set that names an `event`
-column, one of its `vars`, also counts `n_events` (rows where it
-equals 1) and `n_censored`; an `expect` on either count needs that
-`event` key.
+counts as not excluded, as SAS `if <missing> then delete` does. Such a
+patient stays in the set and is counted in the attrition table's
+`n_na_kept` column, "NA on this rule (kept)", at each rule they reach.
+The identifier column named by `id` is used to track exclusions and is
+never written to the sidecar or the manifest. A set that names an
+`event` column, one of its `vars`, also counts each code explicitly:
+`n_censored` (rows where it equals 0), `n_events` (rows where it equals
+1), `n_other_events` (any other code, such as a competing risk) and
+`n_event_missing` (`NA`). Nothing is inferred by subtraction. An
+`expect` on any of these counts needs that `event` key.
+
+The write holds the study's manifest lock (`manifest.yaml.lock`), so two
+writers at once cannot leave one writer's parquet beside the other's
+sidecar. The sidecar records the parquet's sha256, and
+[`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+checks it while holding the same lock, shared.
 
 The parent is read with
 [`hvtiRutilities::read_built()`](https://ehrlinger.github.io/hvtiRutilities/reference/read_built.html),
@@ -72,7 +82,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(
@@ -93,6 +103,12 @@ if (requireNamespace("arrow", quietly = TRUE)) {
 #> 
 #> $n_censored
 #> [1] 3
+#> 
+#> $n_other_events
+#> [1] 0
+#> 
+#> $n_event_missing
+#> [1] 0
 #> 
 # }
 ```

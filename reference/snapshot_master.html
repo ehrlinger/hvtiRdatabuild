@@ -84,7 +84,12 @@ its parent master it was built from.</p>
 <dt id="arg-expect">expect<a class="anchor" aria-label="anchor" href="#arg-expect"></a></dt>
 <dd><p>Optional validation for the current build, passed to
 <code><a href="snapshot_oracle.html">snapshot_oracle()</a></code>. Historical builds are not validated, because their
-logs are rarely retained.</p></dd>
+logs are rarely retained.</p>
+<p>A snapshot that already exists is skipped only when its sidecar is complete
+and, for the current build, records the source's current checksum. The
+current build keeps a fixed file name, so a rebuild is detected by its
+checksum and snapshotted again. Historical builds are named by date and are
+not re-hashed on every run.</p></dd>
 
 </dl></div>
     <div class="section level2">
