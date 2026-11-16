@@ -48,6 +48,7 @@ jobs:
       # to resolve it from the public package repos.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          cache-version: 2
           extra-packages: |
             any::covr
             any::xml2
@@ -56,6 +57,8 @@ jobs:
 
       - name: Test coverage
         run: |
+          # covr >= 4.0.0 required; a cached 3.6.5 would otherwise run silently.
+          stopifnot(packageVersion("covr") >= "4.0.0")
           cov <- covr::package_coverage(
             quiet = FALSE,
             clean = FALSE,
