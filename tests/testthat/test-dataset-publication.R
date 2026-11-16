@@ -584,3 +584,22 @@ test_that("withdrawal and publication serialize without losing either change", {
   expect_identical(releases[[1L]]$status, "withdrawn")
   expect_identical(releases[[2L]]$status, "published")
 })
+
+test_that("publish_dataset() publishes a parquet draft", {
+  skip_if_not_installed("arrow")
+  published <- withr::local_tempdir("published-")
+  draft <- withr::local_tempfile(fileext = ".parquet")
+  # No PHI: identifiers and values are invented.
+  arrow::write_parquet(
+    data.frame(synthetic_id = c("SYN001", "SYN002"), value = c(1, 2)),
+    draft
+  )
+
+  release <- publish_dataset(draft, "example_pull", published,
+                             extract_date = "2026-11-16")
+
+  expect_identical(tools::file_ext(release$file), "parquet")
+  expect_identical(release$n_rows, 2L)
+  expect_identical(release$n_cols, 2L)
+  expect_true(file.exists(file.path(published, release$file)))
+})

@@ -46,7 +46,8 @@ adopts the new one with \code{\link[hvtiRutilities:adopt_data_update]{hvtiRutili
 \code{datasets_dir}, and reads the staged copy again before recording its SHA-256,
 row count, and column count. It supports the clinical-data formats read by
 \code{\link[hvtiRutilities:read_clinical_data]{hvtiRutilities::read_clinical_data()}}: \code{.sas7bdat}, \code{.csv}, \code{.xlsx},
-\code{.xls}, and \code{.rds}. This verifies that the release is readable and records
+\code{.xls}, \code{.rds}, and \code{.parquet} (which needs the arrow package). This verifies
+that the release is readable and records
 its shape. It does not decide whether the cohort or its values are clinically
 correct.
 
