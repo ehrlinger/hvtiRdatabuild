@@ -170,7 +170,7 @@ writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpLcVUM2/duckdb
+#> ℹ /tmp/RtmpoCIC77/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -179,7 +179,7 @@ con <- DBI::dbConnect(duckdb::duckdb())
 #> ℹ See ?duckdb_storage for details and alternatives.
 dry <- lift_master(read_master_config(cfg_path), con, pq, dialect = "duckdb")
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo2_base_built_demo written to /tmp/RtmpLcVUM2/master1fb56f37d429/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo2_base_built_demo written to /tmp/RtmpoCIC77/master20b7599670ae/built_demo.parquet.ddl.sql
 dry$dry_run
 #> [1] TRUE
 ```
@@ -291,7 +291,7 @@ prop <- propose_correction(cfg2, con,
                            key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
                            expected_prior = 70, new_value = 71, evidence_type = "chart_review",
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
-#> Correction cb16f819678a24ec0 appended.
+#> Correction c5afd5603c7ce723c appended.
 prop$verdict
 #> [1] "appended"
 ```
@@ -305,7 +305,7 @@ someone accepts it:
 ``` r
 
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
-#> Decision d0521f5334a582267 (accept) recorded on cb16f819678a24ec0.
+#> Decision d72109ead1f8572aa (accept) recorded on c5afd5603c7ce723c.
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 #>   age
 #> 1  71
