@@ -328,10 +328,11 @@
 #'
 #' @return The sidecar contents, invisibly: a list with `set`, `parent`,
 #'   `declaration_sha256`, `parquet_sha256`, `written`, `counts`, `n_cols`,
-#'   `attrition`, `packages` and `provenance`. `written` is ISO 8601 UTC text
-#'   (`"2026-11-16T19:40:00Z"`), which `as.POSIXct(written, tz = "UTC",
-#'   format = "%Y-%m-%dT%H:%M:%SZ")` reads back. `provenance` is the hvtiR family's
-#'   record: `package`, `version`, `sha`, `method`, `seed`, `rng_kind` and `time`
+#'   `attrition`, `packages` and `provenance`. `written` is ISO 8601 local time
+#'   with its UTC offset (`"2026-11-16T14:40:00-0500"`), which
+#'   `as.POSIXct(written, format = "%Y-%m-%dT%H:%M:%S%z")` reads back.
+#'   `provenance` is the hvtiR family's record: `package`, `version`, `sha`,
+#'   `method`, `seed`, `rng_kind` and `time`
 #'   (a `POSIXct` here, the same ISO text in the sidecar file).
 #'
 #' @examples
@@ -449,7 +450,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
     parent = parent_after,
     declaration_sha256 = .declaration_sha(raw),
     parquet_sha256 = NA_character_,
-    written = .iso_utc(prov$time),
+    written = .iso_time(prov$time),
     counts = counts,
     n_cols = ncol(out),
     attrition = attrition,
@@ -470,7 +471,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   .atomic_write(p$parquet, function(tmp) arrow::write_parquet(out, tmp))
   side$parquet_sha256 <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
   on_disk <- side
-  on_disk$provenance$time <- .iso_utc(prov$time)
+  on_disk$provenance$time <- .iso_time(prov$time)
   .atomic_write(p$sidecar, function(tmp) yaml::write_yaml(on_disk, tmp))
   hvtiRutilities::update_manifest(
     file = p$parquet, manifest_path = p$manifest, n_rows = nrow(out),
@@ -520,8 +521,10 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #' declaration in `_study.yml` has changed. A stale set is never rebuilt
 #' silently: its exclusions are decisions, and a changed attrition should be
 #' looked at. In a draft render it is read, with a message of class
-#' `hvtiRutilities_stale_analysis_set` giving the [write_analysis_set()] call
-#' that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
+#' `hvtiRdatabuild_stale_analysis_set` giving the [write_analysis_set()] call
+#' that updates it. The message also carries the old class,
+#' `hvtiRutilities_stale_analysis_set`, for one release; catch the new one.
+#' In a final render (`HVTI_TEMPLATE_STRICT` set, as
 #' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
 #' text. A parquet that no longer matches its manifest entry always stops, and
 #' so does a sidecar whose recorded parquet sha256 is not the parquet's. A

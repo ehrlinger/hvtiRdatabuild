@@ -57,7 +57,7 @@ test_that("the analysis-set sidecar carries the record and a POSIXct-readable ti
   expect_provenance_record(side$provenance)
   on_disk <- yaml::read_yaml(.set_paths("eda", cfg)$sidecar)
   for (x in c(on_disk$written, on_disk$provenance$time)) {
-    t <- as.POSIXct(x, tz = "UTC", format = "%Y-%m-%dT%H:%M:%SZ")
+    t <- as.POSIXct(x, format = "%Y-%m-%dT%H:%M:%S%z")
     expect_false(is.na(t))
   }
   expect_length(on_disk$provenance$rng_kind, 3L)

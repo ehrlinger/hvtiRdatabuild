@@ -70,16 +70,19 @@
   )
 }
 
-#' A time as ISO 8601 UTC text, which `as.POSIXct()` reads back
+#' A time as ISO 8601 local text with its UTC offset, which `as.POSIXct()` reads back
+#'
+#' Local time keeps the date a reader takes from the first ten characters the
+#' date the job ran on; the offset keeps the instant exact.
 #'
 #' @param time A `POSIXct`.
 #'
-#' @return Character, such as `"2026-11-16T19:40:00Z"`.
+#' @return Character, such as `"2026-11-16T14:40:00-0500"`.
 #'
 #' @keywords internal
 #' @noRd
-.iso_utc <- function(time) {
-  format(time, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+.iso_time <- function(time) {
+  format(time, "%Y-%m-%dT%H:%M:%S%z")
 }
 
 # Deprecations already announced this session, keyed "fn:what".

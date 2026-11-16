@@ -10,7 +10,7 @@
 * `pull_master()` returns `$meta`, which leads with the hvtiR provenance record (`package`,
   `version`, `sha`, `method`, `seed`, `rng_kind`, `time`). `$provenance` is deprecated and goes in
   the next release. The analysis-set sidecar carries the same record, and its `written` time is
-  ISO 8601 UTC text that `as.POSIXct()` reads back.
+  ISO 8601 local time with its UTC offset, which `as.POSIXct()` reads back.
 * Renamed arguments, each deprecated for one release with a once-per-session warning of class
   `hvtiRdatabuild_deprecated`. Giving both the old and the new name is an error that names both.
   - `compare_built(id)` is `id_col`, with no default (`"ccfidu"` was one study's column).

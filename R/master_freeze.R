@@ -93,7 +93,7 @@ freeze_study_pull <- function(pull, path, dir, dataset_id,
 
   stages <- cohort_summary(pull$cohort)$stages
   meta <- .pull_meta(pull)
-  if (inherits(meta$time, "POSIXct")) meta$time <- .iso_utc(meta$time)
+  if (inherits(meta$time, "POSIXct")) meta$time <- .iso_time(meta$time)
   prov <- c(
     list(schema = 1L),
     meta,
@@ -120,7 +120,9 @@ freeze_study_pull <- function(pull, path, dir, dataset_id,
 #'
 #' @param path Character. A parquet file written by [freeze_study_pull()].
 #'
-#' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`,
+#' @return A list: `schema`; for a pull frozen with the provenance record, that record
+#'   (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, and `time` as ISO 8601
+#'   text); then `master`, `sql_commit`, `applied_correction_ids`,
 #'   `corrections_in_effect`, `parity_verified_at`, `read_at`, `columns`,
 #'   `cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`, `n_unmatched`
 #'   and `cohort_stages`.
