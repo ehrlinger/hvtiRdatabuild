@@ -302,3 +302,87 @@ review_criterion <- function(id, label, role) {
     kind = "review"
   ), class = "cohort_criterion")
 }
+
+# Compile the warehouse criteria: number every leaf test as a flag column, crit_<k>, in
+# declared order.
+.compile_test <- function(test, counter) {
+  if (test$type %in% c("master", "view")) {
+    counter$n <- counter$n + 1L
+    return(list(type = "leaf", col = paste0("crit_", counter$n), test = test))
+  }
+  list(type = test$type, parts = lapply(test$parts, .compile_test, counter = counter))
+}
+
+.compile_criteria <- function(criteria) {
+  counter <- new.env(parent = emptyenv())
+  counter$n <- 0L
+  warehouse <- Filter(function(cr) identical(cr$kind, "warehouse"), criteria)
+  stages <- lapply(warehouse, function(cr) {
+    cr$node <- .compile_test(cr$test, counter)
+    cr
+  })
+  list(stages = stages, n_flags = counter$n)
+}
+
+.node_leaves <- function(node) {
+  if (identical(node$type, "leaf")) return(list(node))
+  do.call(c, lapply(node$parts, .node_leaves))
+}
+
+# Three-valued evaluation of a node over flag columns: 1 met, 0 not met, NA undetermined.
+.eval_node <- function(node, flags) {
+  if (identical(node$type, "leaf")) return(as.integer(flags[[node$col]]))
+  n <- nrow(flags)
+  if (!n) return(integer())
+  m <- matrix(unlist(lapply(node$parts, .eval_node, flags = flags)), nrow = n)
+  ones <- rowSums(m == 1L, na.rm = TRUE)
+  zeros <- rowSums(m == 0L, na.rm = TRUE)
+  out <- if (identical(node$type, "any")) {
+    ifelse(ones > 0, 1L, ifelse(zeros == ncol(m), 0L, NA_integer_))
+  } else {
+    ifelse(zeros > 0, 0L, ifelse(ones == ncol(m), 1L, NA_integer_))
+  }
+  as.integer(out)
+}
+
+# A stage's verdict for each unit. An include criterion passes met units, an exclude
+# criterion passes units that are not met. An undetermined unit follows the route, and
+# `review` marks it for chart review while keeping it in.
+.stage_outcome <- function(role, undetermined, s, label) {
+  target <- if (identical(role, "include")) 1L else 0L
+  und <- is.na(s)
+  passes <- !und & s == target
+  included <- passes | (und & !identical(undetermined, "exclude"))
+  failed <- if (identical(role, "include")) "did not meet: " else "excluded: "
+  # Typed, never ifelse(): an empty stage must still give a character reason.
+  reason <- rep(NA_character_, length(s))
+  reason[!included & und] <- paste0("undetermined: ", label)
+  reason[!included & !und] <- paste0(failed, label)
+  list(included = included, reason = reason,
+       review = und & identical(undetermined, "review"))
+}
+
+.active_units <- function(record) {
+  last <- utils::tail(record$stages$stage_id[order(record$stages$order)], 1L)
+  record$members$patient_id[record$members$stage_id == last & record$members$included]
+}
+
+.describe_test <- function(test) {
+  switch(test$type,
+         master = paste("master row:", test$condition),
+         view = sprintf("%s rows by %s, days %d to %d, %s: %s", test$view, test$date_col,
+                        test$window[[1]], test$window[[2]], test$pick, test$condition),
+         any = paste0("any of [", paste(vapply(test$parts, .describe_test, ""),
+                                        collapse = "; "), "]"),
+         all = paste0("all of [", paste(vapply(test$parts, .describe_test, ""),
+                                        collapse = "; "), "]"))
+}
+
+.describe_criterion <- function(cr) {
+  switch(cr$kind,
+         warehouse = sprintf("%s [%s, warehouse]: %s; undetermined: %s", cr$id, cr$role,
+                             .describe_test(cr$test), cr$undetermined),
+         local = sprintf("%s [%s, local]: file sha256 %s; undetermined: %s", cr$id,
+                         cr$role, cr$sha256, cr$undetermined),
+         review = sprintf("%s [%s, review]", cr$id, cr$role))
+}

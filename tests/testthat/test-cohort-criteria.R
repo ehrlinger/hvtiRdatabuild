@@ -62,3 +62,44 @@ test_that("local and review criteria record what they need", {
   expect_identical(rev$kind, "review")
   expect_error(review_criterion("strategy", "S"), "`role` is required")
 })
+
+test_that("compiling numbers the leaves across stages", {
+  a <- criterion("a", "A", "include", any_of(master_row("x = 1"), master_row("y = 1")),
+                 "exclude")
+  b <- criterion("b", "B", "exclude", master_row("z = 1"), "keep")
+  r <- review_criterion("r", "R", "exclude")
+  comp <- .compile_criteria(list(a, b, r))
+  expect_identical(comp$n_flags, 3L)
+  expect_length(comp$stages, 2L)
+  expect_identical(vapply(.node_leaves(comp$stages[[1]]$node), `[[`, "", "col"),
+                   c("crit_1", "crit_2"))
+  expect_identical(comp$stages[[2]]$node$col, "crit_3")
+})
+
+test_that("any_of and all_of follow three-valued logic", {
+  flags <- data.frame(crit_1 = c(1L, 0L, 0L, NA, NA, 1L),
+                      crit_2 = c(NA, 0L, NA, 0L, NA, 1L))
+  leaf <- function(k) list(type = "leaf", col = paste0("crit_", k))
+  any_node <- list(type = "any", parts = list(leaf(1), leaf(2)))
+  all_node <- list(type = "all", parts = list(leaf(1), leaf(2)))
+  expect_identical(.eval_node(any_node, flags), c(1L, 0L, NA, NA, NA, 1L))
+  expect_identical(.eval_node(all_node, flags), c(NA, 0L, 0L, 0L, NA, 1L))
+})
+
+test_that("a stage outcome applies role and the undetermined route", {
+  s <- c(1L, 0L, NA)
+  inc <- .stage_outcome("include", "review", s, "LVEF")
+  expect_identical(inc$included, c(TRUE, FALSE, TRUE))
+  expect_identical(inc$reason, c(NA, "did not meet: LVEF", NA))
+  expect_identical(inc$review, c(FALSE, FALSE, TRUE))
+  exc <- .stage_outcome("exclude", "exclude", s, "Inotrope")
+  expect_identical(exc$included, c(FALSE, TRUE, FALSE))
+  expect_identical(exc$reason, c("excluded: Inotrope", NA, "undetermined: Inotrope"))
+})
+
+test_that("a stage with nobody active gives typed, empty outcomes", {
+  out <- .stage_outcome("include", "exclude", integer(), "LVEF")
+  expect_identical(out$included, logical())
+  expect_identical(out$reason, character())
+  expect_identical(out$review, logical())
+})
