@@ -8,7 +8,9 @@ cohort_query(
   qualifying,
   epoch,
   index = c("first", "all"),
-  prior = c("keep", "exclude")
+  prior = c("keep", "exclude"),
+  criteria = list(),
+  index_on = NULL
 )
 }
 \arguments{
@@ -21,6 +23,16 @@ example \code{"proc = 'CABG'"}.}
 
 \item{prior}{\code{"keep"} or \code{"exclude"}, for units with a qualifying encounter before
 the epoch.}
+
+\item{criteria}{A list of criteria from \code{\link[=criterion]{criterion()}}, \code{\link[=local_criterion]{local_criterion()}} and
+\code{\link[=review_criterion]{review_criterion()}}, in the order they run: warehouse criteria, then local, then
+review. Each becomes a counted cohort stage; see \code{\link[=criterion]{criterion()}}.}
+
+\item{index_on}{With \code{index = "first"} and criteria, which encounter is the index:
+\code{"qualifying"} takes each patient's first qualifying encounter and then applies the
+criteria, so a patient excluded there is out; \code{"eligible"} applies the criteria to
+every qualifying encounter and takes each patient's first that survives. The two give
+different cohorts, so there is no default. Leave \code{NULL} otherwise.}
 }
 \value{
 An object of class \code{cohort_query}.
@@ -44,6 +56,8 @@ its date never leaves it.
 
 \code{qualifying} is SQL written by the study programmer and run as a \code{WHERE} condition on
 the master. It must never be built from data.
+
+Criteria are evaluated in the warehouse, in the pull's transaction; see \code{\link[=criterion]{criterion()}}.
 }
 \examples{
 cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))

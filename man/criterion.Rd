@@ -13,7 +13,7 @@ criterion(id, label, role, test, undetermined)
 
 \item{role}{\code{"include"} or \code{"exclude"}.}
 
-\item{test}{A test from \code{\link[=master_row]{master_row()}}, \code{\link[=view_rows]{view_rows()}}, \code{\link[tidyselect:any_of]{any_of()}} or \code{\link[tidyselect:all_of]{all_of()}}.}
+\item{test}{A test from \code{\link[=master_row]{master_row()}}, \code{\link[=view_rows]{view_rows()}}, \code{\link[=any_of]{any_of()}} or \code{\link[=all_of]{all_of()}}.}
 
 \item{undetermined}{\code{"exclude"}, \code{"keep"} or \code{"review"}.}
 }

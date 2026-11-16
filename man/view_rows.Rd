@@ -53,5 +53,5 @@ view_rows("echo_measure", date_col = "measured_on", window = c(-30, 0),
 
 }
 \seealso{
-\code{\link[=criterion]{criterion()}}, \code{\link[=master_row]{master_row()}}, \code{\link[tidyselect:any_of]{any_of()}}
+\code{\link[=criterion]{criterion()}}, \code{\link[=master_row]{master_row()}}, \code{\link[=any_of]{any_of()}}
 }

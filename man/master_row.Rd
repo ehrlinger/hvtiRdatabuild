@@ -23,5 +23,5 @@ master_row("salvage = 1")
 
 }
 \seealso{
-\code{\link[=criterion]{criterion()}}, \code{\link[=view_rows]{view_rows()}}, \code{\link[tidyselect:any_of]{any_of()}}
+\code{\link[=criterion]{criterion()}}, \code{\link[=view_rows]{view_rows()}}, \code{\link[=any_of]{any_of()}}
 }
