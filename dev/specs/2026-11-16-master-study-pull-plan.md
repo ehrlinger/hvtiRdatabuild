@@ -473,9 +473,13 @@ git commit -m "feat: cohort_query() defines a cohort by query, epoch and index"
     with the key columns, `columns` and `cohort_unit`. `cohort` is the cohort record
     with its stages: for a query, `qualifying` and `prior_qualifying`; always a final
     `in_master` stage, which excludes units with no master row. `provenance` is
-    `list(master, sql_commit, applied_correction_ids, read_at, columns,
-    cohort_definition, n_cohort, n_matched, n_unmatched)`.
-  - `print.master_pull(x, ...)`.
+    `list(master, sql_commit, applied_correction_ids, corrections_in_effect, read_at,
+    columns, cohort_definition, n_cohort, n_matched, n_unmatched)`.
+    `applied_correction_ids` are those applied to the cohort's own rows;
+    `corrections_in_effect` is every correction id applied anywhere in the master in the
+    same snapshot, so a correction that changed eligibility, or an earlier encounter's
+    row, is on record too. Ids only; no row of the applied view leaves the database.
+  - `print.master_pull(x, ...)` and `str.master_pull(object, ...)`, counts only.
 
 - [ ] **Step 1: Write the test helper.** Create `tests/testthat/helper-master-pull.R`:
 
@@ -724,11 +728,24 @@ test_that("a database error is withheld", {
   expect_match(err, "withheld")
 })
 
-test_that("printing shows counts, never identifiers", {
+test_that("print() and str() show counts, never identifiers or values", {
   con <- local_master_db()
-  out <- capture.output(print(pull_demo(con, demo_query())))
-  expect_true(any(grepl("matched", out)))
-  expect_false(any(grepl("SYN", out, fixed = TRUE)))
+  res <- pull_demo(con, demo_query())
+  for (out in list(capture.output(print(res)), capture.output(str(res)))) {
+    expect_true(any(grepl("matched", out)))
+    expect_false(any(grepl("SYN", out, fixed = TRUE)))
+    expect_false(any(grepl("2010-03-01", out, fixed = TRUE)))
+  }
+})
+
+test_that("corrections in effect cover rows outside the cohort", {
+  con <- local_master_db()
+  DBI::dbExecute(con, paste("INSERT INTO master_demo_corrections_applied",
+                            "VALUES ('C9', 'SYN102', DATE '2012-07-15')"))
+  res <- pull_demo(con, demo_query())
+
+  expect_false("C9" %in% res$provenance$applied_correction_ids)
+  expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2", "C9"))
 })
 ```
 
@@ -896,8 +913,10 @@ test_that("printing shows counts, never identifiers", {
 #' @return An object of class `master_pull`: a list with `data` (one row per active
 #'   unit: the key columns, `columns` and `cohort_unit`), `cohort` (the cohort record,
 #'   ending with the `in_master` stage) and `provenance` (`master`, `sql_commit`,
-#'   `applied_correction_ids`, `read_at`, `columns`, `cohort_definition`, `n_cohort`,
-#'   `n_matched`, `n_unmatched`).
+#'   `applied_correction_ids`, `corrections_in_effect`, `read_at`, `columns`,
+#'   `cohort_definition`, `n_cohort`, `n_matched`, `n_unmatched`).
+#'   `corrections_in_effect` holds every correction id applied anywhere in the master in
+#'   the same snapshot, including any that changed who qualified.
 #'
 #' @seealso [cohort_query()], [build_from_master()], [freeze_study_pull()]
 #'
@@ -983,6 +1002,9 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
             "ON a.mrn = c.mrn AND a.encounter_date = c.encounter_date"),
       .qualified_name(applied_view, dialect), tmp$name
     )))
+    in_effect <- run_step("read corrections in effect", DBI::dbGetQuery(con, paste(
+      "SELECT DISTINCT correction_id FROM", .qualified_name(applied_view, dialect)
+    )))
     run_step("drop cohort temp table", DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
 
     data$cohort_unit <- cohort_unit_id(as.character(data[[mrn_col]]),
@@ -993,7 +1015,8 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
            "to be unique. Nothing was pulled.", call. = FALSE)
     }
     list(data = data, selected = selected, read_at = read_at, commit = commit,
-         applied = sort(unique(as.character(applied$correction_id))))
+         applied = sort(unique(as.character(applied$correction_id))),
+         in_effect = sort(unique(as.character(in_effect$correction_id))))
   })
 
   base <- if (is_query) .query_cohort(cohort, read$selected, master, read$commit) else cohort
@@ -1023,6 +1046,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
       master = master,
       sql_commit = read$commit,
       applied_correction_ids = read$applied,
+      corrections_in_effect = read$in_effect,
       read_at = read_at,
       columns = columns,
       cohort_definition = if (is_query) {
@@ -1056,6 +1080,15 @@ print.master_pull <- function(x, ...) {
   cat("  columns: ", length(p$columns), "; corrections applied: ",
       length(p$applied_correction_ids), "; read at ", p$read_at, "\n", sep = "")
   invisible(x)
+}
+
+#' @rdname print.master_pull
+#' @param object A `master_pull` from [pull_master()].
+#' @export
+str.master_pull <- function(object, ...) {
+  cat("Structure of master_pull\n")
+  print.master_pull(object, ...)
+  invisible(NULL)
 }
 ```
 
@@ -1273,6 +1306,7 @@ test_that("a query cohort runs through pull, build and freeze, end to end", {
   expect_identical(prov$schema, 1L)
   expect_identical(prov$sql_commit, "abc1234")
   expect_setequal(unlist(prov$applied_correction_ids), c("C1", "C2"))
+  expect_setequal(unlist(prov$corrections_in_effect), c("C1", "C2"))
   expect_identical(prov$cohort_definition$index, "first")
   expect_identical(unlist(prov$cohort_stages$stage_id),
                    c("qualifying", "prior_qualifying", "in_master"))
@@ -1423,7 +1457,8 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
 #'
 #' @param path Character. A parquet file written by [freeze_study_pull()].
 #'
-#' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`, `read_at`,
+#' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`,
+#'   `corrections_in_effect`, `read_at`,
 #'   `columns`, `cohort_definition`, `n_cohort`, `n_matched`, `n_unmatched`,
 #'   `cohort_stages` and `study_config_sha256`.
 #'
@@ -1483,6 +1518,7 @@ git commit -m "feat: freeze_study_pull() publishes the pull with provenance in t
   - print.cohort_query
   - pull_master
   - print.master_pull
+  - str.master_pull
   - build_from_master
   - freeze_study_pull
   - read_pull_provenance
