@@ -7,7 +7,9 @@
 #' @param members A data frame with `patient_id`, `stage_id`, `included`, and
 #'   `reason` columns. Identifiers are runtime data and are never printed.
 #' @param stages A data frame with `stage_id`, `order`, `label`, `source`, and
-#'   `provenance` columns, ordered by `order`.
+#'   `provenance` columns, ordered by `order`. `source` is `"upstream"`, `"build"`,
+#'   `"derive"` or `"review"`. `review` is a decision made at chart review, recorded by
+#'   [apply_review()].
 #' @param patient_id_col Name of the patient identifier column in associated
 #'   patient-level data.
 #'
@@ -267,8 +269,8 @@ str.cohort_record <- function(object, ...) {
            call. = FALSE)
     }
   }
-  if (any(!stages$source %in% c("upstream", "build", "derive"))) {
-    stop("Stage source must be upstream, build, or derive.", call. = FALSE)
+  if (any(!stages$source %in% c("upstream", "build", "derive", "review"))) {
+    stop("Stage source must be upstream, build, derive, or review.", call. = FALSE)
   }
 
   if (!is.character(members$patient_id) || anyNA(members$patient_id) ||
