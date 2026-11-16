@@ -60,7 +60,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
   })
   res <- suppressMessages(lift_master(cfg, con, pq, dry_run = FALSE))
   expect_equal(res$verdict, "pass")
-  suppressMessages(backfill_corrections(cfg, con, dry_run = FALSE))
+  backfill_quietly(backfill_corrections(cfg, con, dry_run = FALSE))
 
   # A writer dry run validates and touches nothing.
   n0 <- DBI::dbGetQuery(con, paste0("SELECT COUNT(*) AS n FROM [", name, "_corrections]"))$n
@@ -84,7 +84,7 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
     evidence_type = "chart_review", evidence_ref = "invented", asserted_by = "tester"
   ))
   suppressMessages(decide_correction(cfg, con, r$correction_id, "accept", "tester"))
-  suppressMessages(backfill_corrections(cfg, con, dry_run = FALSE))
+  backfill_quietly(backfill_corrections(cfg, con, dry_run = FALSE))
   v <- DBI::dbGetQuery(con, paste0("SELECT age FROM [", name, "] WHERE ccfid = 'K2'"))
   expect_equal(v$age, 2 / 3)
 

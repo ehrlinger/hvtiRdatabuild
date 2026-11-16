@@ -1,5 +1,10 @@
 * Informational messages go through the hvtiR family's quiet mode: `options(hvti.quiet = TRUE)`
   silences them. Warnings and errors are never silenced.
+* Quiet mode cannot hide unfinished work. `snapshot_master()` warns, with class
+  `hvtiRdatabuild_snapshot_failed`, when a historical snapshot fails, naming the files.
+  `backfill_corrections()` warns, with class `hvtiRdatabuild_incomplete_backfill`, when a legacy
+  fact is unresolved or a statement unparsed, giving counts and program line numbers only. Its
+  result gains `unparsed`, `unresolved_lines` and `unparsed_lines`.
 * Errors a caller is expected to catch carry an `hvtiRdatabuild_<condition>` class and
   `hvtiRdatabuild_error`: `withdrawn_release`, `stale_snapshot`, `parity_failed`,
   `key_not_unique`, `load_log_mismatch`, `parity_gate`, `connection_failed`, `lock_timeout`,

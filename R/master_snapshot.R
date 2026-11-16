@@ -37,7 +37,10 @@
 #' @return Invisibly, a data frame with one row per dataset: `file`, `status`
 #'   (`"written"`, `"skipped"` or `"failed"`), `n_rows`, `n_cols`, `sha256`,
 #'   `source_sha256`, `parent_release`, `parent_source` (`"log"`, `"program"`,
-#'   `"declared"`, `"unknown"` or `"none"`) and `key_verdict`.
+#'   `"declared"`, `"unknown"` or `"none"`) and `key_verdict`. If any
+#'   historical snapshot failed, it also warns with class
+#'   `hvtiRdatabuild_snapshot_failed`, naming the files. The warning is not
+#'   silenced by `hvti.quiet`.
 #'
 #' @seealso [read_master_config()], [lift_master()]
 #'
@@ -121,7 +124,15 @@ snapshot_master <- function(config, dir, which = c("current", "history"),
       }
     )
   })
-  invisible(do.call(rbind, rows))
+  res <- do.call(rbind, rows)
+  failed <- res$file[res$status %in% "failed"]
+  if (length(failed)) {
+    .warn("snapshot_failed",
+      "snapshot_master(): ", length(failed), " historical snapshot(s) failed and were ",
+      "not written: ", paste(failed, collapse = ", "), "."
+    )
+  }
+  invisible(res)
 }
 
 #' Snapshot one dataset and record its lineage and key verdicts

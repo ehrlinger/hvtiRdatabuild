@@ -42,6 +42,28 @@
   ))
 }
 
+#' Warn with an `hvtiRdatabuild_<condition>` class
+#'
+#' For work that finished but is incomplete. Unlike `.hvti_inform()`, it is
+#' not silenced by `hvti.quiet`: quiet mode hides progress, never an
+#' unsuccessful outcome.
+#'
+#' @param condition The condition's name, without the package prefix.
+#' @param ... Pasted together, with no separator, as the message.
+#'
+#' @return `NULL`, invisibly.
+#'
+#' @keywords internal
+#' @noRd
+.warn <- function(condition, ...) {
+  warning(warningCondition(
+    paste0(...),
+    class = c(paste0("hvtiRdatabuild_", condition), "hvtiRdatabuild_warning"),
+    call = NULL
+  ))
+  invisible()
+}
+
 #' The family's seven-field provenance record
 #'
 #' A named list with every field present; a value that does not apply is `NA`

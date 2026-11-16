@@ -13,7 +13,10 @@ Builds analysis-ready clinical datasets for the clinical investigations statisti
 Informational messages, such as the progress lines of \code{\link[=snapshot_master]{snapshot_master()}} and
 \code{\link[=lift_master]{lift_master()}}, follow the hvtiR family option \code{hvti.quiet}:
 \code{options(hvti.quiet = TRUE)} silences them. Warnings and errors are never
-silenced by it.
+silenced by it. A call that finishes with work left undone warns, so quiet
+mode cannot hide it: \code{\link[=snapshot_master]{snapshot_master()}} when a historical snapshot fails,
+and \code{\link[=backfill_corrections]{backfill_corrections()}} when a legacy fact is unresolved or a statement
+unparsed.
 }
 
 \seealso{

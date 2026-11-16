@@ -38,7 +38,10 @@ not re-hashed on every run.}
 Invisibly, a data frame with one row per dataset: \code{file}, \code{status}
 (\code{"written"}, \code{"skipped"} or \code{"failed"}), \code{n_rows}, \code{n_cols}, \code{sha256},
 \code{source_sha256}, \code{parent_release}, \code{parent_source} (\code{"log"}, \code{"program"},
-\code{"declared"}, \code{"unknown"} or \code{"none"}) and \code{key_verdict}.
+\code{"declared"}, \code{"unknown"} or \code{"none"}) and \code{key_verdict}. If any
+historical snapshot failed, it also warns with class
+\code{hvtiRdatabuild_snapshot_failed}, naming the files. The warning is not
+silenced by \code{hvti.quiet}.
 }
 \description{
 Freezes a master's current SAS build, or its historical builds, as parquet

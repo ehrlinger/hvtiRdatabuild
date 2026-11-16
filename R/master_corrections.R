@@ -97,8 +97,12 @@ DECISIONS <- c("accept", "reject", "supersede", "bake") # nolint: object_name_li
 #' @param dry_run If `TRUE`, the default, report what would be recorded.
 #' @param dialect `"mssql"` or `"duckdb"`.
 #'
-#' @return Invisibly, a list of counts: `dry_run`, `facts`, `resolved`,
-#'   `unresolved`, `appended` and `stale`.
+#' @return Invisibly, a list: `dry_run`, the counts `facts`, `resolved`,
+#'   `unresolved`, `unparsed`, `appended` and `stale`, and the build-program
+#'   line numbers `unresolved_lines` and `unparsed_lines`. When any fact is
+#'   unresolved or any statement unparsed, it also warns with class
+#'   `hvtiRdatabuild_incomplete_backfill`, giving counts and line numbers but
+#'   no key or value. The warning is not silenced by `hvti.quiet`.
 #'
 #' @seealso [propose_correction()], [decide_correction()]
 #'
@@ -163,17 +167,34 @@ backfill_corrections <- function(config, con, dry_run = TRUE, dialect = "mssql")
     "legacy: ", nrow(parsed$facts), " facts parsed; ", n_res, " resolved; ",
     nrow(rows$unresolved), " unresolved"
   )
-  if (nrow(rows$unresolved)) {
-    tab <- table(rows$unresolved$reason)
-    .hvti_inform("  unresolved by reason: ", paste(names(tab), tab, sep = " ", collapse = ", "))
-    .hvti_inform("  at lines: ", paste(sort(unique(rows$unresolved$line)), collapse = ", "))
-  }
-  if (length(parsed$unparsed)) {
-    .hvti_inform("  unparsed statements at lines: ", paste(parsed$unparsed, collapse = ", "))
+  unresolved_lines <- sort(unique(as.integer(rows$unresolved$line)))
+  unparsed_lines <- sort(unique(as.integer(parsed$unparsed)))
+  if (nrow(rows$unresolved) || length(unparsed_lines)) {
+    # Counts, reasons and program line numbers only: never a key or a value.
+    reasons <- if (nrow(rows$unresolved)) {
+      tab <- table(rows$unresolved$reason)
+      paste0(" (", paste(names(tab), tab, sep = " ", collapse = ", "), ")")
+    } else {
+      ""
+    }
+    .warn("incomplete_backfill",
+      "backfill_corrections(): the legacy program has ",
+      nrow(rows$unresolved), " unresolved fact(s)", reasons,
+      if (length(unresolved_lines)) {
+        paste0(" at line(s) ", paste(unresolved_lines, collapse = ", "))
+      },
+      " and ", length(unparsed_lines), " unparsed statement(s)",
+      if (length(unparsed_lines)) {
+        paste0(" at line(s) ", paste(unparsed_lines, collapse = ", "))
+      },
+      ". These are not recorded as corrections."
+    )
   }
   out <- list(
     dry_run = dry_run, facts = nrow(parsed$facts), resolved = n_res,
-    unresolved = nrow(rows$unresolved), appended = 0L, stale = NA_integer_
+    unresolved = nrow(rows$unresolved), unparsed = length(unparsed_lines),
+    unresolved_lines = unresolved_lines, unparsed_lines = unparsed_lines,
+    appended = 0L, stale = NA_integer_
   )
   if (dry_run) {
     .hvti_inform("dry run: nothing written")

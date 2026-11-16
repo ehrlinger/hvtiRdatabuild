@@ -1,7 +1,7 @@
 # Tests for backfill_corrections(), propose_correction() and decide_correction().
 # Every id and value is invented. No PHI.
 
-corr_fixture <- function(env = parent.frame()) {
+corr_fixture <- function(env = parent.frame(), program = NULL) {
   dir <- withr::local_tempdir(.local_envir = env)
   d <- data.frame(
     ccfid = c("K1", "K2", "K3"), dt_surg = as.Date("2020-01-01") + 0:2,
@@ -21,12 +21,15 @@ corr_fixture <- function(env = parent.frame()) {
     file.path(dir, "built_t.meta.json"),
     auto_unbox = TRUE
   )
-  writeLines(c(
-    "data m; set base;",
-    "if ccfid = 'K1' then age = 66;",
-    "if ccfid = 'K2' then ccfid = 'K9';",
-    "run;"
-  ), file.path(dir, "bd.sas"))
+  if (is.null(program)) {
+    program <- c(
+      "data m; set base;",
+      "if ccfid = 'K1' then age = 66;",
+      "if ccfid = 'K2' then ccfid = 'K9';",
+      "run;"
+    )
+  }
+  writeLines(program, file.path(dir, "bd.sas"))
   cfg <- structure(list(
     name = "master_c", key = c("ccfid", "dt_surg"),
     alt_keys = list(epic = "emrn"), parent = NULL,
@@ -49,7 +52,7 @@ skip_corr <- function() {
 test_that("the backfill dry run counts and writes nothing", {
   skip_corr()
   f <- corr_fixture()
-  r <- suppressMessages(backfill_corrections(f$cfg, f$con, dialect = "duckdb"))
+  r <- backfill_quietly(backfill_corrections(f$cfg, f$con, dialect = "duckdb"))
   expect_true(r$dry_run)
   expect_equal(r$resolved, 1L)
   expect_false(DBI::dbExistsTable(f$con, "master_c_corrections"))
@@ -58,7 +61,7 @@ test_that("the backfill dry run counts and writes nothing", {
 test_that("an executed backfill records baked facts, remaps the key, regenerates the view", {
   skip_corr()
   f <- corr_fixture()
-  r <- suppressMessages(backfill_corrections(f$cfg, f$con,
+  r <- backfill_quietly(backfill_corrections(f$cfg, f$con,
     dry_run = FALSE,
     dialect = "duckdb"
   ))
@@ -74,7 +77,7 @@ test_that("an executed backfill records baked facts, remaps the key, regenerates
 test_that("a backfilled legacy row also stores the base row's alternate-key columns", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   row <- DBI::dbGetQuery(f$con,
     "SELECT emrn FROM master_c_corrections WHERE evidence_type = 'legacy_sas_inline'"
   )
@@ -84,7 +87,7 @@ test_that("a backfilled legacy row also stores the base row's alternate-key colu
 test_that("a proposal found by alternate key is stored against the primary key", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(emrn = "E3"), alt_key = "epic", var_col = "age",
@@ -102,7 +105,7 @@ test_that("a proposal found by alternate key is stored against the primary key",
 test_that("a primary-key proposal also carries the base row's alternate-key columns", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K3", dt_surg = as.Date("2020-01-03")),
@@ -118,7 +121,7 @@ test_that("a primary-key proposal also carries the base row's alternate-key colu
 test_that("a primary-key proposal must name exactly the key columns, each one value", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1"), var_col = "age", expected_prior = 65.5, new_value = 66,
@@ -136,7 +139,7 @@ test_that("a primary-key proposal must name exactly the key columns, each one va
 test_that("an alternate-key column cannot be corrected through the primary-key path", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -149,7 +152,7 @@ test_that("an alternate-key column cannot be corrected through the primary-key p
 test_that("a failing warehouse call during propose is reported by step, without a value", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   testthat::local_mocked_bindings(
     table_types = function(con, table) stop("mock failure quoting SECRET_VALUE"),
     .package = "hvtiRdatabuild"
@@ -167,7 +170,7 @@ test_that("a failing warehouse call during propose is reported by step, without 
 test_that("a failing warehouse call during decide is reported by step, without a value", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -190,7 +193,7 @@ test_that("a failing warehouse call during decide is reported by step, without a
 test_that("an alternate key with a null part or no match stops without a value", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   msg <- tryCatch(
     propose_correction(
       f$cfg, f$con,
@@ -213,7 +216,7 @@ test_that("an alternate key with a null part or no match stops without a value",
 test_that("writer dry runs return the row and leave both tables unchanged", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   n0 <- DBI::dbGetQuery(f$con, "SELECT COUNT(*) AS n FROM master_c_corrections")$n
   r <- propose_correction(
     f$cfg, f$con,
@@ -241,7 +244,7 @@ test_that("writer dry runs return the row and leave both tables unchanged", {
 test_that("a valid correction is appended, flags the first correction, stores the prior text", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   propose <- function(...) {
     args <- utils::modifyList(list(
       config = f$cfg, con = f$con, key_values = list(
@@ -277,7 +280,7 @@ test_that("a valid correction is appended, flags the first correction, stores th
 test_that("a missing prior is flagged in the verdict and stored with the flag", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K2", dt_surg = as.Date("2020-01-02")),
@@ -295,7 +298,7 @@ test_that("a missing prior is flagged in the verdict and stored with the flag", 
 test_that("a colliding correction id is refused", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   testthat::local_mocked_bindings(
     Sys.time = function() as.POSIXct("2026-01-01 00:00:00", tz = "UTC"),
     .package = "base"
@@ -314,7 +317,7 @@ test_that("a colliding correction id is refused", {
 test_that("an unknown variable is an error", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -326,7 +329,7 @@ test_that("an unknown variable is an error", {
 test_that("a key column cannot be corrected through this path", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -339,7 +342,7 @@ test_that("a key column cannot be corrected through this path", {
 test_that("an unknown evidence type is an error", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -351,7 +354,7 @@ test_that("an unknown evidence type is an error", {
 test_that("a primary key matching 0 rows is an error, with no value in the message", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   msg <- tryCatch(
     propose_correction(
       f$cfg, f$con,
@@ -368,7 +371,7 @@ test_that("a primary key matching 0 rows is an error, with no value in the messa
 test_that("a value that does not cast is an error", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -381,7 +384,7 @@ test_that("a value that does not cast is an error", {
 test_that("a factor value is refused", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -394,7 +397,7 @@ test_that("a factor value is refused", {
 test_that("an over-width value is rejected, and a factor still fails the cast check first", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   testthat::local_mocked_bindings(
     table_types = function(con, table) c(surgeon = "nvarchar(5)"),
     .package = "hvtiRdatabuild"
@@ -420,7 +423,7 @@ test_that("an over-width value is rejected, and a factor still fails the cast ch
 test_that("no widths means no width check", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -434,7 +437,7 @@ test_that("no widths means no width check", {
 test_that("a decision is recorded", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -451,7 +454,7 @@ test_that("a decision is recorded", {
 test_that("an unknown decision is an error", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   r <- suppressMessages(propose_correction(
     f$cfg, f$con,
     key_values = list(ccfid = "K1", dt_surg = as.Date("2020-01-01")),
@@ -467,12 +470,12 @@ test_that("an unknown decision is an error", {
 test_that("a backfill with only the corrections table present still creates decisions", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_true(DBI::dbExistsTable(f$con, "master_c_corrections"))
   expect_true(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
   DBI::dbExecute(f$con, "DROP TABLE master_c_correction_decisions")
   expect_false(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
-  r <- suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  r <- backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_true(DBI::dbExistsTable(f$con, "master_c_correction_decisions"))
   expect_true(r$appended >= 0L)
 })
@@ -485,7 +488,7 @@ test_that("a failing metadata read during backfill is reported by step, without 
     .package = "DBI"
   )
   msg <- tryCatch(
-    suppressMessages(backfill_corrections(f$cfg, f$con, dialect = "duckdb")),
+    backfill_quietly(backfill_corrections(f$cfg, f$con, dialect = "duckdb")),
     error = conditionMessage
   )
   expect_match(msg, "Step 'read metadata' failed")
@@ -495,9 +498,55 @@ test_that("a failing metadata read during backfill is reported by step, without 
 test_that("a decision on an unknown correction is an error", {
   skip_corr()
   f <- corr_fixture()
-  suppressMessages(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
+  backfill_quietly(backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"))
   expect_error(
     decide_correction(f$cfg, f$con, "cnope", "accept", "tester", dialect = "duckdb"),
     "no correction"
   )
+})
+
+test_that("an incomplete backfill warns in quiet mode, and returns the lines to audit", {
+  skip_corr()
+  for (dry in c(TRUE, FALSE)) {
+    f <- corr_fixture(program = c(
+      "data m; set base;",                                # 1
+      "if ccfid = 'K1' then age = 66;",                   # 2 resolved
+      "if ccfid = 'K2' then ccfid = 'K9';",               # 3 unresolved
+      "if ccfid = 'K3' and age > 90 then age = .;",       # 4 unparsed: compound
+      "run;"
+    ))
+    withr::local_options(hvti.quiet = TRUE)
+    w <- NULL
+    r <- withCallingHandlers(
+      backfill_corrections(f$cfg, f$con, dry_run = dry, dialect = "duckdb"),
+      hvtiRdatabuild_incomplete_backfill = function(c) {
+        w <<- c
+        invokeRestart("muffleWarning")
+      },
+      message = function(m) stop("quiet mode printed a message")
+    )
+    expect_s3_class(w, "warning")
+    msg <- conditionMessage(w)
+    expect_match(msg, "1 unresolved", fixed = TRUE)
+    expect_match(msg, "1 unparsed", fixed = TRUE)
+    for (v in c("K2", "K3", "K9", "90")) expect_false(grepl(v, msg, fixed = TRUE))
+    expect_equal(r$unresolved, 1L)
+    expect_equal(r$unparsed, 1L)
+    expect_equal(r$unresolved_lines, 3L)
+    expect_equal(r$unparsed_lines, 4L)
+  }
+})
+
+test_that("a complete backfill does not warn", {
+  skip_corr()
+  f <- corr_fixture(program = c("data m; set base;", "if ccfid = 'K1' then age = 66;", "run;"))
+  withr::local_options(hvti.quiet = TRUE)
+  r <- expect_no_warning(
+    backfill_corrections(f$cfg, f$con, dry_run = FALSE, dialect = "duckdb"),
+    class = "hvtiRdatabuild_incomplete_backfill"
+  )
+  expect_equal(r$unresolved, 0L)
+  expect_equal(r$unparsed, 0L)
+  expect_identical(r$unresolved_lines, integer())
+  expect_identical(r$unparsed_lines, integer())
 })

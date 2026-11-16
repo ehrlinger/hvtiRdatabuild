@@ -18,3 +18,9 @@ expect_provenance_record <- function(p) {
   testthat::expect_true(is.character(p$rng_kind) && length(p$rng_kind) == 3L)
   testthat::expect_true(inherits(p$time, "POSIXct") && length(p$time) == 1L)
 }
+
+# Run a backfill whose legacy program is known to leave facts unresolved:
+# silence the progress messages and the incomplete-backfill warning only.
+backfill_quietly <- function(expr) {
+  suppressMessages(suppressWarnings(expr, classes = "hvtiRdatabuild_incomplete_backfill"))
+}
