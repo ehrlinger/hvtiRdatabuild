@@ -68,7 +68,7 @@ Names are indicative; the schema layout is agreed with data engineering.
 | Corrections | `corrections`, `correction_decisions` tables; `stg_<source>_corrected` views | Append-only, §5.1 contract. A corrected view is its source view with accepted, current corrections applied to its cells. |
 | Rules | `int_<master>_<step>` views, then `<master>` | `bd.data.master.sas` split into named derivation steps, one SQL file each, joined into the wide master. |
 | Review | `<master>_corrections_stale`, `<master>_corrections_conflicts` views | For data management. Never read by a study build. |
-| Answer key | `<master>_oracle_<date>` table | A same-day SAS build, loaded by `lift_master()`. Restricted; read only by the parity gate (§7). |
+| Answer key | `<master>_oracle_<date>` table | A SAS build over the gate's database snapshot, loaded by `load_oracle()`, which publishes nothing. Restricted; read only by the parity gate (§7). |
 
 ### 3.2 Corrections apply to source values
 
@@ -97,8 +97,22 @@ eMRN pair) become **`source`** (the `stg_` view) and **that view's key columns**
 
 ### 3.3 Correction semantics, amended
 
-§5.3 of the September spec stands (compare-and-swap on `expected_prior`, `TRY_CAST`, `as_of`,
-the generated view, the stale reasons) with two changes from #101:
+§5.3 of the September spec stands (compare-and-swap on `expected_prior`, `TRY_CAST`, the
+stale reasons) with these changes:
+
+- **Every correctable column is covered ahead of time.** The September view joined only
+  columns that already had a correction, so a column's first correction needed a view
+  regeneration. Here each `stg_<source>_corrected` view is generated from the full column
+  list of its `stg_<source>` view, as one pivot of the resolved winners per source, and is
+  regenerated only when the `stg_` model itself is deployed. A first correction to a
+  previously untouched column is therefore live on the next query with no deployment. A
+  correction naming a column the source view does not have is refused at intake
+  (`no_variable`).
+- **`as_of` is not a view parameter.** An ordinary view cannot take one. Provenance comes
+  from the pull (§6), and the historical record is the study's frozen release, not a
+  replayed view. An inline table-valued function for replay is deferred until a use needs it.
+
+And two from #101:
 
 - **G1. Disagreeing accepted corrections conflict.** Two accepted corrections to one cell
   with different `new_value`s do not resolve to the latest. Neither applies, the cell keeps
@@ -120,8 +134,13 @@ Nothing is rebuilt or re-released. The path:
 
 1. **Found.** A statistical programmer, fellow or chart reviewer finds a wrong or missing
    source value.
-2. **Submitted** in a fixed template (G4), one row per cell: source view, that view's full
-   key including the encounter date, column, `expected_prior` (with its missing flag),
+
+   Each `stg_` model declares its unique key in model metadata. An encounter-level source's
+   key includes the encounter date; a patient-level source's key is the MRN alone, and its
+   template rows carry no encounter date, because inventing one would address a study
+   encounter rather than that source cell.
+2. **Submitted** in a fixed template (G4), one row per cell: source view, **that view's
+   declared complete unique key**, column, `expected_prior` (with its missing flag),
    `new_value` (with its missing flag), evidence type and reference, and who asserts it. A
    row without the full key is refused here, not discovered later.
 3. **Validated.** `propose_corrections(file, dry_run = TRUE)` returns a verdict per row:
@@ -134,7 +153,7 @@ Nothing is rebuilt or re-released. The path:
    with decider, date and reason. The deciding role is named per master in `master.yml`, and
    a decider who asserted the correction is refused (`self_accepted`, G2).
 6. **Live.** The next query of `<master>` applies it. A study that already froze keeps its
-   pull until it re-pulls, and its freeze record (§6) names the corrections watermark it saw.
+   pull until it re-pulls, and its freeze record (§6) names the corrections it applied.
 
 A model may help reshape a messy submission into the template, only on institutionally
 approved tooling because the sheet carries identifiers. The loader then validates every row;
@@ -149,13 +168,22 @@ the template and the tables unchanged. The existing single-cell `propose_correct
 ### 3.5 Study-side fixes travel up (G5, interim)
 
 A fix made in a study's code leaves the study out of step with the master and every other
-study. `study_correction_candidates()` compares a study's corrected analysis data with the
-master view at the study's `as_of`, on the cohort key, and writes each differing source-column
-cell as a row of the §3.4 template, with the study as evidence reference. It writes a file
-for a human to review and submit. It never appends, and it prints counts, never values.
+study. `study_correction_candidates()` compares a study's corrected analysis data with **the
+study's own retained pull** (§6), never with the live view: sources are not time-travelable,
+so a later read of the view would mistake upstream change for a study fix.
 
-A difference in a derived column is listed separately, as a candidate derivation, not a
-correction (§3.2).
+- A difference in a column the rules pass through from a source (a rename only, as declared
+  by the `stg_` and rules models' column lineage) becomes a row of the §3.4 template, keyed by
+  that source's declared key, with `expected_prior` taken from the retained pull and the
+  study as evidence reference.
+- A difference in a derived column is listed separately, as a candidate derivation, not a
+  correction (§3.2).
+
+If the source has changed since the pull, compare-and-swap at intake catches it: the
+candidate's `expected_prior` no longer matches and the row is refused as `prior_mismatch`
+with nothing written. A study fix that upstream has since made for itself is caught the same
+way. The helper writes a file for a human to review and submit, never appends, and prints
+counts, never values.
 
 ## 4. Ownership
 
@@ -187,7 +215,8 @@ of the September spec already asserts that key unique where non-null.
    disappears at disconnect, so no patient list persists in the warehouse.
 2. **A cohort defined by a query** against `<master>`: an epoch (for example January 2000 to
    July 2024) and a procedure predicate. The result is the first stage of the cohort record,
-   with `source` naming the view and `provenance` recording the SQL commit and `as_of`. From
+   with `source` naming the view and `provenance` recording the SQL commit and the applied
+   correction ids (§6.1). From
    there it proceeds as path 1.
 
 Only the cohort's rows and the study's columns cross the network.
@@ -213,43 +242,95 @@ are not surgeries, is out of scope until a study needs one.
 
 ## 6. The freeze record
 
-A study build is pull, then `build_dataset()` / `derive_vars()` and the cohort record, then
-`publish_dataset()`. The release records:
+### 6.1 A consistent pull
 
+A pull is several statements: create `#study_cohort`, load it, read the applied corrections,
+read the join. **They run in one transaction under snapshot isolation**, so every read sees the
+warehouse as of the transaction's start, and a decision or deployment that commits meanwhile
+is invisible to all of them alike. This needs `ALLOW_SNAPSHOT_ISOLATION` on the warehouse
+database (§10).
+
+The correction record is not a timestamp read beside the data. Inside the same transaction the pull
+reads **the ids of the corrections it applied** to its cohort's rows, from a companion
+`stg_<source>_corrections_applied` view generated beside each corrected view. Ids and counts
+only, no values. That set is exact provenance whatever order decisions committed in, which a
+timestamp or a max id is not.
+
+### 6.2 The release
+
+A study build is pull, then `build_dataset()` / `derive_vars()` and the cohort record, then
+`publish_dataset()`. The release records and retains:
+
+- **the pull itself**, as a checksummed, cohort-scoped parquet of what the view returned,
+  before any study derivation. It is the baseline §3.5 compares against, and the only
+  record of the source values the study saw;
 - the SQL model repository commit the views were deployed from;
-- the corrections watermark (`as_of`) the pull resolved at;
-- the pull timestamp;
+- the applied correction ids (§6.1) and the pull's transaction start time;
 - the study configuration's checksum;
 - the built dataset's SHA-256 and shape.
 
 Sources are not time-travelable, so **the release, not the warehouse, is the record**. A
 study can say which master logic, which corrections and which study logic produced its
-numbers, and its built file is the data.
+numbers; its retained pull and built file are the data. The retained pull holds patient
+values and lives in the study's data folder under the same rules as the built dataset,
+never in a repository.
 
-⚠️ `publish_dataset()` does not accept parquet today (§9 of the September spec). Accepting it
-is part of this work.
+⚠️ `publish_dataset()` does not accept parquet today (§9 of the September spec). Accepting it,
+and carrying a second file per release, is part of this work.
 
 ## 7. The parity gate
 
-The answer key cannot be the March 2026 build. The rules view reads today's sources, so a
-compare against March would mix three differences: port defects, legacy fixes, and upstream
-change since March. Live sources cannot be rewound, so upstream change cannot be separated
-out afterwards.
+### 7.1 One source state for both sides
 
-**The gate uses a same-day oracle.** On the gate day, `bd.data.master.sas` runs once more
-against the live warehouse (the SAS licence runs to 2027). `snapshot_master()` and
-`lift_master()` load it as `<master>_oracle_<date>`, and the rules view is compared to it
-**inside the database** with the existing full keyed comparison. Every differing cell must be
-explained by an activated legacy correction. Output is a verdict per column, never a value.
+The answer key cannot be the March 2026 build: the rules view reads today's sources, and a
+compare against March would mix port defects, legacy fixes and upstream change. Nor is "the
+same day" enough. A SAS build at 09:00 and a comparison at 15:00 read different sources if
+anything was loaded in between, and the gate could not tell that apart from a port defect.
+
+**Both sides read one frozen source state.** For the gate run, data engineering creates a
+read-only **database snapshot** of the warehouse database (`CREATE DATABASE … AS SNAPSHOT
+OF`). `bd.data.master.sas` runs against the snapshot, and the rules models are deployed into
+a gate schema that reads the same snapshot. Neither side ever sees a later write.
+
+Where a database snapshot is not available (§10), the fallback fails closed: the gate records
+a per-source change marker (row count and a `CHECKSUM_AGG` of a row hash, or change tracking
+where enabled) before the SAS run and again after the comparison, and **any change voids the
+run**. The verdicts and markers are kept as evidence, and the gate is rerun. A void run never
+yields a pass.
+
+### 7.2 Loading the oracle without publishing it
+
+`lift_master()` as it stands loads a base table, checks it against its own parquet, records a
+passing parity row, overwrites the master's metadata and repoints the master view at the
+table (`.publish_views()`). Used on the oracle, it would replace the rules view with the
+oracle and record a pass that compared no derivations.
+
+So the gate gets its own two steps, and neither touches the master view, its metadata or its
+parity records:
+
+- **`load_oracle()`**: snapshot and load the SAS output as `<master>_oracle_<date>`,
+  with the load-integrity check against its parquet recorded as *oracle integrity*, never as
+  master parity. It shares the DDL and load code with `lift_master()` but not its publishing
+  tail.
+- **`parity_gate()`**: the full keyed comparison of the **deployed rules view** in the gate
+  schema with the oracle, inside the database. Every differing cell must be explained by an
+  activated legacy correction. Output is a verdict per column, never a value. A pass is
+  recorded against **the SQL model commit and the deployment it tested**, and only a master
+  deployed from that commit counts as gated.
 
 The twelve historical snapshots remain the record of what SAS produced. They are not the gate.
 
-A master whose gate has not passed is not offered to study builds.
+A master whose current deployment has no passing gate record is not offered to study builds.
 
 ## 8. Failure handling
 
 - A model that does not run on the synthetic fixtures is never deployed.
-- A parity mismatch blocks the master from study builds (§7).
+- A parity mismatch blocks the master from study builds (§7). A source change during a
+  fallback gate run voids the run; it never passes.
+- Loading the oracle or failing the gate never changes the master view, its metadata or its
+  parity records (§7.2).
+- A pull that cannot open its snapshot-isolation transaction stops; it does not fall back to
+  separate reads (§6.1).
 - Stale and conflicting corrections are surfaced in their views, not raised.
 - Correction intake validates a whole file before writing anything, and refuses it if any
   row fails: `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact`,
@@ -270,6 +351,21 @@ A master whose gate has not passed is not offered to study builds.
   candidates from derived-column ones.
 - **Study builds:** the cohort temp-table join, index `first` and `all`, the pre-epoch stage,
   and duplicate-match failure, on duckdb with synthetic data.
+- **First correction to an untouched column** is applied on the next query with no
+  deployment, because the corrected view already covers every column (§3.3).
+- **Source keys:** intake against a patient-level source (key without encounter date) and an
+  encounter-level one.
+- **Study-side candidates after upstream change:** a source cell changed after the study's
+  pull is refused at intake as `prior_mismatch`, and a pass-through difference against the
+  retained pull yields the right `expected_prior` (§3.5).
+- **Consistent pull:** a decision committed during a pull is absent from both the data and
+  the applied correction ids, on SQL Server in the integration rehearsal (duckdb has no
+  snapshot isolation to test it with).
+- **Gate isolation:** `load_oracle()` and a failing `parity_gate()` leave the master view,
+  metadata and parity records untouched; a pass is bound to the tested commit, and a master
+  deployed from another commit is not gated.
+- **Gate rehearsal:** an upstream write between the SAS run and the comparison voids a
+  fallback run; under a database snapshot it cannot reach either side.
 - **Real data:** gated, shape and verdicts only, every failure message checked for what it
   prints.
 - The SQL repository holds logic only. No identifier, fixture copied from real data, or
@@ -285,6 +381,11 @@ A master whose gate has not passed is not offered to study builds.
 - [ ] **The mitral stress test.** Which of its derivations (the discharge echo is the known
       hard one) must be modelled before the cardiac design is frozen.
 - [ ] **Encounter-date semantics** for masters whose encounter is not a surgery.
+- [ ] **Snapshot isolation.** `ALLOW_SNAPSHOT_ISOLATION` on the warehouse database (§6.1).
+- [ ] **Database snapshots for the gate.** Rights to create one, and whether SAS can read it
+      through its existing connection (§7.1); otherwise the fail-closed fallback is the gate.
+- [ ] **Corrected-view performance** of a pivot over every column of a wide source (§3.3),
+      measured on the largest source before the design is frozen.
 
 ## 11. Out of scope
 
