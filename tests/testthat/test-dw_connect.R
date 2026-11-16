@@ -1,4 +1,4 @@
-test_that("connection arguments carry TrustServerCertificate by default", {
+test_that("connection arguments verify the server certificate by default", {
   # HOME is faked so .resolve_credentials()'s mode-check of ~/.Renviron
   # inspects an empty directory rather than whatever the real developer or
   # CI machine happens to have at that path.
@@ -11,7 +11,7 @@ test_that("connection arguments carry TrustServerCertificate by default", {
     server = "<DW-SERVER>", database = "<DW-DB>", port = 1433L
   )
 
-  expect_identical(args$TrustServerCertificate, "Yes")
+  expect_identical(args$TrustServerCertificate, "No")
   expect_identical(args$Encrypt, "yes")
 })
 
@@ -79,7 +79,7 @@ test_that("dw_connect() passes assembled arguments to DBI::dbConnect", {
                      dsn = "HVI_DW")
 
   expect_s3_class(conn, "FakeConnection")
-  expect_identical(seen$TrustServerCertificate, "Yes")
+  expect_identical(seen$TrustServerCertificate, "No")
 })
 
 test_that("a failed connection message never contains the password", {
@@ -143,4 +143,25 @@ test_that("a connection warning never reveals the password", {
   expect_false(grepl("hunter2", conditionMessage(result), fixed = TRUE))
   expect_null(conditionCall(result))
   expect_false(grepl("hunter2", shown, fixed = TRUE))
+})
+
+test_that("a failed connection that verified the certificate says what to try", {
+  skip_if_not_installed("odbc")
+  withr::local_envvar(c(HOME = withr::local_tempdir()))
+  testthat::local_mocked_bindings(
+    dbConnect = function(drv, ...) stop("SSL Provider: certificate verify failed"),
+    .package = "DBI"
+  )
+  msg <- tryCatch(dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW"),
+                  error = conditionMessage)
+  expect_match(msg, "^dw_connect\\(\\): ")
+  expect_match(msg, "trust_certificate = TRUE")
+  expect_match(msg, "CA")
+  trusting <- tryCatch(
+    dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW",
+               trust_certificate = TRUE),
+    error = conditionMessage
+  )
+  expect_false(grepl("trust_certificate = TRUE", trusting, fixed = TRUE),
+               label = "the certificate advice appears only when the certificate was checked")
 })

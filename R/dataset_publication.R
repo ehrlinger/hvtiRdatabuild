@@ -424,6 +424,17 @@
     return(NULL)
   }
   release <- dataset$releases[[utils::tail(which(matches), 1L)]]
+  if (identical(release$status, "withdrawn")) {
+    # Republishing withdrawn bytes would otherwise hand back the withdrawn
+    # record, and a caller undoing a mistaken withdrawal would think it worked.
+    stop("publish_dataset(): these bytes are the withdrawn release ", release$release_id,
+         " (", request$dataset_id, ", extract date ", request$extract_date, "). ",
+         "Nothing was published. Reinstating a withdrawn release is a separate, ",
+         "deliberate act: set its `status` back to `published` and remove its withdrawal ",
+         "fields in ", basename(.publication_catalog_path(request$datasets_dir)),
+         " as a reviewed change. To publish corrected data, publish different bytes.",
+         call. = FALSE)
+  }
   path <- file.path(request$datasets_dir, release$file)
   if (!file.exists(path)) {
     stop("Published release is missing: ", path, call. = FALSE)
@@ -493,8 +504,9 @@
 #' and so on. The catalog lock protects that sequence when two processes publish
 #' at once. Publishing the same bytes again for the same dataset and date is
 #' idempotent: it returns the existing release rather than creating a revision.
-#' If that release was withdrawn, it remains withdrawn; publication does not
-#' reactivate the bytes under a new release identity.
+#' If that release was withdrawn, publication is an error that names the
+#' withdrawn release: it neither reactivates the bytes nor publishes them under
+#' a new release identity.
 #'
 #' The release file moves into place before the catalog is replaced. If the
 #' catalog write fails, the file remains as an unregistered orphan. No study can

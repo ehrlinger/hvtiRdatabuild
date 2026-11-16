@@ -179,18 +179,23 @@ master_ddl <- function(parquet, table, schema_name = "dbo") {
 #' Load a parquet snapshot into an existing table, one row group at a time
 #'
 #' Each group and its log row commit in one transaction, so a failure resumes
-#' from the last committed group rather than restarting.
+#' from the last committed group rather than restarting. The log records the
+#' parquet's sha256 with each group, so a resume skips only groups of the same
+#' parquet. A log written for a different parquet means the table holds other
+#' data, and the load stops rather than mix the two.
 #'
 #' @param con A DBI connection.
 #' @param parquet Character. Path to the parquet snapshot.
 #' @param table Character. The target table's name.
 #' @param log_table Character. The name of the load log table.
+#' @param sha256 Character. The parquet's sha256; computed when not given.
 #'
 #' @return A list with `row_groups`, `loaded` and `skipped` counts.
 #'
 #' @keywords internal
 #' @noRd
-load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_log")) {
+load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_log"),
+                         sha256 = .file_sha256(parquet)) {
   if (!DBI::dbExistsTable(con, table)) {
     stop("Target table does not exist: ", table, ". Run the DDL first.", call. = FALSE)
   }
@@ -203,10 +208,17 @@ load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_
     }
     DBI::dbCreateTable(con, log_table,
                        data.frame(row_group = integer(), n_rows = integer(),
-                                  loaded_at = character()))
+                                  loaded_at = character(), parquet_sha256 = character()))
   }
-  done <- DBI::dbGetQuery(con, paste("SELECT row_group FROM",
-                                     DBI::dbQuoteIdentifier(con, log_table)))$row_group
+  log <- DBI::dbGetQuery(con, paste("SELECT * FROM", DBI::dbQuoteIdentifier(con, log_table)))
+  if (nrow(log) && (!"parquet_sha256" %in% names(log) ||
+                      any(is.na(log$parquet_sha256) | log$parquet_sha256 != sha256))) {
+    stop("lift_master(): target table ", table, " holds row groups loaded from a ",
+         "different parquet (or from a load log that records none); drop it and its ",
+         "load log before loading.",
+         call. = FALSE)
+  }
+  done <- log$row_group
 
   reader <- arrow::ParquetFileReader$create(parquet)
   n_groups <- reader$num_row_groups
@@ -224,7 +236,8 @@ load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_
       DBI::dbAppendTable(con, table, d)
       DBI::dbAppendTable(con, log_table, data.frame(
         row_group = g, n_rows = nrow(d),
-        loaded_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S")
+        loaded_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
+        parquet_sha256 = sha256
       ))
     })
     loaded <- loaded + 1L

@@ -23,7 +23,13 @@ snapshot_master(
 
 \item{expect}{Optional validation for the current build, passed to
 \code{\link[=snapshot_oracle]{snapshot_oracle()}}. Historical builds are not validated, because their
-logs are rarely retained.}
+logs are rarely retained.
+
+A snapshot that already exists is skipped only when its sidecar is complete
+and, for the current build, records the source's current checksum. The
+current build keeps a fixed file name, so a rebuild is detected by its
+checksum and snapshotted again. Historical builds are named by date and are
+not re-hashed on every run.}
 }
 \value{
 Invisibly, a data frame with one row per dataset: \code{file}, \code{status}

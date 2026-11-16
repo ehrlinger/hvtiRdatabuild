@@ -25,8 +25,8 @@ local_study <- function(sets = list(), env = parent.frame()) {
     row.names = FALSE
   )
   suppressMessages(invisible(hvtiRutilities::register_data(
-    root,
-    file = "built.csv"
+    file = "built.csv",
+    root = root
   )))
   if (length(sets)) {
     yml <- file.path(root, "_study.yml")
@@ -62,6 +62,18 @@ stale_by_new_parent <- function(env = parent.frame()) {
   write_analysis_set("eda", cfg)
   f <- hvtiRutilities::built_path(cfg)
   cat("21,70,5,0,3,1\n", file = f, append = TRUE)
+  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
+  hvtiRutilities::study_config(cfg$root)
+}
+
+# A study whose event column holds a competing-risk code (2) and missing values
+# among the rows the eda set keeps. Rows 3 and 5 were 0, row 4 was 1.
+local_coded_event_study <- function(sets, env = parent.frame()) {
+  cfg <- local_study(sets, env = env)
+  f <- hvtiRutilities::built_path(cfg)
+  d <- utils::read.csv(f)
+  d$dead[3:5] <- c(2L, NA, 2L)
+  utils::write.csv(d, f, row.names = FALSE)
   withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
   hvtiRutilities::study_config(cfg$root)
 }

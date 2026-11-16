@@ -63,8 +63,15 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
     }
   }
 
-  o_ids <- as.character(oracle[[id]])
-  r_ids <- as.character(r[[id]])
+  o_ids <- .id_text(oracle[[id]], "oracle")
+  r_ids <- .id_text(r[[id]], "r")
+  # Defence in depth: ids unique on input must stay unique as text.
+  for (side in list(list("oracle", o_ids), list("r", r_ids))) {
+    if (anyDuplicated(side[[2]])) {
+      stop("compare_built(): two distinct identifiers in ", side[[1]], " have the same ",
+           "text form, so they cannot be matched apart.", call. = FALSE)
+    }
+  }
   common <- intersect(o_ids, r_ids)
 
   rows <- list(
@@ -111,6 +118,41 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
   rownames(out) <- NULL
 
   structure(out, class = c("built_comparison", "data.frame"), rows = rows)
+}
+
+#' Identifiers as text that matches by value, losslessly
+#'
+#' `as.character(100000)` is `"1e+05"` while `as.character(100000L)` is
+#' `"100000"`, so text from `as.character()` would not match a SAS oracle's
+#' double ids to R's integer ids, and rounded text such as `formatC(digits = 15)`
+#' can make two distinct doubles one id. A whole number is written in full with
+#' `"%.0f"`; any other number with the fewest of 15 or 17 significant digits
+#' that reads back as the same double. Distinct numbers therefore give distinct
+#' text, and equal integer and double values give the same text. A whole number
+#' beyond 2^53 is refused: a double that large cannot tell neighbouring ids
+#' apart, so it may already have merged two of them.
+#'
+#' @param x An identifier column.
+#' @param side `"oracle"` or `"r"`, for the error message.
+#'
+#' @return A character vector.
+#'
+#' @keywords internal
+#' @noRd
+.id_text <- function(x, side) {
+  if (!is.numeric(x)) return(as.character(x))
+  x <- as.double(x)
+  if (any(!is.finite(x)) || any(x == round(x) & abs(x) > 2^53)) {
+    stop("compare_built(): ", side, " has numeric identifier(s) that a double cannot ",
+         "hold exactly (beyond 2^53, or not finite), so neighbouring ids may already be ",
+         "merged. Read the identifier as character.", call. = FALSE)
+  }
+  whole <- x == round(x)
+  out <- sprintf("%.15g", x)
+  lossy <- as.double(out) != x
+  out[lossy] <- sprintf("%.17g", x[lossy])
+  out[whole] <- sprintf("%.0f", x[whole])
+  out
 }
 
 #' Verdict levels, most serious first

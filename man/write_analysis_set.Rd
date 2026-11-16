@@ -13,8 +13,8 @@ write_analysis_set(name, cfg = hvtiRutilities::study_config())
 }
 \value{
 The sidecar contents, invisibly: a list with \code{set}, \code{parent},
-\code{declaration_sha256}, \code{written}, \code{counts}, \code{n_cols}, \code{attrition} and
-\code{packages}.
+\code{declaration_sha256}, \code{parquet_sha256}, \code{written}, \code{counts}, \code{n_cols},
+\code{attrition} and \code{packages}.
 }
 \description{
 Cuts the analysis set \code{name}, declared under \verb{analysis_sets:} in the study's
@@ -27,11 +27,20 @@ parent dataset and the attrition.
 \details{
 Nothing is written unless every check passes. Each \code{when} is R code evaluated
 against the data with only base R visible; a missing value counts as not
-excluded, as SAS \verb{if <missing> then delete} does. The identifier column named
+excluded, as SAS \verb{if <missing> then delete} does. Such a patient stays in the
+set and is counted in the attrition table's \code{n_na_kept} column, "NA on this
+rule (kept)", at each rule they reach. The identifier column named
 by \code{id} is used to track exclusions and is never written to the sidecar or
 the manifest. A set that names an \code{event} column, one of its \code{vars}, also
-counts \code{n_events} (rows where it equals 1) and \code{n_censored}; an \code{expect} on
-either count needs that \code{event} key.
+counts each code explicitly: \code{n_censored} (rows where it equals 0),
+\code{n_events} (rows where it equals 1), \code{n_other_events} (any other code, such
+as a competing risk) and \code{n_event_missing} (\code{NA}). Nothing is inferred by
+subtraction. An \code{expect} on any of these counts needs that \code{event} key.
+
+The write holds the study's manifest lock (\code{manifest.yaml.lock}), so two
+writers at once cannot leave one writer's parquet beside the other's
+sidecar. The sidecar records the parquet's sha256, and
+\code{\link[=read_analysis_set]{read_analysis_set()}} checks it while holding the same lock, shared.
 
 The parent is read with \code{\link[hvtiRutilities:read_built]{hvtiRutilities::read_built()}}, and a working read is refused: an
 analysis set is built from registered data only. A dataset with no dated version, including one
@@ -59,7 +68,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(

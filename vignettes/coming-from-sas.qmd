@@ -166,8 +166,10 @@ particular plot. Add another set only when the study has a different
 population or variable contract. If the SAS step keeps every row, omit
 `exclude`; the `vars` list alone expresses its projection. `event` names the
 set's own event column, which must be one of its `vars`; from it
-`write_analysis_set()` calculates `n_events` and `n_censored`, and only a set
-with an `event` may add expectations for them.
+`write_analysis_set()` counts each code: `n_censored` (0), `n_events` (1),
+`n_other_events` (any other code, such as a competing risk) and
+`n_event_missing` (`NA`). Only a set with an `event` may add expectations for
+them.
 
 Write the checkpoint explicitly after the built dataset is ready:
 
