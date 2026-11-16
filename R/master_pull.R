@@ -366,9 +366,9 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
                                compiled, read$selected)
     base <- staged$cohort
     queue <- staged$queue
-    sql_active <- cohort_unit_id(as.character(read$selected$mrn),
-                                 as.Date(read$selected$encounter_date))[
-                                   read$selected$active == 1L]
+    sql_units <- cohort_unit_id(as.character(read$selected$mrn),
+                                as.Date(read$selected$encounter_date))
+    sql_active <- sql_units[read$selected$active == 1L]
     if (!setequal(sql_active, .active_units(base))) {
       .abort("criteria_disagree",
              "pull_master(): the warehouse and R disagree on the active cohort (",

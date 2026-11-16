@@ -1,15 +1,5 @@
 # No PHI: identifiers, values and decisions are invented.
 
-review_pull <- function(env = parent.frame()) {
-  con <- local_master_db(env)
-  seed_criteria_views(con)
-  routed <- criterion("lvef", "LVEF 25% or less", "include",
-                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
-                                "lvef <= 25"),
-                      undetermined = "review")
-  strategy <- review_criterion("strategy", "Planned alternative support", "exclude")
-  pull_demo(con, demo_query(criteria = list(routed, strategy), index_on = "qualifying"))
-}
 
 write_decisions <- function(rows) {
   f <- withr::local_tempfile(fileext = ".csv", .local_envir = parent.frame())

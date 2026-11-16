@@ -9,10 +9,6 @@ inotrope <- criterion("inotrope", "Inotrope within 72 hours", "exclude",
                       view_rows("med_demo", "given_at", c(-3, 0), "any",
                                 "drug_class = 'inotrope'"),
                       undetermined = "keep")
-criteria_db <- function(env = parent.frame()) {
-  con <- local_master_db(env)
-  seed_criteria_views(con)
-}
 
 test_that("each criterion is a counted stage, in declared order", {
   con <- criteria_db()

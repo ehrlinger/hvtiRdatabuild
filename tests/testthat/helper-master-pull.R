@@ -81,3 +81,46 @@ local_freeze_setup <- function(env = parent.frame()) {
   list(con = con, config = demo_config,
        dir = withr::local_tempdir("published-", .local_envir = env))
 }
+
+# Criteria fixtures. They live here, beside the master they read, so every helper they
+# call is defined in this file.
+
+# Echo and medication views for the master_demo encounters above:
+# SYN101 2010-03-01, SYN103 2015-06-30 (and 2018-02-02 with second_cabg),
+# SYN104 2020-01-10.
+seed_criteria_views <- function(con) {
+  DBI::dbWriteTable(con, "echo_demo", data.frame(
+    mrn = c("SYN101", "SYN101", "SYN103", "SYN103", "SYN103"),
+    measured_on = as.Date(c("2010-02-20", "2010-01-01", "2015-06-25", "2015-06-25",
+                            "2018-01-30")),
+    lvef = c(22, 50, 30, 20, 24),
+    stringsAsFactors = FALSE
+  ))
+  DBI::dbWriteTable(con, "med_demo", data.frame(
+    mrn = c("SYN101", "SYN103", "SYN104"),
+    given_at = as.POSIXct(c("2010-02-27 08:00", "2015-06-29 10:00", "2020-01-14 09:00"),
+                          tz = "UTC"),
+    drug_class = c("inotrope", "inotrope", "inotrope"),
+    stringsAsFactors = FALSE
+  ))
+  invisible(con)
+}
+
+# A duckdb master with the criteria views.
+criteria_db <- function(env = parent.frame()) {
+  con <- local_master_db(env)
+  seed_criteria_views(con)
+}
+
+# A pull with one criterion routing undetermined units to review, and one review
+# criterion: it is left awaiting review.
+review_pull <- function(env = parent.frame()) {
+  con <- local_master_db(env)
+  seed_criteria_views(con)
+  routed <- criterion("lvef", "LVEF 25% or less", "include",
+                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
+                                "lvef <= 25"),
+                      undetermined = "review")
+  strategy <- review_criterion("strategy", "Planned alternative support", "exclude")
+  pull_demo(con, demo_query(criteria = list(routed, strategy), index_on = "qualifying"))
+}
