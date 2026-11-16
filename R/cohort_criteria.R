@@ -386,3 +386,56 @@ review_criterion <- function(id, label, role) {
                          cr$role, cr$sha256, cr$undetermined),
          review = sprintf("%s [%s, review]", cr$id, cr$role))
 }
+
+# Keep each patient's earliest active encounter. Runs after every other eligibility
+# decision, so a patient whose first encounter fails a local or review criterion can
+# still enter on a later one.
+.index_eligible_stage <- function(record) {
+  active <- .active_units(record)
+  parts <- split_cohort_unit(active)
+  ord <- order(parts$mrn, parts$encounter_date)
+  first <- logical(length(active))
+  first[ord] <- !duplicated(parts$mrn[ord])
+  reason <- rep(NA_character_, length(active))
+  reason[!first] <- "a later eligible encounter; the first is the index"
+  append_cohort_stage(
+    record,
+    data.frame(stage_id = "index_eligible", order = max(record$stages$order) + 1L,
+               label = "First eligible encounter per patient", source = "upstream",
+               provenance = sprintf("%d later eligible encounter(s) set aside",
+                                    sum(!first)),
+               stringsAsFactors = FALSE),
+    data.frame(patient_id = active, included = first, reason = reason,
+               stringsAsFactors = FALSE)
+  )
+}
+
+# Rebuild the warehouse criteria stages from the flags read back. Returns the record
+# and the units routed to review.
+.criteria_stages <- function(record, compiled, selected) {
+  units <- cohort_unit_id(as.character(selected$mrn), as.Date(selected$encounter_date))
+  queue <- data.frame(cohort_unit = character(), criterion_id = character(),
+                      stringsAsFactors = FALSE)
+  add_stage <- function(record, id, label, provenance, active, out) {
+    append_cohort_stage(
+      record,
+      data.frame(stage_id = id, order = max(record$stages$order) + 1L, label = label,
+                 source = "upstream", provenance = provenance, stringsAsFactors = FALSE),
+      data.frame(patient_id = active, included = out$included, reason = out$reason,
+                 stringsAsFactors = FALSE)
+    )
+  }
+  for (st in compiled$stages) {
+    active <- .active_units(record)
+    s <- .eval_node(st$node, selected[match(active, units), , drop = FALSE])
+    out <- .stage_outcome(st$role, st$undetermined, s, st$label)
+    prov <- sprintf("%s; met %d, not met %d, undetermined %d", .describe_criterion(st),
+                    sum(s %in% 1L), sum(s %in% 0L), sum(is.na(s)))
+    record <- add_stage(record, st$id, st$label, prov, active, out)
+    if (any(out$review)) {
+      queue <- rbind(queue, data.frame(cohort_unit = active[out$review],
+                                       criterion_id = st$id, stringsAsFactors = FALSE))
+    }
+  }
+  list(cohort = record, queue = queue)
+}
