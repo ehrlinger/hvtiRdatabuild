@@ -35,6 +35,22 @@ reference:
   - dw_pull
   - print.pull_result
 
+- title: "Pull: Master views to a study"
+  desc: >
+    Define a cohort of encounters, select and pull it from a master view in one consistent
+    read, build from the pull, and freeze it with its provenance.
+  contents:
+  - cohort_unit_id
+  - split_cohort_unit
+  - cohort_query
+  - print.cohort_query
+  - pull_master
+  - print.master_pull
+  - str.master_pull
+  - build_from_master
+  - freeze_study_pull
+  - read_pull_provenance
+
 - title: "Build: Assemble and Derive"
   desc: >
     Join the pulled modules into a study's built dataset, run its study-specific
