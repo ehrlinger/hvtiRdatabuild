@@ -46,16 +46,20 @@ jobs:
       # hvtiRdatabuild Imports hvtiRutilities, which is not on CRAN. Pull it
       # from GitHub explicitly so setup-r-dependencies doesn't try (and fail)
       # to resolve it from the public package repos.
+      # covr 4.0.0 pinned to the CRAN source: the PPM mirror lagged CRAN on release day.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
+          cache-version: 2
           extra-packages: |
-            any::covr
+            url::https://cran.r-project.org/src/contrib/covr_4.0.0.tar.gz
             any::xml2
             github::ehrlinger/hvtiRutilities
           needs: coverage
 
       - name: Test coverage
         run: |
+          # covr >= 4.0.0 required; a cached 3.6.5 would otherwise run silently.
+          stopifnot(packageVersion("covr") >= "4.0.0")
           cov <- covr::package_coverage(
             quiet = FALSE,
             clean = FALSE,
