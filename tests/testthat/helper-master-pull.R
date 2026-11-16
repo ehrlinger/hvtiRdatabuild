@@ -1,6 +1,6 @@
 # No PHI: identifiers and values are invented.
 
-# One master and the two plan-3 contract views. SYN101 had a qualifying CABG in 1998,
+# One master and the three contract views. SYN101 had a qualifying CABG in 1998,
 # before the test epoch, and another in 2010.
 seed_master <- function(con) {
   DBI::dbWriteTable(con, "master_demo", data.frame(
@@ -19,6 +19,11 @@ seed_master <- function(con) {
   ))
   DBI::dbWriteTable(con, "master_demo_deployment",
                     data.frame(sql_commit = "abc1234", stringsAsFactors = FALSE))
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass",
+    verified_at = as.POSIXct("2026-11-01 12:00:00", tz = "UTC"),
+    stringsAsFactors = FALSE
+  ))
   invisible(con)
 }
 
@@ -48,8 +53,21 @@ unit_cohort <- function(mrn, dates) {
   )
 }
 
-pull_demo <- function(con, cohort, columns = "age") {
-  pull_master(con, "master_demo", cohort, columns = columns, dialect = "duckdb")
+# A study configuration shared by tests that never edit it.
+demo_config <- local({
+  path <- tempfile("study-config-", fileext = ".yaml")
+  writeLines("study: st0000", path)
+  path
+})
+
+pull_demo <- function(con, cohort, columns = "age", study_config = demo_config) {
+  pull_master(con, "master_demo", cohort, columns = columns, study_config = study_config,
+              dialect = "duckdb")
+}
+
+add_parity <- function(con, commit, verdict, at) {
+  DBI::dbExecute(con, "INSERT INTO master_demo_parity VALUES (?, ?, ?)",
+                 params = list(commit, verdict, as.POSIXct(at, tz = "UTC")))
 }
 
 active_units <- function(cohort) {
@@ -60,8 +78,6 @@ active_units <- function(cohort) {
 local_freeze_setup <- function(env = parent.frame()) {
   testthat::skip_if_not_installed("arrow")
   con <- local_master_db(env)
-  config <- withr::local_tempfile(fileext = ".yaml", .local_envir = env)
-  writeLines("study: st0000", config)
-  list(con = con, config = config,
+  list(con = con, config = demo_config,
        dir = withr::local_tempdir("published-", .local_envir = env))
 }

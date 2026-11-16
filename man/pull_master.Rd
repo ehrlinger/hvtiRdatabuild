@@ -9,11 +9,13 @@ pull_master(
   master,
   cohort,
   columns,
+  study_config,
   mrn_col = "mrn",
   date_col = "encounter_date",
   dialect = c("mssql", "duckdb"),
   applied_view = paste0(master, "_corrections_applied"),
-  deployment_view = paste0(master, "_deployment")
+  deployment_view = paste0(master, "_deployment"),
+  parity_view = paste0(master, "_parity")
 )
 }
 \arguments{
@@ -27,19 +29,23 @@ pull_master(
 
 \item{columns}{Character. The study's columns, besides the key.}
 
+\item{study_config}{Character. Path to the study configuration file that defines this
+pull. Its checksum is recorded in the provenance.}
+
 \item{mrn_col, date_col}{Character. The master's key columns.}
 
 \item{dialect}{\code{"mssql"} (the warehouse) or \code{"duckdb"} (tests).}
 
-\item{applied_view, deployment_view}{Character. The master's applied-corrections and
-deployment views.}
+\item{applied_view, deployment_view, parity_view}{Character. The master's
+applied-corrections, deployment and parity-verdict views.}
 }
 \value{
 An object of class \code{master_pull}: a list with \code{data} (one row per active
 unit: the key columns, \code{columns} and \code{cohort_unit}), \code{cohort} (the cohort record,
 ending with the \code{in_master} stage) and \code{provenance} (\code{master}, \code{sql_commit},
-\code{applied_correction_ids}, \code{corrections_in_effect}, \code{read_at}, \code{columns},
-\code{cohort_definition}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched}).
+\code{applied_correction_ids}, \code{corrections_in_effect}, \code{parity_verified_at}, \code{read_at},
+\code{columns}, \code{cohort_definition}, \code{study_config_sha256}, \code{n_cohort}, \code{n_matched},
+\code{n_unmatched}).
 \code{corrections_in_effect} holds every correction id applied anywhere in the master in
 the same snapshot, including any that changed who qualified.
 }
@@ -56,6 +62,13 @@ encounter flag are computed in SQL, so no key outside the cohort leaves the data
 For a supplied \code{\link[=new_cohort_record]{new_cohort_record()}} of \code{\link[=cohort_unit_id]{cohort_unit_id()}} units, its active units are
 loaded. The temp table is dropped before commit and never outlives the connection, so
 no patient list persists in the warehouse.
+
+The master must have \strong{passed its parity gate at the deployed SQL commit}: the most
+recent verdict in \code{parity_view} for that commit must be \code{"pass"}. Otherwise nothing
+is pulled. The gate is read in the same snapshot as the data.
+
+The study configuration's SHA-256 is recorded when the pull runs, so
+\code{\link[=freeze_study_pull]{freeze_study_pull()}} can refuse a configuration that changed afterwards.
 
 The returned cohort ends with an \code{in_master} stage that excludes units with no master
 row, so the data match the active cohort exactly. A unit matching more than one
@@ -76,8 +89,14 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
   ))
   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+  ))
+  config <- tempfile(fileext = ".yaml")
+  writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+  pull_master(con, "master_demo", q, columns = "age", study_config = config,
+                      dialect = "duckdb")
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 }

@@ -15,8 +15,8 @@ freeze_study_pull(
 \arguments{
 \item{pull}{A \code{master_pull} from \code{\link[=pull_master]{pull_master()}}.}
 
-\item{study_config}{Character. Path to the study configuration file whose checksum is
-recorded.}
+\item{study_config}{Character. Path to the study configuration file given to
+\code{\link[=pull_master]{pull_master()}}; it must be unchanged since the pull.}
 
 \item{datasets_dir, dataset_id, extract_date}{As for \code{\link[=publish_dataset]{publish_dataset()}}.}
 }
@@ -28,11 +28,15 @@ Sources are not time-travelable, so the release, not the warehouse, is the recor
 what a study read. \code{freeze_study_pull()} publishes the pull as an immutable parquet
 release with \code{\link[=publish_dataset]{publish_dataset()}}, with its provenance written \strong{into the file's own
 metadata}: the SQL model commit, the ids of the corrections applied, when the pull
-read, the cohort definition and stage counts, and the study configuration's checksum.
+read, the parity verdict it passed, the cohort definition and stage counts, and the
+study configuration's checksum as recorded when the pull ran.
 Because the provenance is part of the bytes, the release's SHA-256 covers it, and a
 release can never exist without it. Read it back with \code{\link[=read_pull_provenance]{read_pull_provenance()}}.
 }
 \details{
+The configuration must be unchanged since the pull: if its checksum no longer matches
+the one \code{\link[=pull_master]{pull_master()}} recorded, nothing is published.
+
 Retrying the same pull returns the same release. A distinct pull with identical data
 carries different provenance, so it becomes its own release.
 
@@ -52,10 +56,14 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
   ))
   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
-  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull <- pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+  ))
   config <- tempfile(fileext = ".yaml")
   writeLines("study: st0000", config)
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+  pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+                      dialect = "duckdb")
   published <- tempfile("published-")
   dir.create(published)
   release <- freeze_study_pull(pull, config, published, "st0000_pull")

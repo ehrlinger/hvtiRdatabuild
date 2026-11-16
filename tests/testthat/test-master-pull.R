@@ -104,7 +104,7 @@ test_that("a change committed during the pull is invisible to it", {
   })
 
   res <- pull_master(con, "master_demo", demo_query(index = "all"), columns = "age",
-                     dialect = "duckdb")
+                     study_config = demo_config, dialect = "duckdb")
 
   expect_identical(res$provenance$sql_commit, "abc1234")
   expect_false("SYN103|2018-02-02" %in% res$data$cohort_unit)
@@ -173,7 +173,8 @@ test_that("bad column requests are refused before any query", {
 test_that("a database error is withheld", {
   con <- local_master_db()
   err <- tryCatch(
-    pull_master(con, "no_such_master", demo_query(), columns = "age", dialect = "duckdb"),
+    pull_master(con, "no_such_master", demo_query(), columns = "age",
+                study_config = demo_config, dialect = "duckdb"),
     error = conditionMessage
   )
   expect_match(err, "withheld")
@@ -205,4 +206,42 @@ test_that("an excluded prior encounter's corrections are not attributed to the p
 
   expect_identical(res$provenance$applied_correction_ids, "C2")
   expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2"))
+})
+
+test_that("a master without a parity pass for its deployed commit is not pulled", {
+  con <- local_master_db()
+  DBI::dbExecute(con, "DELETE FROM master_demo_parity")
+  expect_error(pull_demo(con, demo_query()), "parity gate")
+
+  add_parity(con, "old0001", "pass", "2026-10-01 12:00:00")
+  expect_error(pull_demo(con, demo_query()), "parity gate")
+
+  add_parity(con, "abc1234", "fail", "2026-11-01 12:00:00")
+  expect_error(pull_demo(con, demo_query()), "parity gate")
+})
+
+test_that("the latest verdict for the deployed commit decides the gate", {
+  con <- local_master_db()
+  add_parity(con, "abc1234", "fail", "2026-11-02 12:00:00")
+  expect_error(pull_demo(con, demo_query()), "parity gate")
+
+  add_parity(con, "abc1234", "pass", "2026-11-03 12:00:00")
+  res <- pull_demo(con, demo_query())
+  expect_identical(res$provenance$parity_verified_at, "2026-11-03T12:00:00Z")
+})
+
+test_that("the gate's refusal names no commit and pulls nothing", {
+  con <- local_master_db()
+  DBI::dbExecute(con, "UPDATE master_demo_parity SET verdict = 'fail'")
+  err <- tryCatch(pull_demo(con, demo_query()), error = conditionMessage)
+  expect_false(grepl("abc1234", err, fixed = TRUE))
+  expect_false(grepl("SYN", err, fixed = TRUE))
+})
+
+test_that("the pull records the study configuration's checksum when it runs", {
+  con <- local_master_db()
+  res <- pull_demo(con, demo_query())
+  expect_identical(res$provenance$study_config_sha256,
+                   digest::digest(demo_config, algo = "sha256", file = TRUE))
+  expect_error(pull_demo(con, demo_query(), study_config = tempfile()), "study_config")
 })

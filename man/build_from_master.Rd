@@ -32,8 +32,14 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
   ))
   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+  ))
+  config <- tempfile(fileext = ".yaml")
+  writeLines("study: st0000", config)
   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-  pull <- pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+  pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+                      dialect = "duckdb")
   build_from_master(pull)
   DBI::dbDisconnect(con, shutdown = TRUE)
 }

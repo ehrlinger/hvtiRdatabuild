@@ -6,9 +6,13 @@
 #' what a study read. `freeze_study_pull()` publishes the pull as an immutable parquet
 #' release with [publish_dataset()], with its provenance written **into the file's own
 #' metadata**: the SQL model commit, the ids of the corrections applied, when the pull
-#' read, the cohort definition and stage counts, and the study configuration's checksum.
+#' read, the parity verdict it passed, the cohort definition and stage counts, and the
+#' study configuration's checksum as recorded when the pull ran.
 #' Because the provenance is part of the bytes, the release's SHA-256 covers it, and a
 #' release can never exist without it. Read it back with [read_pull_provenance()].
+#'
+#' The configuration must be unchanged since the pull: if its checksum no longer matches
+#' the one [pull_master()] recorded, nothing is published.
 #'
 #' Retrying the same pull returns the same release. A distinct pull with identical data
 #' carries different provenance, so it becomes its own release.
@@ -17,8 +21,8 @@
 #' the same rules as the built dataset, never in a repository.
 #'
 #' @param pull A `master_pull` from [pull_master()].
-#' @param study_config Character. Path to the study configuration file whose checksum is
-#'   recorded.
+#' @param study_config Character. Path to the study configuration file given to
+#'   [pull_master()]; it must be unchanged since the pull.
 #' @param datasets_dir,dataset_id,extract_date As for [publish_dataset()].
 #'
 #' @return Invisibly, the release, as returned by [publish_dataset()].
@@ -38,10 +42,14 @@
 #'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
-#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-#'   pull <- pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+#'   DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+#'     sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+#'   ))
 #'   config <- tempfile(fileext = ".yaml")
 #'   writeLines("study: st0000", config)
+#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'   pull <- pull_master(con, "master_demo", q, columns = "age", study_config = config,
+#'                       dialect = "duckdb")
 #'   published <- tempfile("published-")
 #'   dir.create(published)
 #'   release <- freeze_study_pull(pull, config, published, "st0000_pull")
@@ -65,13 +73,17 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
     stop("'study_config' must be the path of an existing study configuration file.",
          call. = FALSE)
   }
+  if (!identical(digest::digest(study_config, algo = "sha256", file = TRUE),
+                 pull$provenance$study_config_sha256)) {
+    stop("The study configuration has changed since the pull. Pull again with the ",
+         "current configuration. Nothing was published.", call. = FALSE)
+  }
 
   stages <- cohort_summary(pull$cohort)$stages
   prov <- c(
     list(schema = 1L),
     pull$provenance,
-    list(cohort_stages = as.list(stages[c("stage_id", "n_in", "n_excluded", "n_remaining")]),
-         study_config_sha256 = digest::digest(study_config, algo = "sha256", file = TRUE))
+    list(cohort_stages = as.list(stages[c("stage_id", "n_in", "n_excluded", "n_remaining")]))
   )
   table <- arrow::arrow_table(pull$data)
   metadata <- table$metadata
@@ -95,9 +107,9 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
 #' @param path Character. A parquet file written by [freeze_study_pull()].
 #'
 #' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`,
-#'   `corrections_in_effect`, `read_at`,
-#'   `columns`, `cohort_definition`, `n_cohort`, `n_matched`, `n_unmatched`,
-#'   `cohort_stages` and `study_config_sha256`.
+#'   `corrections_in_effect`, `parity_verified_at`, `read_at`, `columns`,
+#'   `cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`, `n_unmatched`
+#'   and `cohort_stages`.
 #'
 #' @seealso [freeze_study_pull()]
 #'

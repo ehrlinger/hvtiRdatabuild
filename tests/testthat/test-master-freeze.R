@@ -81,3 +81,15 @@ test_that("a frozen prior-excluded pull records only its retained units' correct
   expect_identical(unlist(prov$applied_correction_ids), "C2")
   expect_setequal(unlist(prov$corrections_in_effect), c("C1", "C2"))
 })
+
+test_that("a configuration changed between pull and freeze stops the freeze", {
+  f <- local_freeze_setup()
+  config <- withr::local_tempfile(fileext = ".yaml")
+  writeLines("study: st0000", config)
+  pull <- pull_demo(f$con, demo_query(), study_config = config)
+  writeLines("study: st0000\nepoch_end: 2025-01-01", config)
+
+  expect_error(freeze_study_pull(pull, config, f$dir, "st0000_pull",
+                                 extract_date = "2026-11-16"), "changed since the pull")
+  expect_length(list.files(f$dir, pattern = "[.]parquet$"), 0L)
+})

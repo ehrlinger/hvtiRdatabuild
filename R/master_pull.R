@@ -58,6 +58,26 @@
   commit
 }
 
+# The parity gate (spec §7.2): a master is offered to study builds only while the most
+# recent parity verdict for its deployed SQL commit is a pass. Fails closed on no
+# verdict, a failed one, or a pass recorded only for another commit. Returns the time
+# the passing verdict was recorded.
+.read_parity <- function(con, parity_view, commit, dialect) {
+  verdicts <- run_step("read parity verdicts", DBI::dbGetQuery(
+    con,
+    paste("SELECT verdict, verified_at FROM", .qualified_name(parity_view, dialect),
+          "WHERE sql_commit = ? ORDER BY verified_at DESC"),
+    params = list(commit)
+  ))
+  if (!nrow(verdicts) || !identical(as.character(verdicts$verdict[[1]]), "pass")) {
+    stop("The master has not passed its parity gate at the deployed SQL commit: ",
+         nrow(verdicts), " verdict(s) recorded for it, the latest not a pass. ",
+         "Nothing was pulled.", call. = FALSE)
+  }
+  format(as.POSIXct(verdicts$verified_at[[1]], tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ",
+         tz = "UTC")
+}
+
 .unit_cohort_active <- function(cohort) {
   if (!identical(cohort$patient_id_col, "cohort_unit")) {
     stop("A supplied cohort must be built on cohort_unit_id() units ",
@@ -136,6 +156,13 @@
 #' loaded. The temp table is dropped before commit and never outlives the connection, so
 #' no patient list persists in the warehouse.
 #'
+#' The master must have **passed its parity gate at the deployed SQL commit**: the most
+#' recent verdict in `parity_view` for that commit must be `"pass"`. Otherwise nothing
+#' is pulled. The gate is read in the same snapshot as the data.
+#'
+#' The study configuration's SHA-256 is recorded when the pull runs, so
+#' [freeze_study_pull()] can refuse a configuration that changed afterwards.
+#'
 #' The returned cohort ends with an `in_master` stage that excludes units with no master
 #' row, so the data match the active cohort exactly. A unit matching more than one
 #' master row stops the pull, because the key is meant to be unique. Nothing in an error
@@ -147,16 +174,19 @@
 #' @param cohort A [cohort_query()], or a [new_cohort_record()] built on
 #'   [cohort_unit_id()] units (`patient_id_col = "cohort_unit"`).
 #' @param columns Character. The study's columns, besides the key.
+#' @param study_config Character. Path to the study configuration file that defines this
+#'   pull. Its checksum is recorded in the provenance.
 #' @param mrn_col,date_col Character. The master's key columns.
 #' @param dialect `"mssql"` (the warehouse) or `"duckdb"` (tests).
-#' @param applied_view,deployment_view Character. The master's applied-corrections and
-#'   deployment views.
+#' @param applied_view,deployment_view,parity_view Character. The master's
+#'   applied-corrections, deployment and parity-verdict views.
 #'
 #' @return An object of class `master_pull`: a list with `data` (one row per active
 #'   unit: the key columns, `columns` and `cohort_unit`), `cohort` (the cohort record,
 #'   ending with the `in_master` stage) and `provenance` (`master`, `sql_commit`,
-#'   `applied_correction_ids`, `corrections_in_effect`, `read_at`, `columns`,
-#'   `cohort_definition`, `n_cohort`, `n_matched`, `n_unmatched`).
+#'   `applied_correction_ids`, `corrections_in_effect`, `parity_verified_at`, `read_at`,
+#'   `columns`, `cohort_definition`, `study_config_sha256`, `n_cohort`, `n_matched`,
+#'   `n_unmatched`).
 #'   `corrections_in_effect` holds every correction id applied anywhere in the master in
 #'   the same snapshot, including any that changed who qualified.
 #'
@@ -176,18 +206,31 @@
 #'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+#'   DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+#'     sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+#'   ))
+#'   config <- tempfile(fileext = ".yaml")
+#'   writeLines("study: st0000", config)
 #'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
-#'   pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+#'   pull_master(con, "master_demo", q, columns = "age", study_config = config,
+#'                       dialect = "duckdb")
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
 #' }
 #' }
 #'
 #' @export
-pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
+pull_master <- function(con, master, cohort, columns, study_config, mrn_col = "mrn",
                         date_col = "encounter_date", dialect = c("mssql", "duckdb"),
                         applied_view = paste0(master, "_corrections_applied"),
-                        deployment_view = paste0(master, "_deployment")) {
+                        deployment_view = paste0(master, "_deployment"),
+                        parity_view = paste0(master, "_parity")) {
   dialect <- match.arg(dialect)
+  if (missing(study_config) || !is.character(study_config) || length(study_config) != 1L ||
+        is.na(study_config) || !file.exists(study_config)) {
+    stop("'study_config' must be the path of an existing study configuration file.",
+         call. = FALSE)
+  }
+  config_sha256 <- digest::digest(study_config, algo = "sha256", file = TRUE)
   if (!is.character(columns) || !length(columns) || anyNA(columns) ||
         any(!nzchar(columns))) {
     stop("'columns' must name at least one column.", call. = FALSE)
@@ -214,6 +257,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
   read <- .with_snapshot_txn(con, dialect, {
     read_at <- run_step("read time", DBI::dbGetQuery(con, .read_now_sql(dialect)))$read_at
     commit <- .read_deployment(con, deployment_view, dialect)
+    parity_at <- .read_parity(con, parity_view, commit, dialect)
     run_step("create cohort temp table", DBI::dbExecute(con, tmp$create))
     if (is_query) {
       run_step("select cohort", DBI::dbExecute(
@@ -260,6 +304,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
            "to be unique. Nothing was pulled.", call. = FALSE)
     }
     list(data = data, selected = selected, read_at = read_at, commit = commit,
+         parity_at = parity_at,
          applied = sort(unique(as.character(applied$correction_id))),
          in_effect = sort(unique(as.character(in_effect$correction_id))))
   })
@@ -292,6 +337,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
       sql_commit = read$commit,
       applied_correction_ids = read$applied,
       corrections_in_effect = read$in_effect,
+      parity_verified_at = read$parity_at,
       read_at = read_at,
       columns = columns,
       cohort_definition = if (is_query) {
@@ -300,6 +346,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
       } else {
         "supplied cohort_record"
       },
+      study_config_sha256 = config_sha256,
       n_cohort = length(active),
       n_matched = sum(found),
       n_unmatched = sum(!found)

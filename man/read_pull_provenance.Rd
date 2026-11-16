@@ -11,9 +11,9 @@ read_pull_provenance(path)
 }
 \value{
 A list: \code{schema}, \code{master}, \code{sql_commit}, \code{applied_correction_ids},
-\code{corrections_in_effect}, \code{read_at},
-\code{columns}, \code{cohort_definition}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched},
-\code{cohort_stages} and \code{study_config_sha256}.
+\code{corrections_in_effect}, \code{parity_verified_at}, \code{read_at}, \code{columns},
+\code{cohort_definition}, \code{study_config_sha256}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched}
+and \code{cohort_stages}.
 }
 \description{
 Read the provenance a frozen pull carries

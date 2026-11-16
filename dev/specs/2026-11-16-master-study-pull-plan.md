@@ -64,11 +64,21 @@ tests build them in duckdb; the names are the contract.
 | `<master>` | at least the key columns (default `mrn`, `encounter_date`) and the study's columns | one per encounter |
 | `<master>_corrections_applied` | `correction_id`, `mrn`, `encounter_date` | one per correction applied to that encounter's row |
 | `<master>_deployment` | `sql_commit` | exactly one: the SQL model commit the views were deployed from |
+| `<master>_parity` | `sql_commit`, `verdict` (`"pass"` or `"fail"`), `verified_at` | one per parity verdict recorded; `pull_master()` requires the latest for the deployed commit to be `"pass"` |
 
 ⚠️ The spec (§6.1) names the applied-corrections view per source
 (`stg_<source>_corrections_applied`). A study pull reads a master, not its sources, so the
 master-keyed rollup above is what the pull needs. Plan 3 generates it from the per-source
 views. **Record this as a one-line amendment to spec §6.1 in plan 3.**
+
+⚠️ **Added during review of #106:** spec §7.2 says a master whose parity gate has not
+passed is not offered to study builds, so `pull_master()` consumes the gate now rather
+than waiting for plan 2. It reads `<master>_parity` in the pull's snapshot and fails
+closed on no verdict, a failed one, or a pass only for another commit. Plan 2 writes the
+verdicts; plan 3 deploys the view. **Record the view in spec §7.2 in plan 2.** The same
+review moved the study configuration's checksum from freeze time to pull time:
+`pull_master()` takes `study_config`, and `freeze_study_pull()` refuses a file changed
+since.
 
 ## File structure
 
