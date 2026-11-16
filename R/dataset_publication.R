@@ -297,7 +297,7 @@
   }
 
   extension <- tolower(tools::file_ext(draft))
-  supported <- c("sas7bdat", "csv", "xlsx", "xls", "rds")
+  supported <- c("sas7bdat", "csv", "xlsx", "xls", "rds", "parquet")
   if (!extension %in% supported) {
     stop(
       "Unsupported draft extension '.", extension, "'. Supported: ",
@@ -483,7 +483,8 @@
 #' `datasets_dir`, and reads the staged copy again before recording its SHA-256,
 #' row count, and column count. It supports the clinical-data formats read by
 #' [hvtiRutilities::read_clinical_data()]: `.sas7bdat`, `.csv`, `.xlsx`,
-#' `.xls`, and `.rds`. This verifies that the release is readable and records
+#' `.xls`, `.rds`, and `.parquet` (which needs the arrow package). This verifies
+#' that the release is readable and records
 #' its shape. It does not decide whether the cohort or its values are clinically
 #' correct.
 #'
