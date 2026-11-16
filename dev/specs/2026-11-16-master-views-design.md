@@ -253,7 +253,8 @@ A master whose gate has not passed is not offered to study builds.
 - Stale and conflicting corrections are surfaced in their views, not raised.
 - Correction intake validates a whole file before writing anything, and refuses it if any
   row fails: `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact`,
-  `derived_variable`, or `self_accepted`. Verdicts only, no values in any message.
+  or `derived_variable`. A decision by the correction's own asserter is refused
+  (`self_accepted`). Verdicts only, no values in any message.
 - A cohort match with duplicates stops the pull (§5.4).
 
 ## 9. Testing and PHI
