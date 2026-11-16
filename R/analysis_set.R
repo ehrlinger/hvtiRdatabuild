@@ -513,7 +513,8 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
 #' text. A parquet that no longer matches its manifest entry always stops, and
 #' so does a sidecar whose recorded parquet sha256 is not the parquet's. A
-#' sidecar written before sidecars recorded that sha256 is treated as stale.
+#' sidecar written before sidecars recorded that sha256 is not checked;
+#' rewriting the set adds the check.
 #'
 #' When the built dataset is registered as a dated parquet, "changed" means a
 #' newer version has been registered with [hvtiRutilities::update_manifest()].
@@ -597,9 +598,9 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
     stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",
          "manifest entry. ", fix, call. = FALSE)
   }
-  if (is.null(side$parquet_sha256)) {
-    .stale_set(name, "its sidecar was written before sidecars recorded their parquet's sha256.")
-  } else if (!same(side$parquet_sha256, actual_sha)) {
+  # A sidecar written before sidecars recorded the parquet's sha256 cannot be
+  # checked; rewriting the set adds the check.
+  if (!is.null(side$parquet_sha256) && !same(side$parquet_sha256, actual_sha)) {
     stop("read_analysis_set(): analysis set `", name, "`: its sidecar does not describe ",
          basename(p$parquet), " (the sidecar records a different parquet sha256), so its ",
          "counts and attrition cannot be trusted. ", fix, call. = FALSE)

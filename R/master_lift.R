@@ -192,7 +192,7 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
 #' @noRd
 .check_source_current <- function(config, meta) {
   if (is.null(meta$source) || is.null(meta$source_sha256) ||
-        !identical(as.character(meta$source), config[["current"]])) {
+        !identical(as.character(meta$source), basename(config[["current"]]))) {
     return(invisible(NULL))
   }
   src <- file.path(config[["snapshots"]], config[["current"]])

@@ -430,7 +430,9 @@
     stop("publish_dataset(): these bytes are the withdrawn release ", release$release_id,
          " (", request$dataset_id, ", extract date ", request$extract_date, "). ",
          "Nothing was published. Reinstating a withdrawn release is a separate, ",
-         "deliberate act; it is not done by publishing the same bytes again.",
+         "deliberate act: set its `status` back to `published` and remove its withdrawal ",
+         "fields in ", basename(.publication_catalog_path(request$datasets_dir)),
+         " as a reviewed change. To publish corrected data, publish different bytes.",
          call. = FALSE)
   }
   path <- file.path(request$datasets_dir, release$file)

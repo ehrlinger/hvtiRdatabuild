@@ -28,8 +28,10 @@
 #'   logs are rarely retained.
 #'
 #' A snapshot that already exists is skipped only when its sidecar is complete
-#' and records the source's current checksum. The current build keeps a fixed
-#' file name, so a rebuild is detected by its checksum and snapshotted again.
+#' and, for the current build, records the source's current checksum. The
+#' current build keeps a fixed file name, so a rebuild is detected by its
+#' checksum and snapshotted again. Historical builds are named by date and are
+#' not re-hashed on every run.
 #'
 #' @return Invisibly, a data frame with one row per dataset: `file`, `status`
 #'   (`"written"`, `"skipped"` or `"failed"`), `n_rows`, `n_cols`, `sha256`,
@@ -93,7 +95,7 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
       if (!.snapshot_complete(out)) {
         message(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
         .clean_partial(out)
-      } else if (!.snapshot_source_current(out, sas)) {
+      } else if (is_current && !.snapshot_source_current(out, sas)) {
         # The current master keeps a fixed file name, so a rebuild shows up
         # only as a new source checksum.
         message(sprintf("rebuilding %s: its source has changed", basename(out)))

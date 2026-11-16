@@ -213,8 +213,9 @@ load_parquet <- function(con, parquet, table, log_table = paste0(table, "__load_
   log <- DBI::dbGetQuery(con, paste("SELECT * FROM", DBI::dbQuoteIdentifier(con, log_table)))
   if (nrow(log) && (!"parquet_sha256" %in% names(log) ||
                       any(is.na(log$parquet_sha256) | log$parquet_sha256 != sha256))) {
-    stop("Target table ", table, " holds row groups loaded from a different parquet ",
-         "(or from a load log that records none); drop it and its load log before loading.",
+    stop("lift_master(): target table ", table, " holds row groups loaded from a ",
+         "different parquet (or from a load log that records none); drop it and its ",
+         "load log before loading.",
          call. = FALSE)
   }
   done <- log$row_group

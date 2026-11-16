@@ -6,7 +6,7 @@
   rebuilt master loads a new base table and moves the view to it, where it used to skip the row
   groups already logged. A load log written for a different parquet now stops the load.
 * `publish_dataset()` on bytes identical to a withdrawn release is an error that names the
-  withdrawn release. It used to return the withdrawn record as if publication had worked.
+  withdrawn release and says how to reinstate it. It used to return the withdrawn record as if publication had worked.
 * `write_analysis_set()` counts each event code explicitly: `n_censored` (0), `n_events` (1),
   `n_other_events` (any other code) and `n_event_missing` (`NA`). `n_censored` was `n` minus the
   events, which counted competing risks and missing codes as censored. `expect:` accepts the two
@@ -15,7 +15,7 @@
   counted at each rule they reach in a new attrition column, `n_na_kept`.
 * `write_analysis_set()` holds the study's manifest lock while it writes, and the sidecar records
   the parquet's sha256. `read_analysis_set()` stops when the sidecar does not describe the parquet
-  beside it, and treats a sidecar written before this change as stale.
+  beside it. A sidecar written before this change is not checked until the set is rewritten.
 * `compare_built()` matches numeric ids by value: a double `100000` in a SAS oracle and an integer
   `100000L` in R no longer show up as row drift.
 * `dw_connect()` defaults to `trust_certificate = FALSE`, so the warehouse server's TLS certificate

@@ -27,7 +27,8 @@ that updates it. In a final render (\code{HVTI_TEMPLATE_STRICT} set, as
 \code{hvtiRtemplates::render_job(final = TRUE)} sets it) it stops with the same
 text. A parquet that no longer matches its manifest entry always stops, and
 so does a sidecar whose recorded parquet sha256 is not the parquet's. A
-sidecar written before sidecars recorded that sha256 is treated as stale.
+sidecar written before sidecars recorded that sha256 is not checked;
+rewriting the set adds the check.
 
 When the built dataset is registered as a dated parquet, "changed" means a
 newer version has been registered with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}}.
