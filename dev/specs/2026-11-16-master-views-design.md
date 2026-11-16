@@ -30,9 +30,9 @@ Decisions, each dated 2026-11-16 and made by the maintainer:
 2. **Reproducibility is the study's, at pull time.** The view is always current. A study
    build freezes what it pulled and records how (§6). The warehouse holds no dated copies.
 3. **The rules are plain SQL model files**, one `SELECT` per file, laid out as a dbt project
-   would be, and deployed to the current SQL Server first. A move to dbt is expected when
-   the registry (HVTR) is implemented, and the layout keeps that move to configuration
-   rather than a rewrite.
+   would be, and deployed to the current SQL Server first. dbt is an option, not a plan:
+   whether to adopt it is a cost/benefit evaluation for the registry (HVTR) work. The
+   layout costs nothing now and keeps that option cheap if it is taken.
 4. **Corrections live in interim SQL Server tables** under the §5.1 contract, with gaps G1
    and G7 from #101 folded in. The registry replaces the tables later; the SQL model that
    reads them does not change.
@@ -241,6 +241,7 @@ A master whose gate has not passed is not offered to study builds.
 
 - Corrections gaps G3, G5 and G6, which are registry design input.
 - Masters with no warehouse source (external systems, submission files, REDCap registries).
-- The move to dbt, and to the registry's engine.
+- Whether to adopt dbt (a cost/benefit evaluation for the registry work), and the move to
+  the registry's engine.
 - The `vars` template and the migration of existing studies (specs 4 and 5 of the September
   plan), which build on §5 here.
