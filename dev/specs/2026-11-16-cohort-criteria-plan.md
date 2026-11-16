@@ -38,10 +38,23 @@ until `apply_review()` records a decisions file.
 4. **`freeze_study_pull()` also refuses a pull awaiting review.** The addendum named only
    `build_from_master()`. A release with undecided members would be wrong for the same
    reason.
-5. **With `index_on = "eligible"`, every qualifying encounter's key leaves the database**,
-   not only each patient's first. That is the candidate set, and it carries keys and flags,
-   never view values.
-6. **`nearest` avoids an aggregate over an outer reference.** SQL Server refuses
+5. **With `index_on = "eligible"`, the first eligible encounter is chosen last**, after
+   the warehouse, local and review criteria have all ruled. It is not chosen in SQL. A
+   patient whose first encounter passes the warehouse but fails a local or review criterion
+   must still be able to enter on a later one. So every candidate encounter that survives
+   the warehouse criteria is pulled (its master row too, not only its key), and the
+   `index_eligible` stage runs after the local stages, or in `apply_review()` when review
+   is pending. The cost is a larger pull and review list. That is the price of the
+   documented semantics.
+6. **A stage can leave nobody active, and the next stage still records.** Every outcome is
+   built with typed vectors, never `ifelse()` on a possibly empty vector (which returns
+   `logical(0)` and fails `.validate_cohort_outcomes()`). That includes plan 1's `in_master`
+   stage, which criteria can now reach with an empty cohort.
+7. **A local criterion's file is hashed when it is read, not only when it is declared.**
+   `.local_stages()` hashes the file before and after `decide()`. It refuses the pull if
+   the file differs from the declared hash, or changed during evaluation. The recorded hash
+   is then the hash of the bytes the decisions came from.
+8. **`nearest` avoids an aggregate over an outer reference.** SQL Server refuses
    `MIN(ABS(DATEDIFF(day, outer.date, inner.date)))` (error 8124). The nearest row is found
    from the latest row on or before the encounter and the earliest row on or after it,
    each an aggregate over inner columns only.
@@ -508,7 +521,9 @@ criterion <- function(id, label, role, test, undetermined) {
 #'
 #' For a source outside the warehouse. It runs after the pull's transaction, against the
 #' candidates that survived the warehouse criteria, so the provenance does not claim one
-#' snapshot covers it. The file's SHA-256 is recorded when the criterion is declared.
+#' snapshot covers it. The file's SHA-256 is taken when the criterion is declared, and
+#' again before and after `decide()` reads it. [pull_master()] refuses the pull if the
+#' file has changed since it was declared, or changed while it was read.
 #'
 #' @inheritParams criterion
 #' @param path Character. The file the criterion reads.
@@ -657,6 +672,13 @@ test_that("a stage outcome applies role and the undetermined route", {
   expect_identical(exc$included, c(FALSE, TRUE, FALSE))
   expect_identical(exc$reason, c("excluded: Inotrope", NA, "undetermined: Inotrope"))
 })
+
+test_that("a stage with nobody active gives typed, empty outcomes", {
+  out <- .stage_outcome("include", "exclude", integer(), "LVEF")
+  expect_identical(out$included, logical())
+  expect_identical(out$reason, character())
+  expect_identical(out$review, logical())
+})
 ```
 
 Create `test-criteria-sql.R`:
@@ -762,8 +784,10 @@ Expected: FAIL with `could not find function ".compile_criteria"`.
   passes <- !und & s == target
   included <- passes | (und & !identical(undetermined, "exclude"))
   failed <- if (identical(role, "include")) "did not meet: " else "excluded: "
-  reason <- ifelse(included, NA_character_,
-                   ifelse(und, paste0("undetermined: ", label), paste0(failed, label)))
+  # Typed, never ifelse(): an empty stage must still give a character reason.
+  reason <- rep(NA_character_, length(s))
+  reason[!included & und] <- paste0("undetermined: ", label)
+  reason[!included & !und] <- paste0(failed, label)
   list(included = included, reason = reason,
        review = und & identical(undetermined, "review"))
 }
@@ -1214,8 +1238,7 @@ git commit -m "feat: cohort_query() takes criteria and a declared index_on"
 
 **Files:**
 - Modify: `R/master_pull.R`
-- Modify: `R/criteria_sql.R` (append `.first_eligible_sql()`)
-- Modify: `R/cohort_criteria.R` (append `.criteria_stages()`)
+- Modify: `R/cohort_criteria.R` (append `.criteria_stages()`, `.index_eligible_stage()`)
 - Test: `tests/testthat/test-master-criteria.R`
 
 **Interfaces:**
@@ -1223,8 +1246,13 @@ git commit -m "feat: cohort_query() takes criteria and a declared index_on"
 - Produces:
   - `.cohort_temp(dialect, n_flags = 0L)`: as before, plus `active` (default 1) and
     `crit_1..crit_n`.
-  - `.criteria_stages(record, compiled, selected, query)` → `list(cohort, queue)`, where
-    `queue` is a data frame of `cohort_unit` and `criterion_id`.
+  - `.criteria_stages(record, compiled, selected)` → `list(cohort, queue)`, where `queue`
+    is a data frame of `cohort_unit` and `criterion_id`. It builds the warehouse stages
+    only.
+  - `.index_eligible_stage(record)` → the record with an `index_eligible` stage keeping
+    each patient's earliest active encounter. It is called **after every other
+    eligibility decision**: at the end of `pull_master()` when no review is pending, and
+    otherwise at the end of `apply_review()` (Task 8).
   - `pull_master()` returns, in addition: `meta$status` (`"complete"` or
     `"awaiting review"`), `meta$review_decisions_sha256` (`NA`), `meta$cohort_definition`
     with `criteria` and `index_on`, and `pull$review` (`queue`, `criteria`: a data frame
@@ -1280,8 +1308,22 @@ test_that("index_on decides whether a later encounter can be the index", {
   expect_false(any(grepl("^SYN103", on_qualifying$data$cohort_unit)))
   expect_true("SYN103|2018-02-02" %in% on_eligible$data$cohort_unit)
   expect_identical(cohort_summary(on_eligible$cohort)$stages$stage_id,
-                   c("qualifying", "prior_qualifying", "inotrope", "index_eligible",
-                     "in_master"))
+                   c("qualifying", "prior_qualifying", "inotrope", "in_master",
+                     "index_eligible"))
+  expect_false(anyDuplicated(sub("\\|.*", "", on_eligible$data$cohort_unit)) > 0)
+})
+
+test_that("a criterion that excludes everyone still records the stages after it", {
+  con <- criteria_db()
+  nobody <- criterion("nobody", "Nobody", "include", master_row("age > 200"), "exclude")
+  res <- pull_demo(con, demo_query(criteria = list(nobody, inotrope),
+                                   index_on = "eligible"))
+  s <- cohort_summary(res$cohort)$stages
+  expect_identical(s$stage_id, c("qualifying", "prior_qualifying", "nobody", "inotrope",
+                                 "in_master", "index_eligible"))
+  expect_identical(nrow(res$data), 0L)
+  expect_identical(res$meta$status, "complete")
+  expect_identical(res$meta$n_cohort, 0L)
 })
 
 test_that("undetermined units routed to review leave the pull awaiting review", {
@@ -1326,23 +1368,42 @@ test_that("a pull without criteria is unchanged", {
 Run: `Rscript -e 'devtools::test(filter = "master-criteria")'`
 Expected: FAIL. With no criteria evaluation the `lvef` stage is missing.
 
-- [ ] **Step 3: `.first_eligible_sql()`** (append to `R/criteria_sql.R`)
+- [ ] **Step 3: `.index_eligible_stage()`** (append to `R/cohort_criteria.R`)
 
 ```r
-# Keep each patient's earliest still-active encounter.
-.first_eligible_sql <- function(tmp) {
-  sprintf(paste("UPDATE %1$s SET active = 0 WHERE active = 1 AND EXISTS (SELECT 1 FROM",
-                "%1$s e WHERE e.mrn = %1$s.mrn AND e.active = 1 AND",
-                "e.encounter_date < %1$s.encounter_date)"), tmp)
+# Keep each patient's earliest active encounter. Runs after every other eligibility
+# decision, so a patient whose first encounter fails a local or review criterion can
+# still enter on a later one.
+.index_eligible_stage <- function(record) {
+  active <- .active_units(record)
+  parts <- split_cohort_unit(active)
+  ord <- order(parts$mrn, parts$encounter_date)
+  first <- logical(length(active))
+  first[ord] <- !duplicated(parts$mrn[ord])
+  reason <- rep(NA_character_, length(active))
+  reason[!first] <- "a later eligible encounter; the first is the index"
+  append_cohort_stage(
+    record,
+    data.frame(stage_id = "index_eligible", order = max(record$stages$order) + 1L,
+               label = "First eligible encounter per patient", source = "upstream",
+               provenance = sprintf("%d later eligible encounter(s) set aside",
+                                    sum(!first)),
+               stringsAsFactors = FALSE),
+    data.frame(patient_id = active, included = first, reason = reason,
+               stringsAsFactors = FALSE)
+  )
 }
 ```
+
+`split_cohort_unit(character())` returns an empty data frame (checked on `main`), so an
+empty cohort needs no guard here.
 
 - [ ] **Step 4: `.criteria_stages()`** (append to `R/cohort_criteria.R`)
 
 ```r
-# Rebuild the warehouse criteria stages from the flags read back, then the
-# index_eligible stage. Returns the record and the units routed to review.
-.criteria_stages <- function(record, compiled, selected, query) {
+# Rebuild the warehouse criteria stages from the flags read back. Returns the record
+# and the units routed to review.
+.criteria_stages <- function(record, compiled, selected) {
   units <- cohort_unit_id(as.character(selected$mrn), as.Date(selected$encounter_date))
   queue <- data.frame(cohort_unit = character(), criterion_id = character(),
                       stringsAsFactors = FALSE)
@@ -1366,19 +1427,6 @@ Expected: FAIL. With no criteria evaluation the `lvef` stage is missing.
       queue <- rbind(queue, data.frame(cohort_unit = active[out$review],
                                        criterion_id = st$id, stringsAsFactors = FALSE))
     }
-  }
-  if (identical(query$index_on, "eligible")) {
-    active <- .active_units(record)
-    parts <- split_cohort_unit(active)
-    ord <- order(parts$mrn, parts$encounter_date)
-    first <- logical(length(active))
-    first[ord] <- !duplicated(parts$mrn[ord])
-    out <- list(included = first,
-                reason = ifelse(first, NA_character_,
-                                "a later eligible encounter; the first is the index"))
-    record <- add_stage(record, "index_eligible", "First eligible encounter per patient",
-                        sprintf("%d later eligible encounter(s) set aside", sum(!first)),
-                        active, out)
   }
   list(cohort = record, queue = queue)
 }
@@ -1471,10 +1519,6 @@ query and keep the empty-epoch check:
         run_step(paste("apply criterion", st$id),
                  DBI::dbExecute(con, .deactivate_sql(tmp$name, st)))
       }
-      if (identical(cohort$index_on, "eligible")) {
-        run_step("keep first eligible encounter",
-                 DBI::dbExecute(con, .first_eligible_sql(tmp$name)))
-      }
       flag_sql <- if (compiled$n_flags) {
         paste0(", crit_", seq_len(compiled$n_flags), collapse = "")
       } else {
@@ -1499,7 +1543,7 @@ with
                       stringsAsFactors = FALSE)
   if (is_query) {
     staged <- .criteria_stages(.query_cohort(cohort, read$selected, master, read$commit),
-                               compiled, read$selected, cohort)
+                               compiled, read$selected)
     base <- staged$cohort
     queue <- staged$queue
     sql_active <- cohort_unit_id(as.character(read$selected$mrn),
@@ -1520,7 +1564,31 @@ with
 `.query_cohort()` excludes prior-qualifying units already, so with no criteria the check
 compares the same set it always did.
 
-5f. After `data <- read$data[...]` and before `fields <- list(`, add:
+With `index_on = "eligible"` the SQL keeps **every** surviving candidate encounter. The
+first-eligible choice is made in R once every other criterion has ruled (5f, and Task 8).
+
+5e'. Type the `in_master` stage's reason. Criteria can now bring it an empty cohort, and
+`ifelse()` on an empty vector returns `logical(0)`, which the cohort validator refuses.
+Replace
+
+```r
+    data.frame(patient_id = active, included = found,
+               reason = ifelse(found, NA_character_, "no row in the master view"),
+               stringsAsFactors = FALSE)
+```
+
+with
+
+```r
+    data.frame(patient_id = active, included = found,
+               reason = replace(rep(NA_character_, length(active)), !found,
+                                "no row in the master view"),
+               stringsAsFactors = FALSE)
+```
+
+5f. **Replace** the line `data <- read$data[read$data$cohort_unit %in% active[found], ,
+drop = FALSE]` (and the `row.names(data) <- NULL` after it) with the block below. Data
+are filtered only after the last stage this call can add.
 
 ```r
   final_active <- .active_units(final)
@@ -1533,6 +1601,12 @@ compares the same set it always did.
   } else {
     "complete"
   }
+  # First eligible is chosen last. With review pending, apply_review() chooses it.
+  if (is_query && identical(cohort$index_on, "eligible") && identical(status, "complete")) {
+    final <- .index_eligible_stage(final)
+  }
+  data <- read$data[read$data$cohort_unit %in% .active_units(final), , drop = FALSE]
+  row.names(data) <- NULL
 ```
 
 5g. In `fields`, change the query branch of `cohort_definition` to
@@ -1642,6 +1716,50 @@ test_that("a local criterion runs on the surviving candidates and records the fi
   expect_match(utils::tail(s$provenance, 1L), covid$sha256, fixed = TRUE)
 })
 
+test_that("a local file changed after it was declared is refused", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("mrn", "SYN104"), f)
+  covid <- local_criterion("covid", "COVID-19", "exclude", f,
+                           decide = function(units, path) rep(FALSE, nrow(units)),
+                           undetermined = "keep")
+  writeLines(c("mrn", "SYN101"), f)
+  expect_error(pull_demo(con, demo_query(criteria = list(covid), index_on = "qualifying")),
+               class = "hvtiRdatabuild_local_criterion_changed",
+               regexp = "changed since it was declared")
+})
+
+test_that("a local file changed while it was read is refused", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("mrn", "SYN104"), f)
+  covid <- local_criterion("covid", "COVID-19", "exclude", f,
+                           decide = function(units, path) {
+                             writeLines(c("mrn", "SYN101"), path)
+                             rep(FALSE, nrow(units))
+                           },
+                           undetermined = "keep")
+  expect_error(pull_demo(con, demo_query(criteria = list(covid), index_on = "qualifying")),
+               class = "hvtiRdatabuild_local_criterion_changed",
+               regexp = "changed while it was read")
+})
+
+test_that("a later encounter can be the index when a local criterion drops the first", {
+  con <- criteria_db()
+  DBI::dbExecute(con, second_cabg)
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("cohort_unit", "SYN103|2015-06-30"), f)
+  drop_first <- local_criterion(
+    "local_drop", "Excluded in the study's file", "exclude", f,
+    decide = function(units, path) units$cohort_unit %in% utils::read.csv(path)$cohort_unit,
+    undetermined = "keep"
+  )
+  res <- pull_demo(con, demo_query(criteria = list(drop_first), index_on = "eligible"))
+  expect_true("SYN103|2018-02-02" %in% res$data$cohort_unit)
+  expect_identical(utils::tail(res$cohort$stages$stage_id, 2L),
+                   c("local_drop", "index_eligible"))
+})
+
 test_that("a local criterion must return one decision per unit", {
   con <- criteria_db()
   f <- withr::local_tempfile(fileext = ".csv")
@@ -1670,15 +1788,25 @@ Expected: FAIL. The `covid` stage is missing.
     keys <- split_cohort_unit(active)
     units <- data.frame(cohort_unit = active, mrn = keys$mrn,
                         encounter_date = keys$encounter_date, stringsAsFactors = FALSE)
+    # The recorded hash must be the hash of the bytes decide() read.
+    sha_before <- digest::digest(cr$path, algo = "sha256", file = TRUE)
+    if (!identical(sha_before, cr$sha256)) {
+      .abort("local_criterion_changed", "pull_master(): the file for local criterion \"",
+             cr$id, "\" has changed since it was declared. Declare the criterion again.")
+    }
     met <- cr$decide(units, cr$path)
+    if (!identical(digest::digest(cr$path, algo = "sha256", file = TRUE), sha_before)) {
+      .abort("local_criterion_changed", "pull_master(): the file for local criterion \"",
+             cr$id, "\" changed while it was read. Nothing was pulled.")
+    }
     if (!is.logical(met) || length(met) != length(active)) {
       .abort("local_criterion", "pull_master(): local criterion \"", cr$id,
              "\" returned ", length(met), " value(s) for ", length(active),
              " unit(s); it must return one logical per unit.")
     }
-    s <- ifelse(is.na(met), NA_integer_, as.integer(met))
+    s <- as.integer(met)
     out <- .stage_outcome(cr$role, cr$undetermined, s, cr$label)
-    prov <- sprintf("%s; met %d, not met %d, undetermined %d; after the snapshot",
+    prov <- sprintf("%s; met %d, not met %d, undetermined %d; read after the snapshot",
                     .describe_criterion(cr), sum(s %in% 1L), sum(s %in% 0L),
                     sum(is.na(s)))
     record <- append_cohort_stage(
@@ -1713,14 +1841,13 @@ before `data <- read$data[...]`:
   }
 ```
 
-Then change the data filter from `active[found]` to the final active set:
+This goes before the Task 6 5f block, so the status, the first-eligible choice and the
+data filter all see the local stages. `n_matched` and `n_unmatched` keep their in-master
+meaning. They are computed from `found` before this point, so leave them.
 
-```r
-  data <- read$data[read$data$cohort_unit %in% .active_units(final), , drop = FALSE]
-```
-
-`n_matched` and `n_unmatched` keep their in-master meaning. They are computed from
-`found` before this point, so leave them.
+A local criterion runs on every surviving candidate, including later encounters kept for
+`index_on = "eligible"`. `decide()` should therefore judge each encounter, not each
+patient.
 
 - [ ] **Step 5: Run the tests and confirm they pass**
 
@@ -1753,6 +1880,8 @@ git commit -m "feat: local criteria run in R after the snapshot, with the file c
     `meta$review_decisions_sha256` set.
   - `build_from_master()` and `freeze_study_pull()` refuse with class
     `hvtiRdatabuild_awaiting_review`.
+  - With `index_on = "eligible"`, `apply_review()` appends `index_eligible` (Task 6's
+    `.index_eligible_stage()`) after the review stages.
 
 - [ ] **Step 1: Write the failing tests** `tests/testthat/test-master-review.R`
 
@@ -1829,6 +1958,69 @@ test_that("decisions must answer exactly the review list, with declared reasons"
 
 The last case works as follows: the two `lvef` rows are `not_met` on an include
 criterion, so they are exclusions and need a code.
+
+Add the two-encounter cases for `index_on = "eligible"`, and the empty cohort:
+
+```r
+decide_all <- function(pull, met_units = character(), code = "PLANNED") {
+  rl <- review_list(pull)
+  rl$outcome <- ifelse(rl$cohort_unit %in% met_units, "met", "not_met")
+  crit <- pull$review$criteria
+  role <- crit$role[match(rl$criterion_id, crit$criterion_id)]
+  excludes <- (role == "include" & rl$outcome == "not_met") |
+    (role == "exclude" & rl$outcome == "met")
+  rl$reason_code <- replace(rep(NA_character_, nrow(rl)), excludes, code)
+  rl
+}
+
+test_that("a later encounter is the index when review excludes the first", {
+  con <- local_master_db()
+  seed_criteria_views(con)
+  DBI::dbExecute(con, second_cabg)
+  strategy <- review_criterion("strategy", "Planned alternative support", "exclude")
+  pull <- pull_demo(con, demo_query(criteria = list(strategy), index_on = "eligible"))
+  expect_identical(nrow(review_list(pull)), 4L)
+  rl <- decide_all(pull, met_units = "SYN103|2015-06-30")
+  out <- apply_review(pull, write_decisions(rl), reason_codes = "PLANNED")
+  expect_setequal(out$data$cohort_unit,
+                  c("SYN101|2010-03-01", "SYN103|2018-02-02", "SYN104|2020-01-10"))
+  expect_identical(utils::tail(out$cohort$stages$stage_id, 2L),
+                   c("strategy", "index_eligible"))
+})
+
+test_that("a later encounter is the index when a routed first is excluded at review", {
+  con <- local_master_db()
+  seed_criteria_views(con)
+  DBI::dbExecute(con, second_cabg)
+  routed <- criterion("lvef", "LVEF 25% or less", "include",
+                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
+                                "lvef <= 25"),
+                      undetermined = "review")
+  pull <- pull_demo(con, demo_query(criteria = list(routed), index_on = "eligible"))
+  # SYN103 2015 (tied echoes) and SYN104 (no echo) are routed; SYN103 2018 met.
+  expect_setequal(pull$review$queue$cohort_unit,
+                  c("SYN103|2015-06-30", "SYN104|2020-01-10"))
+  out <- apply_review(pull, write_decisions(decide_all(pull, code = "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  expect_setequal(out$data$cohort_unit, c("SYN101|2010-03-01", "SYN103|2018-02-02"))
+})
+
+test_that("an empty cohort before a review criterion needs no review", {
+  con <- local_master_db()
+  seed_criteria_views(con)
+  nobody <- criterion("nobody", "Nobody", "include", master_row("age > 200"), "exclude")
+  res <- pull_demo(con, demo_query(
+    criteria = list(nobody, review_criterion("strategy", "Strategy", "exclude")),
+    index_on = "qualifying"
+  ))
+  expect_identical(res$meta$status, "complete")
+  expect_identical(nrow(review_list(res)), 0L)
+  expect_s3_class(build_from_master(res), "build_result")
+})
+```
+
+The `decide_all()` helper uses `ifelse()` only on `review_list()` rows, which are never
+empty in these tests.
 
 - [ ] **Step 2: Run them and confirm they fail**
 
@@ -1943,13 +2135,16 @@ apply_review <- function(pull, path, reason_codes) {
   }
   sha <- digest::digest(path, algo = "sha256", file = TRUE)
   label <- crit$label[match(dec$criterion_id, crit$criterion_id)]
-  dec$reason <- ifelse(excludes, paste0(label, " at review: ", dec$reason_code),
-                       NA_character_)
+  dec$reason <- rep(NA_character_, nrow(dec))
+  dec$reason[excludes] <- paste0(label[excludes], " at review: ",
+                                 dec$reason_code[excludes])
   review_stage <- function(record, id, stage_label, rows) {
     active <- .active_units(record)
     hit <- rows[rows$cohort_unit %in% active & !is.na(rows$reason), , drop = FALSE]
     hit <- hit[!duplicated(hit$cohort_unit), , drop = FALSE]
     out <- !active %in% hit$cohort_unit
+    reason <- rep(NA_character_, length(active))
+    reason[!out] <- hit$reason[match(active[!out], hit$cohort_unit)]
     append_cohort_stage(
       record,
       data.frame(stage_id = id, order = max(record$stages$order) + 1L,
@@ -1957,9 +2152,7 @@ apply_review <- function(pull, path, reason_codes) {
                  provenance = sprintf("decisions file sha256 %s; %d decided", sha,
                                       nrow(rows)),
                  stringsAsFactors = FALSE),
-      data.frame(patient_id = active, included = out,
-                 reason = ifelse(out, NA_character_,
-                                 hit$reason[match(active, hit$cohort_unit)]),
+      data.frame(patient_id = active, included = out, reason = reason,
                  stringsAsFactors = FALSE)
     )
   }
@@ -1974,6 +2167,12 @@ apply_review <- function(pull, path, reason_codes) {
   for (i in which(crit$kind == "review")) {
     rows <- dec[dec$criterion_id == crit$criterion_id[[i]], , drop = FALSE]
     record <- review_stage(record, crit$criterion_id[[i]], crit$label[[i]], rows)
+  }
+  # With index_on = "eligible", the first eligible encounter is chosen only now, once
+  # review has ruled on every candidate.
+  definition <- .pull_meta(pull)$cohort_definition
+  if (is.list(definition) && identical(definition$index_on, "eligible")) {
+    record <- .index_eligible_stage(record)
   }
   pull$cohort <- record
   pull$data <- pull$data[pull$data$cohort_unit %in% .active_units(record), , drop = FALSE]
@@ -2001,6 +2200,22 @@ In `build_from_master()` and in `freeze_study_pull()`, right after the `inherits
 ```
 
 Add one sentence to each function's roxygen: "A pull awaiting chart review is refused."
+
+In `build_from_master()`, make the `build` stage's outcomes explicit lengths, so a pull
+whose criteria excluded everyone still builds. `data.frame(patient_id = character(),
+included = TRUE)` fails, because a length-one value cannot recycle to zero rows. Replace
+
+```r
+    data.frame(patient_id = active, included = TRUE, reason = NA_character_,
+               stringsAsFactors = FALSE)
+```
+
+with
+
+```r
+    data.frame(patient_id = active, included = rep(TRUE, length(active)),
+               reason = rep(NA_character_, length(active)), stringsAsFactors = FALSE)
+```
 
 - [ ] **Step 5: Run the tests and confirm they pass**
 
