@@ -12,7 +12,8 @@
 #' release can never exist without it. Read it back with [read_pull_provenance()].
 #'
 #' The configuration must be unchanged since the pull: if its checksum no longer matches
-#' the one [pull_master()] recorded, nothing is published.
+#' the one [pull_master()] recorded, nothing is published. A pull awaiting chart review is
+#' refused.
 #'
 #' Retrying the same pull returns the same release. A distinct pull with identical data
 #' carries different provenance, so it becomes its own release.
@@ -76,6 +77,10 @@ freeze_study_pull <- function(pull, path, dir, dataset_id,
   datasets_dir <- dir
   if (!inherits(pull, "master_pull")) {
     stop("'pull' must be a master_pull from pull_master().", call. = FALSE)
+  }
+  if (identical(.pull_meta(pull)$status, "awaiting review")) {
+    .abort("awaiting_review", "freeze_study_pull(): this pull is awaiting chart review; ",
+           "record the decisions with apply_review() first.")
   }
   if (!requireNamespace("arrow", quietly = TRUE)) {
     stop("Freezing a pull writes parquet and needs the arrow package.", call. = FALSE)
