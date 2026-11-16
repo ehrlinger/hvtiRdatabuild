@@ -24,14 +24,22 @@ Invisibly, a list with \code{dry_run}, \code{base_table}, \code{ddl_path} and
 \code{verdict} (\code{"pass"}, or \code{NA} for a dry run).
 }
 \description{
-Checks the primary key, creates a base table named for the snapshot's
-release, loads it row group by row group, and proves it equal to the
+Checks that the snapshot is current, checks the primary key, creates a base
+table named for the snapshot's release and checksum, loads it row group by
+row group, and proves it equal to the
 snapshot: counts, aggregates and a sampled compare first, then a full
 comparison of every column joined on the key. Only then is a parity record
 written and the master's view created. If the master already has a
 corrections table, the view is regenerated with corrections applied.
 }
 \details{
+The snapshot is current when its sidecar's \code{source_sha256} matches the
+configuration's current build as it is now; a rebuilt build stops the lift
+until \code{\link[=snapshot_master]{snapshot_master()}} has been re-run. Because the base table's name
+carries the first 12 hex digits of the parquet's sha256, re-lifting a
+rebuilt snapshot loads a new base table and moves the view to it. The
+earlier base table is left in place.
+
 A dry run, the default, writes the table's DDL next to the snapshot for a
 hand-off and touches nothing else. Warehouse errors are reported by step,
 with the driver's message withheld, because it can carry a data value.

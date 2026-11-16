@@ -27,6 +27,10 @@
 #'   [snapshot_oracle()]. Historical builds are not validated, because their
 #'   logs are rarely retained.
 #'
+#' A snapshot that already exists is skipped only when its sidecar is complete
+#' and records the source's current checksum. The current build keeps a fixed
+#' file name, so a rebuild is detected by its checksum and snapshotted again.
+#'
 #' @return Invisibly, a data frame with one row per dataset: `file`, `status`
 #'   (`"written"`, `"skipped"` or `"failed"`), `n_rows`, `n_cols`, `sha256`,
 #'   `source_sha256`, `parent_release`, `parent_source` (`"log"`, `"program"`,
@@ -86,9 +90,17 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
                       parent_source = NA_character_, key_verdict = NA_character_,
                       stringsAsFactors = FALSE)
     if (file.exists(out)) {
-      if (.snapshot_complete(out)) return(row)
-      message(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
-      .clean_partial(out)
+      if (!.snapshot_complete(out)) {
+        message(sprintf("rebuilding %s: incomplete snapshot", basename(out)))
+        .clean_partial(out)
+      } else if (!.snapshot_source_current(out, sas)) {
+        # The current master keeps a fixed file name, so a rebuild shows up
+        # only as a new source checksum.
+        message(sprintf("rebuilding %s: its source has changed", basename(out)))
+        .clean_partial(out)
+      } else {
+        return(row)
+      }
     }
 
     if (is_current) return(.snapshot_one(sas, config, out, is_current, chunk_rows, expect, row))
@@ -170,6 +182,21 @@ snapshot_master <- function(config, out_dir, which = c("current", "history"),
   if (!file.exists(meta_path)) return(FALSE)
   meta <- tryCatch(jsonlite::read_json(meta_path), error = function(e) NULL)
   !is.null(meta) && !is.null(meta$lineage) && !is.null(meta$keys)
+}
+
+#' Was a snapshot taken from the source as it is now?
+#'
+#' @param out Path to the parquet file; its sidecar must be complete.
+#' @param sas Path to the SAS dataset it was taken from.
+#'
+#' @return `TRUE` when the sidecar's `source_sha256` matches the source's
+#'   current checksum.
+#'
+#' @keywords internal
+#' @noRd
+.snapshot_source_current <- function(out, sas) {
+  meta <- jsonlite::read_json(.snapshot_meta_path(out))
+  identical(as.character(meta$source_sha256), .file_sha256(sas))
 }
 
 #' Remove a snapshot's parquet and sidecar, if either was partially written

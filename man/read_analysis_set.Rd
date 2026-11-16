@@ -25,7 +25,9 @@ looked at. In a draft render it is read, with a message of class
 \code{hvtiRutilities_stale_analysis_set} giving the \code{\link[=write_analysis_set]{write_analysis_set()}} call
 that updates it. In a final render (\code{HVTI_TEMPLATE_STRICT} set, as
 \code{hvtiRtemplates::render_job(final = TRUE)} sets it) it stops with the same
-text. A parquet that no longer matches its manifest entry always stops.
+text. A parquet that no longer matches its manifest entry always stops, and
+so does a sidecar whose recorded parquet sha256 is not the parquet's. A
+sidecar written before sidecars recorded that sha256 is treated as stale.
 
 When the built dataset is registered as a dated parquet, "changed" means a
 newer version has been registered with \code{\link[hvtiRutilities:update_manifest]{hvtiRutilities::update_manifest()}}.
@@ -51,7 +53,7 @@ if (requireNamespace("arrow", quietly = TRUE)) {
     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
     row.names = FALSE
   )
-  suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+  suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
   yml <- file.path(root, "_study.yml")
   y <- yaml::read_yaml(yml)
   y$analysis_sets <- list(primary = list(

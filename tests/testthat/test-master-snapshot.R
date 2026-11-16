@@ -198,3 +198,38 @@ test_that("history lineage does not pick up the current build's log", {
   res <- snapshot_master(m$cfg, withr::local_tempdir(), which = "history")
   expect_equal(res$parent_source, "unknown")
 })
+
+test_that("a rebuilt current build is snapshotted again, not skipped", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  m <- make_master()
+  out <- withr::local_tempdir()
+  first <- snapshot_master(m$cfg, out, which = "current")
+  # Rebuild the current master under its fixed name, with fewer rows.
+  src <- file.path(m$dir, "built.sas7bdat")
+  d <- haven::read_sas(src)
+  suppressWarnings(haven::write_sas(d[1:2, ], src))
+  res <- suppressMessages(snapshot_master(m$cfg, out, which = "current"))
+  expect_equal(res$status, "written")
+  expect_equal(res$n_rows, 2)
+  expect_false(identical(res$source_sha256, first$source_sha256))
+  meta <- jsonlite::read_json(file.path(out, "built.meta.json"), simplifyVector = TRUE)
+  expect_equal(meta$source_sha256, res$source_sha256)
+})
+
+test_that("lift_master() refuses a snapshot whose current source has changed", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("tidyselect")
+  skip_if_not_installed("duckdb")
+  m <- make_master()
+  out <- withr::local_tempdir()
+  snapshot_master(m$cfg, out, which = "current")
+  src <- file.path(m$dir, "built.sas7bdat")
+  suppressWarnings(haven::write_sas(haven::read_sas(src)[1:2, ], src))
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  expect_error(lift_master(m$cfg, con, file.path(out, "built.parquet"), dialect = "duckdb"),
+               "lift_master\\(\\): .*stale.*snapshot_master")
+})

@@ -60,3 +60,16 @@ test_that("the SAS missing-sorts-low divergence is visible, not hidden", {
   expect_equal(res$verdict[res$variable == "underweight"], "differs")
   expect_true(res$n_differ[res$variable == "underweight"] >= 1L)
 })
+
+test_that("numeric ids match by value whatever their storage type", {
+  o <- data.frame(ccfidu = c(100000, 200000, 1e15), age = c(60, 61, 62))
+  r <- data.frame(ccfidu = c(100000L, 200000L), age = c(60, 61))
+  res <- compare_built(o[1:2, ], r, id = "ccfidu")
+  rows <- attr(res, "rows")
+  expect_equal(rows$n_common, 2L)
+  expect_length(rows$only_oracle, 0L)
+  expect_length(rows$only_r, 0L)
+  expect_equal(res$verdict[res$variable == "age"], "identical")
+  big <- compare_built(o[3, ], data.frame(ccfidu = 1e15, age = 62), id = "ccfidu")
+  expect_equal(attr(big, "rows")$n_common, 1L)
+})

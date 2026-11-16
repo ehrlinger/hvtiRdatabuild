@@ -10,7 +10,7 @@ dw_connect(
   dsn = NULL,
   port = NULL,
   encrypt = TRUE,
-  trust_certificate = TRUE,
+  trust_certificate = FALSE,
   ...
 )
 }
@@ -27,7 +27,7 @@ credentials and none enters R's memory.}
 \item{encrypt}{Whether to request an encrypted connection.}
 
 \item{trust_certificate}{Whether to trust the server certificate without
-validating it against a CA chain.}
+validating it against a CA chain. \code{FALSE}, the default, validates it.}
 
 \item{...}{Further arguments passed to \code{\link[DBI:dbConnect]{DBI::dbConnect()}}.}
 }
@@ -41,15 +41,15 @@ a configuration file, a log line, or an error message, and the connection
 string is never echoed.
 }
 \details{
-\code{trust_certificate} defaults to \code{TRUE} for a specific reason. Microsoft
-changed the \code{Encrypt} default from \code{no} in \emph{ODBC Driver 17 for SQL Server}
-to \code{yes} in driver 18. A connection string that worked under the older
-driver fails with a certificate error under 18 unless it either disables
-encryption or trusts the server certificate. The legacy SAS connection
-carried \code{TrustServerCertificate=Yes}, which is why the pull works today.
-Whether trusting the certificate is the right long-term posture, versus
-installing the institutional CA chain, is a question for whoever
-administers the DSN, but changing it silently would break every pull.
+\code{trust_certificate} defaults to \code{FALSE}: the warehouse server's TLS
+certificate is checked against the machine's CA chain, because the
+connection carries credentials. Microsoft changed the \code{Encrypt} default
+from \code{no} in \emph{ODBC Driver 17 for SQL Server} to \code{yes} in driver 18, and the
+legacy SAS connection carried \code{TrustServerCertificate=Yes}. If a connection
+fails because the certificate does not verify, install the institutional CA
+chain on the machine (ask whoever administers the server or the DSN). Pass
+\code{trust_certificate = TRUE} only as a stop-gap: it accepts any certificate,
+so it does not protect the credentials from an impostor server.
 
 Set the \code{HVI_DW_KERBEROS} environment variable to enable the top rung of
 the credential ladder, Kerberos integrated authentication: no stored

@@ -305,7 +305,7 @@ test_that("a no-rule set reads back with typed empty attrition", {
   write_analysis_set("eda", cfg)
   attrition <- attr(read_analysis_set("eda", cfg), "attrition")
   expect_s3_class(attrition, "data.frame")
-  expect_named(attrition, c("rule", "reason", "n_before", "n_excluded", "n_after"))
+  expect_named(attrition, c("rule", "reason", "n_before", "n_excluded", "n_after", "n_na_kept"))
   expect_equal(nrow(attrition), 0L)
 })
 
@@ -542,4 +542,100 @@ test_that("a registered read still writes the set", {
   cfg <- local_study(list(eda = eda_set()))
   withr::local_envvar(HVTI_DATA = NA)
   expect_no_error(write_analysis_set("eda", cfg))
+})
+
+test_that("event counts are explicit: censored, events, other codes and missing", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_coded_event_study(list(eda = eda_set()))
+  side <- write_analysis_set("eda", cfg)
+  expect_equal(side$counts$n, 18L)
+  expect_equal(side$counts$n_censored, 7L)
+  expect_equal(side$counts$n_events, 8L)
+  expect_equal(side$counts$n_other_events, 2L)
+  expect_equal(side$counts$n_event_missing, 1L)
+})
+
+test_that("an expect on n_censored checks the explicit count, not n minus events", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_coded_event_study(list(eda = eda_set(expect = list(n_censored = 10))))
+  expect_error(write_analysis_set("eda", cfg), "expected n_censored = 10, got 7")
+  cfg <- local_coded_event_study(list(eda = eda_set(
+    expect = list(n_censored = 7, n_other_events = 2, n_event_missing = 1)
+  )))
+  expect_no_error(write_analysis_set("eda", cfg))
+})
+
+test_that("expect on the new event counts needs an event column", {
+  cfg <- local_study(list(eda = eda_set()))
+  v <- function(b) .set_validate(b, "eda", cfg)
+  expect_error(v(eda_set(event = NULL, expect = list(n_other_events = 0))),
+               "`expect: n_other_events` needs an `event`")
+  expect_error(v(eda_set(event = NULL, expect = list(n_event_missing = 0))),
+               "`expect: n_event_missing` needs an `event`")
+})
+
+test_that("a patient NA on a rule is kept and counted per rule", {
+  skip_if_not_installed("hvtiPlotR")
+  b <- rule_block(list(list(reason = "No aggrecan", when = "is.na(aggrc)"),
+                       list(reason = "Under 18", when = "age < 18")))
+  ex <- .apply_exclusions(exclusion_data(), b, "eda")
+  # row 4 has age NA and reaches rule 2; it is kept.
+  expect_true(ex$keep[4])
+  expect_equal(ex$attrition$n_na_kept, c(0L, 1L))
+  # Row 1 (aggrc NA) is excluded by rule 1, so rule 2 counts only row 3.
+  b2 <- rule_block(list(list(reason = "Under 18", when = "age < 18"),
+                        list(reason = "High aggrecan", when = "aggrc > 3")))
+  ex2 <- .apply_exclusions(exclusion_data(), b2, "eda")
+  expect_equal(ex2$attrition$n_na_kept, c(1L, 1L))
+})
+
+test_that("the NA-kept count reaches the sidecar and the read attrition", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set(exclude = list(
+    list(reason = "Low aggrecan", when = "aggrc < 3")
+  ))))
+  side <- write_analysis_set("eda", cfg)
+  expect_equal(side$attrition[[1]]$n_na_kept, 1L)
+  expect_equal(attr(read_analysis_set("eda", cfg), "attrition")$n_na_kept, 1L)
+})
+
+test_that("a sidecar that does not describe the parquet beside it stops the read", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  cfg <- local_study(list(eda = eda_set()))
+  write_analysis_set("eda", cfg)
+  p <- .set_paths("eda", cfg)
+  first_sidecar <- readLines(p$sidecar)
+  # A second writer's parquet lands beside the first writer's sidecar.
+  f <- hvtiRutilities::built_path(cfg)
+  cat("21,70,5,0,3,1\n", file = f, append = TRUE)
+  withr::with_dir(cfg$root, suppressMessages(hvtiRutilities::update_manifest()))
+  cfg <- hvtiRutilities::study_config(cfg$root)
+  write_analysis_set("eda", cfg)
+  writeLines(first_sidecar, p$sidecar)
+  expect_error(suppressMessages(read_analysis_set("eda", cfg)),
+               "read_analysis_set\\(\\): .*sidecar does not describe")
+})
+
+test_that("write_analysis_set() takes the study's manifest lock", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("hvtiPlotR")
+  testthat::skip_on_os("windows")
+  cfg <- local_study(list(eda = eda_set()))
+  p <- .set_paths("eda", cfg)
+  lock_path <- paste0(p$manifest, ".lock")
+  # Another process holds the lock; a same-process lock would not block.
+  holder <- parallel::mcparallel({
+    l <- filelock::lock(lock_path)
+    Sys.sleep(3)
+    filelock::unlock(l)
+  })
+  withr::defer(parallel::mccollect(holder, wait = TRUE))
+  Sys.sleep(0.5)
+  local_mocked_bindings(.lock_timeout_ms = function() 100)
+  expect_error(write_analysis_set("eda", cfg), "write_analysis_set\\(\\): .*lock")
+  expect_false(file.exists(p$parquet))
 })

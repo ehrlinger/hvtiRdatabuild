@@ -348,20 +348,19 @@ test_that("publishing identical same-date bytes is idempotent", {
   expect_identical(list.files(dir, pattern = "^cohort_.*\\.csv$"), first$file)
 })
 
-test_that("publishing withdrawn bytes preserves the withdrawn release", {
+test_that("publishing bytes identical to a withdrawn release is an error naming it", {
   dir <- local_publication_dir()
   draft <- write_synthetic_draft(dir)
 
   first <- publish_dataset(draft, "cohort", dir, "2026-09-21")
-  withdrawn <- withdraw_dataset_release(
-    "cohort", first$release_id, dir, "Synthetic source correction"
+  withdraw_dataset_release("cohort", first$release_id, dir, "Synthetic source correction")
+  expect_error(
+    publish_dataset(draft, "cohort", dir, "2026-09-21"),
+    paste0("publish_dataset\\(\\): .*withdrawn release ", first$release_id)
   )
-  repeated <- publish_dataset(draft, "cohort", dir, "2026-09-21")
   catalog <- .publication_read_catalog(.publication_catalog_path(dir))
-
-  expect_identical(repeated, withdrawn)
-  expect_identical(repeated$status, "withdrawn")
   expect_length(catalog$datasets$cohort$releases, 1L)
+  expect_identical(catalog$datasets$cohort$releases[[1]]$status, "withdrawn")
   expect_identical(list.files(dir, pattern = "^cohort_.*\\.csv$"), first$file)
 })
 

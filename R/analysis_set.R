@@ -4,7 +4,8 @@
 # Design: dev/specs/2026-09-14-analysis-sets-design.md.
 
 .set_keys <- c("id", "vars", "event", "exclude", "expect")
-.expect_keys <- c("n", "n_events", "n_censored")
+.expect_keys <- c("n", "n_events", "n_censored", "n_other_events", "n_event_missing")
+.event_keys <- c("n_events", "n_censored", "n_other_events", "n_event_missing")
 
 # The set's block exactly as yaml::read_yaml() returns it. The declaration hash
 # is taken over this, before any normalization, so the hash describes what the
@@ -98,7 +99,7 @@
       stop(where, ": `expect: ", k, "` must be a non-negative whole number.",
            call. = FALSE)
   }
-  needs_event <- intersect(names(expect), c("n_events", "n_censored"))
+  needs_event <- intersect(names(expect), .event_keys)
   if (length(needs_event) && is.null(event))
     stop(where, ": `expect: ", needs_event[1L], "` needs an `event` column. ",
          "Name it with `event:` in the set.", call. = FALSE)
@@ -138,8 +139,7 @@
   if (!is.logical(v) || length(v) != nrow(d))
     stop(where, " must give one TRUE/FALSE per row (", nrow(d), "); it gave ",
          length(v), " value(s) of type ", typeof(v), ".", call. = FALSE)
-  # SAS `if <missing> then delete` does not delete.
-  !is.na(v) & v
+  v
 }
 
 .apply_exclusions <- function(d, block, name) {
@@ -159,10 +159,13 @@
          paste(collisions, collapse = ", "), ".", call. = FALSE)
   }
   work <- d
-  for (k in seq_along(rules)) work[[flag_cols[k]]] <- .eval_rule(d, rules[[k]], name, k)
+  raw_flags <- lapply(seq_along(rules), function(k) .eval_rule(d, rules[[k]], name, k))
+  # SAS `if <missing> then delete` does not delete: a patient NA on a rule is
+  # kept, and counted per rule below so the gap is visible (T3-D3).
+  for (k in seq_along(rules)) work[[flag_cols[k]]] <- !is.na(raw_flags[[k]]) & raw_flags[[k]]
 
   tracker <- do.call(hvtiPlotR::hv_consort_start,
-                     list(work, as.name(block$id), pass_col = ".hv_start"))
+                     list(work, patient_id_col = block$id, pass_col = ".hv_start"))
   formulas <- lapply(seq_along(rules), function(k) {
     eval(call("~", as.name(flag_cols[k]), rules[[k]]$reason), baseenv())
   })
@@ -175,6 +178,13 @@
   # stage, not per reason (hvtiPlotR#129). Remove this when #129 ships.
   n_excl <- vapply(rules, function(r) sum(reason == r$reason, na.rm = TRUE), integer(1))
   n_after <- nrow(d) - cumsum(n_excl)
+  # Rows NA on rule k that reached it: not excluded by an earlier rule.
+  reached <- rep(TRUE, nrow(d))
+  n_na <- integer(length(rules))
+  for (k in seq_along(rules)) {
+    n_na[k] <- sum(reached & is.na(raw_flags[[k]]))
+    reached <- reached & !(!is.na(raw_flags[[k]]) & raw_flags[[k]])
+  }
   list(
     keep = tracker$data$.hv_keep,
     attrition = data.frame(
@@ -182,7 +192,8 @@
       reason = vapply(rules, function(r) r$reason, character(1)),
       n_before = as.integer(c(nrow(d), utils::head(n_after, -1L))),
       n_excluded = as.integer(n_excl),
-      n_after = as.integer(n_after)
+      n_after = as.integer(n_after),
+      n_na_kept = as.integer(n_na)
     )
   )
 }
@@ -190,7 +201,7 @@
 .empty_attrition <- function() {
   data.frame(
     rule = integer(), reason = character(), n_before = integer(),
-    n_excluded = integer(), n_after = integer()
+    n_excluded = integer(), n_after = integer(), n_na_kept = integer()
   )
 }
 
@@ -290,11 +301,20 @@
 #' @details
 #' Nothing is written unless every check passes. Each `when` is R code evaluated
 #' against the data with only base R visible; a missing value counts as not
-#' excluded, as SAS `if <missing> then delete` does. The identifier column named
+#' excluded, as SAS `if <missing> then delete` does. Such a patient stays in the
+#' set and is counted in the attrition table's `n_na_kept` column, "NA on this
+#' rule (kept)", at each rule they reach. The identifier column named
 #' by `id` is used to track exclusions and is never written to the sidecar or
 #' the manifest. A set that names an `event` column, one of its `vars`, also
-#' counts `n_events` (rows where it equals 1) and `n_censored`; an `expect` on
-#' either count needs that `event` key.
+#' counts each code explicitly: `n_censored` (rows where it equals 0),
+#' `n_events` (rows where it equals 1), `n_other_events` (any other code, such
+#' as a competing risk) and `n_event_missing` (`NA`). Nothing is inferred by
+#' subtraction. An `expect` on any of these counts needs that `event` key.
+#'
+#' The write holds the study's manifest lock (`manifest.yaml.lock`), so two
+#' writers at once cannot leave one writer's parquet beside the other's
+#' sidecar. The sidecar records the parquet's sha256, and
+#' [read_analysis_set()] checks it.
 #'
 #' The parent is read with [hvtiRutilities::read_built()], and a working read is refused: an
 #' analysis set is built from registered data only. A dataset with no dated version, including one
@@ -307,8 +327,8 @@
 #' @param cfg List. A study manifest from [hvtiRutilities::study_config()].
 #'
 #' @return The sidecar contents, invisibly: a list with `set`, `parent`,
-#'   `declaration_sha256`, `written`, `counts`, `n_cols`, `attrition` and
-#'   `packages`.
+#'   `declaration_sha256`, `parquet_sha256`, `written`, `counts`, `n_cols`,
+#'   `attrition` and `packages`.
 #'
 #' @examples
 #' \donttest{
@@ -329,7 +349,7 @@
 #'     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
 #'     row.names = FALSE
 #'   )
-#'   suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+#'   suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
 #'   yml <- file.path(root, "_study.yml")
 #'   y <- yaml::read_yaml(yml)
 #'   y$analysis_sets <- list(primary = list(
@@ -398,8 +418,13 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 
   counts <- list(n = nrow(out))
   if (!is.null(b$event)) {
-    counts$n_events <- as.integer(sum(out[[b$event]] == 1, na.rm = TRUE))
-    counts$n_censored <- counts$n - counts$n_events
+    # Explicit counts, nothing inferred by subtraction (T3-D2): a competing
+    # risk or a missing code is not censoring.
+    ev <- out[[b$event]]
+    counts$n_events <- as.integer(sum(ev == 1, na.rm = TRUE))
+    counts$n_censored <- as.integer(sum(ev == 0, na.rm = TRUE))
+    counts$n_other_events <- as.integer(sum(!is.na(ev) & !ev %in% c(0, 1)))
+    counts$n_event_missing <- as.integer(sum(is.na(ev)))
   }
   for (k in names(b$expect)) {
     if (!isTRUE(counts[[k]] == b$expect[[k]]))
@@ -416,6 +441,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
     set = name,
     parent = parent_after,
     declaration_sha256 = .declaration_sha(raw),
+    parquet_sha256 = NA_character_,
     written = format(Sys.time(), "%Y-%m-%dT%H:%M:%S"),
     counts = counts,
     n_cols = ncol(out),
@@ -426,7 +452,15 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
       arrow = as.character(utils::packageVersion("arrow"))
     )
   )
+  lock <- filelock::lock(paste0(p$manifest, ".lock"), timeout = .lock_timeout_ms())
+  if (is.null(lock)) {
+    stop("write_analysis_set(): timed out waiting for the study's manifest lock (",
+         basename(p$manifest), ".lock); another job is writing. Nothing was written.",
+         call. = FALSE)
+  }
+  on.exit(filelock::unlock(lock), add = TRUE)
   .atomic_write(p$parquet, function(tmp) arrow::write_parquet(out, tmp))
+  side$parquet_sha256 <- digest::digest(p$parquet, algo = "sha256", file = TRUE)
   .atomic_write(p$sidecar, function(tmp) yaml::write_yaml(side, tmp))
   hvtiRutilities::update_manifest(
     file = p$parquet, manifest_path = p$manifest, n_rows = nrow(out),
@@ -434,6 +468,9 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   )
   invisible(side)
 }
+
+# How long write_analysis_set() waits for the manifest lock, in milliseconds.
+.lock_timeout_ms <- function() 10000
 
 # The templates' rule for a final render: HVTI_TEMPLATE_STRICT unset, 0, false
 # or no is a draft; anything else is final, so a mistyped value fails safe.
@@ -474,7 +511,9 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #' `hvtiRutilities_stale_analysis_set` giving the [write_analysis_set()] call
 #' that updates it. In a final render (`HVTI_TEMPLATE_STRICT` set, as
 #' `hvtiRtemplates::render_job(final = TRUE)` sets it) it stops with the same
-#' text. A parquet that no longer matches its manifest entry always stops.
+#' text. A parquet that no longer matches its manifest entry always stops, and
+#' so does a sidecar whose recorded parquet sha256 is not the parquet's. A
+#' sidecar written before sidecars recorded that sha256 is treated as stale.
 #'
 #' When the built dataset is registered as a dated parquet, "changed" means a
 #' newer version has been registered with [hvtiRutilities::update_manifest()].
@@ -506,7 +545,7 @@ write_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
 #'     file.path(hvtiRutilities::study_dir("datasets", root), "built.csv"),
 #'     row.names = FALSE
 #'   )
-#'   suppressMessages(hvtiRutilities::register_data(root, file = "built.csv"))
+#'   suppressMessages(hvtiRutilities::register_data(file = "built.csv", root = root))
 #'   yml <- file.path(root, "_study.yml")
 #'   y <- yaml::read_yaml(yml)
 #'   y$analysis_sets <- list(primary = list(
@@ -557,6 +596,13 @@ read_analysis_set <- function(name, cfg = hvtiRutilities::study_config()) {
   if (!length(e) || !same(e[[1L]]$sha256, actual_sha)) {
     stop("analysis set `", name, "`: ", basename(p$parquet), " does not match its ",
          "manifest entry. ", fix, call. = FALSE)
+  }
+  if (is.null(side$parquet_sha256)) {
+    .stale_set(name, "its sidecar was written before sidecars recorded their parquet's sha256.")
+  } else if (!same(side$parquet_sha256, actual_sha)) {
+    stop("read_analysis_set(): analysis set `", name, "`: its sidecar does not describe ",
+         basename(p$parquet), " (the sidecar records a different parquet sha256), so its ",
+         "counts and attrition cannot be trusted. ", fix, call. = FALSE)
   }
 
   d <- as.data.frame(arrow::read_parquet(p$parquet))

@@ -54,9 +54,9 @@ test_that("lift and corrections behave on SQL Server as on duckdb", {
         tab
       )), error = function(e) NULL)
     }
-    tryCatch(DBI::dbRemoveTable(con, .base_table_name(cfg, pq)), error = function(e) NULL)
-    tryCatch(DBI::dbRemoveTable(con, paste0(.base_table_name(cfg, pq), "__load_log")),
-             error = function(e) NULL)
+    base <- .base_table_name(cfg, pq, .file_sha256(pq))
+    tryCatch(DBI::dbRemoveTable(con, base), error = function(e) NULL)
+    tryCatch(DBI::dbRemoveTable(con, paste0(base, "__load_log")), error = function(e) NULL)
   })
   res <- suppressMessages(lift_master(cfg, con, pq, dry_run = FALSE))
   expect_equal(res$verdict, "pass")

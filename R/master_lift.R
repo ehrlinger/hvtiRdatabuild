@@ -6,12 +6,20 @@
 
 #' Lift a master's parquet snapshot into the warehouse as a view
 #'
-#' Checks the primary key, creates a base table named for the snapshot's
-#' release, loads it row group by row group, and proves it equal to the
+#' Checks that the snapshot is current, checks the primary key, creates a base
+#' table named for the snapshot's release and checksum, loads it row group by
+#' row group, and proves it equal to the
 #' snapshot: counts, aggregates and a sampled compare first, then a full
 #' comparison of every column joined on the key. Only then is a parity record
 #' written and the master's view created. If the master already has a
 #' corrections table, the view is regenerated with corrections applied.
+#'
+#' The snapshot is current when its sidecar's `source_sha256` matches the
+#' configuration's current build as it is now; a rebuilt build stops the lift
+#' until [snapshot_master()] has been re-run. Because the base table's name
+#' carries the first 12 hex digits of the parquet's sha256, re-lifting a
+#' rebuilt snapshot loads a new base table and moves the view to it. The
+#' earlier base table is left in place.
 #'
 #' A dry run, the default, writes the table's DDL next to the snapshot for a
 #' hand-off and touches nothing else. Warehouse errors are reported by step,
@@ -76,7 +84,8 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
     stop("The parquet does not match its sidecar checksum; re-run snapshot_master().",
          call. = FALSE)
   }
-  base <- .base_table_name(config, parquet)
+  .check_source_current(config, meta)
+  base <- .base_table_name(config, parquet, meta$parquet_sha256)
 
   kv <- key_verdict(parquet, config[["key"]])
   message(format_key_verdict(kv))
@@ -114,7 +123,8 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
       }
     })
   }
-  r <- run_step("load", load_parquet(con, parquet, base))
+  r <- run_step("load", load_parquet(con, parquet, base,
+                                     sha256 = as.character(meta$parquet_sha256)))
   message("load: ", r$loaded, " row groups loaded, ", r$skipped, " already present")
 
   res <- run_step("parity check", parity_check(con, base, parquet, config[["key"]],
@@ -145,18 +155,53 @@ lift_master <- function(config, con, parquet, dry_run = TRUE, dialect = "mssql")
                  verdict = "pass"))
 }
 
-#' The base table's name, from the master's name and the snapshot's stem
+#' The base table's name, from the master's name, the snapshot's stem and its
+#' checksum
+#'
+#' The current master keeps a fixed file name, so the stem alone would give a
+#' rebuilt snapshot the old snapshot's table, and its load log would skip the
+#' row groups already logged. The first 12 hex digits of the parquet's sha256
+#' make a rebuilt snapshot a new table.
 #'
 #' @param config A `master_config`.
 #' @param parquet Path to the snapshot.
+#' @param sha256 The parquet's sha256, as its sidecar records it.
 #'
 #' @return A lower-case identifier.
 #'
 #' @keywords internal
 #' @noRd
-.base_table_name <- function(config, parquet) {
+.base_table_name <- function(config, parquet, sha256) {
   stem <- tolower(gsub("[^A-Za-z0-9]+", "_", sub("\\.parquet$", "", basename(parquet))))
-  paste0(config[["name"]], "_base_", stem)
+  paste0(config[["name"]], "_base_", stem, "_", tolower(substr(sha256, 1L, 12L)))
+}
+
+#' Stop when the current build has changed since its snapshot was taken
+#'
+#' A sidecar that names the configuration's current build and records its
+#' `source_sha256` is checked against the build as it is now. A rebuilt
+#' current master would otherwise be lifted from its stale snapshot.
+#' Historical builds, and sidecars that record no source, are not checked.
+#'
+#' @param config A `master_config`.
+#' @param meta The snapshot's sidecar, as a list.
+#'
+#' @return `NULL`, invisibly. Stops when the source has changed.
+#'
+#' @keywords internal
+#' @noRd
+.check_source_current <- function(config, meta) {
+  if (is.null(meta$source) || is.null(meta$source_sha256) ||
+        !identical(as.character(meta$source), config[["current"]])) {
+    return(invisible(NULL))
+  }
+  src <- file.path(config[["snapshots"]], config[["current"]])
+  if (file.exists(src) && !identical(.file_sha256(src), as.character(meta$source_sha256))) {
+    stop("lift_master(): the snapshot is stale; ", config[["current"]], " has been rebuilt ",
+         "since it was taken. Re-run snapshot_master() and lift the new snapshot.",
+         call. = FALSE)
+  }
+  invisible(NULL)
 }
 
 #' The base table of the latest passing parity record

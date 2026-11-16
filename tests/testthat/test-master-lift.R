@@ -32,7 +32,8 @@ test_that("the dry run writes the DDL and touches nothing", {
   res <- lift_master(f$cfg, con, f$pq, dialect = "duckdb")
   expect_true(res$dry_run)
   expect_true(file.exists(res$ddl_path))
-  expect_equal(res$base_table, "master_t_base_built_2026")
+  expect_equal(res$base_table,
+               paste0("master_t_base_built_2026_", substr(.file_sha256(f$pq), 1, 12)))
   expect_equal(length(DBI::dbListTables(con)), 0L)
 })
 
@@ -50,7 +51,7 @@ test_that("an executed lift loads, passes parity, records it, and creates the vi
   expect_equal(res$verdict, "pass")
   v <- DBI::dbGetQuery(con, "SELECT * FROM master_t ORDER BY id")
   expect_equal(nrow(v), 6L)
-  expect_equal(.current_base(con, f$cfg, "duckdb"), "master_t_base_built_2026")
+  expect_equal(.current_base(con, f$cfg, "duckdb"), res$base_table)
   expect_true(DBI::dbExistsTable(con, "master_t_meta"))
 })
 
@@ -169,4 +170,30 @@ test_that(".current_base's own stop messages are unwrapped, but its DB calls are
   msg <- tryCatch(.current_base(con, f$cfg, "duckdb"), error = conditionMessage)
   expect_match(msg, "Step 'check parity table exists' failed")
   expect_false(grepl("SECRET_VALUE", msg))
+})
+
+test_that("re-lifting a rebuilt snapshot replaces the data rather than skipping it", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("jsonlite")
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("withr")
+  skip_if_not_installed("tidyselect")
+  f <- lift_fixture()
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  first <- suppressMessages(lift_master(f$cfg, con, f$pq, dry_run = FALSE, dialect = "duckdb"))
+  # Rebuild the snapshot under the same file name with one row changed.
+  d <- f$data
+  d$age[1] <- 99
+  arrow::write_parquet(d, f$pq)
+  meta_path <- file.path(f$dir, "built_2026.meta.json")
+  meta <- jsonlite::read_json(meta_path)
+  meta$parquet_sha256 <- digest::digest(f$pq, algo = "sha256", file = TRUE)
+  jsonlite::write_json(meta, meta_path, auto_unbox = TRUE)
+  second <- suppressMessages(lift_master(f$cfg, con, f$pq, dry_run = FALSE, dialect = "duckdb"))
+  expect_equal(second$verdict, "pass")
+  expect_false(identical(second$base_table, first$base_table))
+  v <- DBI::dbGetQuery(con, "SELECT age FROM master_t WHERE id = 'K1'")
+  expect_equal(v$age, 99)
 })

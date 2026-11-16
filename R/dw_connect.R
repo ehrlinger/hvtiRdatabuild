@@ -5,15 +5,15 @@
 #' a configuration file, a log line, or an error message, and the connection
 #' string is never echoed.
 #'
-#' `trust_certificate` defaults to `TRUE` for a specific reason. Microsoft
-#' changed the `Encrypt` default from `no` in *ODBC Driver 17 for SQL Server*
-#' to `yes` in driver 18. A connection string that worked under the older
-#' driver fails with a certificate error under 18 unless it either disables
-#' encryption or trusts the server certificate. The legacy SAS connection
-#' carried `TrustServerCertificate=Yes`, which is why the pull works today.
-#' Whether trusting the certificate is the right long-term posture, versus
-#' installing the institutional CA chain, is a question for whoever
-#' administers the DSN, but changing it silently would break every pull.
+#' `trust_certificate` defaults to `FALSE`: the warehouse server's TLS
+#' certificate is checked against the machine's CA chain, because the
+#' connection carries credentials. Microsoft changed the `Encrypt` default
+#' from `no` in *ODBC Driver 17 for SQL Server* to `yes` in driver 18, and the
+#' legacy SAS connection carried `TrustServerCertificate=Yes`. If a connection
+#' fails because the certificate does not verify, install the institutional CA
+#' chain on the machine (ask whoever administers the server or the DSN). Pass
+#' `trust_certificate = TRUE` only as a stop-gap: it accepts any certificate,
+#' so it does not protect the credentials from an impostor server.
 #'
 #' Set the `HVI_DW_KERBEROS` environment variable to enable the top rung of
 #' the credential ladder, Kerberos integrated authentication: no stored
@@ -36,7 +36,7 @@
 #' @param port Optional port number.
 #' @param encrypt Whether to request an encrypted connection.
 #' @param trust_certificate Whether to trust the server certificate without
-#'   validating it against a CA chain.
+#'   validating it against a CA chain. `FALSE`, the default, validates it.
 #' @param ... Further arguments passed to [DBI::dbConnect()].
 #'
 #' @return A [DBI::DBIConnection-class] object.
@@ -52,7 +52,7 @@
 #'
 #' @export
 dw_connect <- function(server, database, dsn = NULL, port = NULL,
-                       encrypt = TRUE, trust_certificate = TRUE, ...) {
+                       encrypt = TRUE, trust_certificate = FALSE, ...) {
   if (!requireNamespace("odbc", quietly = TRUE)) {
     stop("Package 'odbc' is required to connect to the warehouse. ",
          "Install it with install.packages('odbc').", call. = FALSE)
@@ -74,9 +74,15 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
     tryCatch(
       do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
       error = function(e) {
-        stop("Could not connect to the warehouse. The driver reported a ",
+        stop("dw_connect(): Could not connect to the warehouse. The driver reported a ",
              "failure; the connection string is not shown because it may ",
              "carry a credential. Check the DSN, server, and database.",
+             if (isTRUE(encrypt) && !isTRUE(trust_certificate)) paste0(
+               " The server's TLS certificate was checked against this machine's CA ",
+               "chain. If the certificate does not verify, install the institutional CA ",
+               "chain (ask the server's administrator). `trust_certificate = TRUE` connects ",
+               "without checking it, as a stop-gap only: it accepts any server's certificate."
+             ),
              call. = FALSE)
       }
     ),
@@ -99,7 +105,7 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
 #' @noRd
 .build_connection_args <- function(server, database, dsn = NULL, port = NULL,
                                    encrypt = TRUE,
-                                   trust_certificate = TRUE) {
+                                   trust_certificate = FALSE) {
   cred <- .resolve_credentials(dsn = dsn)
 
   args <- list(

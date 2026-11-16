@@ -132,8 +132,10 @@ test_that("load_parquet loads row groups and resumes after a partial load", {
   DBI::dbExecute(con, "CREATE TABLE base2 (id VARCHAR, age DOUBLE, dt_surg DATE)")
   DBI::dbExecute(con, "INSERT INTO base2 SELECT * FROM base WHERE id IN ('K1', 'K2')")
   DBI::dbExecute(con, paste("CREATE TABLE base2__load_log",
-                            "(row_group INTEGER, n_rows INTEGER, loaded_at VARCHAR)"))
-  DBI::dbExecute(con, "INSERT INTO base2__load_log VALUES (0, 2, 'earlier')")
+                            "(row_group INTEGER, n_rows INTEGER, loaded_at VARCHAR,",
+                            "parquet_sha256 VARCHAR)"))
+  DBI::dbExecute(con, sprintf("INSERT INTO base2__load_log VALUES (0, 2, 'earlier', '%s')",
+                              .file_sha256(pq)))
   r <- load_parquet(con, pq, "base2")
   expect_true(r$loaded == 2L && r$skipped == 1L, label = "resume loads only the missing groups")
   expect_true(DBI::dbGetQuery(con, "SELECT COUNT(DISTINCT id) AS n, COUNT(*) AS m FROM base2")$m
@@ -291,4 +293,21 @@ test_that("parity_full catches a key value changed in the table that aggregates 
   res2 <- parity_full(con3, "base3", pq3, c("id", "dt_surg"), dialect = "duckdb")
   key_row <- res2[res2$variable == "id+dt_surg", ]
   expect_equal(key_row$verdict, "mismatch")
+})
+
+test_that("load_parquet refuses a log written for a different parquet", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("duckdb")
+  skip_if_not_installed("DBI")
+  skip_if_not_installed("haven")
+  pq <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(data.frame(id = paste0("K", 1:3), age = c(60, 61, 62)), pq)
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  DBI::dbExecute(con, "CREATE TABLE base (id VARCHAR, age DOUBLE)")
+  load_parquet(con, pq, "base")
+  arrow::write_parquet(data.frame(id = paste0("K", 1:3), age = c(70, 71, 72)), pq)
+  msg <- tryCatch(load_parquet(con, pq, "base"), error = conditionMessage)
+  expect_match(msg, "different parquet")
+  expect_false(grepl("K1|70", msg), label = "the message carries no value")
 })

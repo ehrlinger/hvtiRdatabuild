@@ -63,8 +63,8 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
     }
   }
 
-  o_ids <- as.character(oracle[[id]])
-  r_ids <- as.character(r[[id]])
+  o_ids <- .id_text(oracle[[id]])
+  r_ids <- .id_text(r[[id]])
   common <- intersect(o_ids, r_ids)
 
   rows <- list(
@@ -111,6 +111,22 @@ compare_built <- function(oracle, r, id = "ccfidu", tolerance = 1e-8) {
   rownames(out) <- NULL
 
   structure(out, class = c("built_comparison", "data.frame"), rows = rows)
+}
+
+#' Identifiers as text that matches by value
+#'
+#' `as.character(100000)` is `"1e+05"` while `as.character(100000L)` is
+#' `"100000"`, so a SAS oracle's double ids would not match R's integer ids.
+#' Numbers are written in full, to 15 significant digits.
+#'
+#' @param x An identifier column.
+#'
+#' @return A character vector.
+#'
+#' @keywords internal
+#' @noRd
+.id_text <- function(x) {
+  if (is.numeric(x)) trimws(formatC(x, format = "fg", digits = 15)) else as.character(x)
 }
 
 #' Verdict levels, most serious first
