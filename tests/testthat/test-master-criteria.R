@@ -98,3 +98,81 @@ test_that("a pull without criteria is unchanged", {
                    c("qualifying", "prior_qualifying", "in_master"))
   expect_identical(res$meta$status, "complete")
 })
+
+test_that("a local criterion runs on the surviving candidates and records the file", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("mrn", "SYN104"), f)
+  seen_n <- NULL
+  covid <- local_criterion(
+    "covid", "COVID-19 within 14 days", "exclude", f,
+    decide = function(units, path) {
+      seen_n <<- nrow(units)
+      units$mrn %in% utils::read.csv(path)$mrn
+    },
+    undetermined = "keep"
+  )
+  res <- pull_demo(con, demo_query(criteria = list(inotrope, covid),
+                                   index_on = "qualifying"))
+  expect_identical(seen_n, 1L)
+  expect_identical(nrow(res$data), 0L)
+  s <- res$cohort$stages
+  expect_identical(utils::tail(s$stage_id, 1L), "covid")
+  expect_identical(utils::tail(s$source, 1L), "build")
+  expect_match(utils::tail(s$provenance, 1L), covid$sha256, fixed = TRUE)
+})
+
+test_that("a local file changed after it was declared is refused", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("mrn", "SYN104"), f)
+  covid <- local_criterion("covid", "COVID-19", "exclude", f,
+                           decide = function(units, path) rep(FALSE, nrow(units)),
+                           undetermined = "keep")
+  writeLines(c("mrn", "SYN101"), f)
+  expect_error(pull_demo(con, demo_query(criteria = list(covid), index_on = "qualifying")),
+               class = "hvtiRdatabuild_local_criterion_changed",
+               regexp = "changed since it was declared")
+})
+
+test_that("a local file changed while it was read is refused", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("mrn", "SYN104"), f)
+  covid <- local_criterion("covid", "COVID-19", "exclude", f,
+                           decide = function(units, path) {
+                             writeLines(c("mrn", "SYN101"), path)
+                             rep(FALSE, nrow(units))
+                           },
+                           undetermined = "keep")
+  expect_error(pull_demo(con, demo_query(criteria = list(covid), index_on = "qualifying")),
+               class = "hvtiRdatabuild_local_criterion_changed",
+               regexp = "changed while it was read")
+})
+
+test_that("a later encounter can be the index when a local criterion drops the first", {
+  con <- criteria_db()
+  DBI::dbExecute(con, second_cabg)
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines(c("cohort_unit", "SYN103|2015-06-30"), f)
+  drop_first <- local_criterion(
+    "local_drop", "Excluded in the study's file", "exclude", f,
+    decide = function(units, path) units$cohort_unit %in% utils::read.csv(path)$cohort_unit,
+    undetermined = "keep"
+  )
+  res <- pull_demo(con, demo_query(criteria = list(drop_first), index_on = "eligible"))
+  expect_true("SYN103|2018-02-02" %in% res$data$cohort_unit)
+  expect_identical(utils::tail(res$cohort$stages$stage_id, 2L),
+                   c("local_drop", "index_eligible"))
+})
+
+test_that("a local criterion must return one decision per unit", {
+  con <- criteria_db()
+  f <- withr::local_tempfile(fileext = ".csv")
+  writeLines("mrn", f)
+  bad <- local_criterion("bad", "Bad", "exclude", f,
+                         decide = function(units, path) TRUE, undetermined = "keep")
+  expect_error(pull_demo(con, demo_query(criteria = list(bad), index_on = "qualifying")),
+               class = "hvtiRdatabuild_local_criterion",
+               regexp = "returned 1 value\\(s\\) for 3 unit\\(s\\)")
+})

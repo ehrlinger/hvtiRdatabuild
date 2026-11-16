@@ -439,3 +439,48 @@ review_criterion <- function(id, label, role) {
   }
   list(cohort = record, queue = queue)
 }
+
+.local_stages <- function(record, locals) {
+  queue <- data.frame(cohort_unit = character(), criterion_id = character(),
+                      stringsAsFactors = FALSE)
+  for (cr in locals) {
+    active <- .active_units(record)
+    keys <- split_cohort_unit(active)
+    units <- data.frame(cohort_unit = active, mrn = keys$mrn,
+                        encounter_date = keys$encounter_date, stringsAsFactors = FALSE)
+    # The recorded hash must be the hash of the bytes decide() read.
+    sha_before <- digest::digest(cr$path, algo = "sha256", file = TRUE)
+    if (!identical(sha_before, cr$sha256)) {
+      .abort("local_criterion_changed", "pull_master(): the file for local criterion \"",
+             cr$id, "\" has changed since it was declared. Declare the criterion again.")
+    }
+    met <- cr$decide(units, cr$path)
+    if (!identical(digest::digest(cr$path, algo = "sha256", file = TRUE), sha_before)) {
+      .abort("local_criterion_changed", "pull_master(): the file for local criterion \"",
+             cr$id, "\" changed while it was read. Nothing was pulled.")
+    }
+    if (!is.logical(met) || length(met) != length(active)) {
+      .abort("local_criterion", "pull_master(): local criterion \"", cr$id,
+             "\" returned ", length(met), " value(s) for ", length(active),
+             " unit(s); it must return one logical per unit.")
+    }
+    s <- as.integer(met)
+    out <- .stage_outcome(cr$role, cr$undetermined, s, cr$label)
+    prov <- sprintf("%s; met %d, not met %d, undetermined %d; read after the snapshot",
+                    .describe_criterion(cr), sum(s %in% 1L), sum(s %in% 0L),
+                    sum(is.na(s)))
+    record <- append_cohort_stage(
+      record,
+      data.frame(stage_id = cr$id, order = max(record$stages$order) + 1L,
+                 label = cr$label, source = "build", provenance = prov,
+                 stringsAsFactors = FALSE),
+      data.frame(patient_id = active, included = out$included, reason = out$reason,
+                 stringsAsFactors = FALSE)
+    )
+    if (any(out$review)) {
+      queue <- rbind(queue, data.frame(cohort_unit = active[out$review],
+                                       criterion_id = cr$id, stringsAsFactors = FALSE))
+    }
+  }
+  list(cohort = record, queue = queue)
+}

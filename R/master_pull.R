@@ -396,6 +396,13 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
                                 "no row in the master view"),
                stringsAsFactors = FALSE)
   )
+  locals <- Filter(function(cr) identical(cr$kind, "local"),
+                   if (is_query) cohort$criteria else list())
+  if (length(locals)) {
+    local_out <- .local_stages(final, locals)
+    final <- local_out$cohort
+    queue <- rbind(queue, local_out$queue)
+  }
   final_active <- .active_units(final)
   queue <- queue[queue$cohort_unit %in% final_active, , drop = FALSE]
   criteria <- if (is_query) cohort$criteria else list()
