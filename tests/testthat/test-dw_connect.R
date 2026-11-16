@@ -165,3 +165,37 @@ test_that("a failed connection that verified the certificate says what to try", 
   expect_false(grepl("trust_certificate = TRUE", trusting, fixed = TRUE),
                label = "the certificate advice appears only when the certificate was checked")
 })
+
+test_that("a failed connection says whether the network, TLS, login or driver failed", {
+  skip_if_not_installed("odbc")
+  withr::local_envvar(c(HOME = withr::local_tempdir()))
+  # Driver messages modelled on ODBC Driver 18 and unixODBC, each carrying an
+  # invented secret that must never reach the error.
+  cases <- list(
+    network = paste("[Microsoft][ODBC Driver 18 for SQL Server]TCP Provider: Error code",
+                    "0x2AF9 s3cret; Login timeout expired; A network-related or",
+                    "instance-specific error has occurred"),
+    tls = paste("[Microsoft][ODBC Driver 18 for SQL Server]SSL Provider:",
+                "[error:0A000086:SSL routines::certificate verify failed] s3cret"),
+    login = "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]Login failed for user 's3cret'.",
+    driver = paste("[unixODBC][Driver Manager]Can't open lib",
+                   "'/opt/s3cret/libmsodbcsql.so' : file not found"),
+    unknown = "something else entirely s3cret"
+  )
+  for (kind in names(cases)) {
+    driver_msg <- cases[[kind]]
+    testthat::local_mocked_bindings(
+      dbConnect = function(drv, ...) stop(driver_msg),
+      .package = "DBI"
+    )
+    e <- tryCatch(dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW"),
+                  error = identity)
+    expect_s3_class(e, "hvtiRdatabuild_connection_failed")
+    expect_identical(e$kind, kind, label = paste("kind for", kind))
+    msg <- conditionMessage(e)
+    expect_false(grepl("s3cret", msg, fixed = TRUE), label = paste("no driver text for", kind))
+    expect_identical(grepl("trust_certificate = TRUE", msg, fixed = TRUE),
+                     kind %in% c("tls", "unknown"),
+                     label = paste("certificate advice only where it can apply, for", kind))
+  }
+})

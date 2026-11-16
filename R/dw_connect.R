@@ -40,6 +40,11 @@
 #' @param ... Further arguments passed to [DBI::dbConnect()].
 #'
 #' @return A [DBI::DBIConnection-class] object.
+#'   A failed connection is an error of class `hvtiRdatabuild_connection_failed`
+#'   whose `kind` field says what failed: `"driver"` (the ODBC driver or DSN
+#'   would not load), `"network"` (the server name did not resolve or nothing
+#'   answered), `"tls"`, `"login"` or `"unknown"`. The driver's own message is
+#'   never shown, because it may carry a credential.
 #'
 #' @examples
 #' \donttest{
@@ -74,16 +79,24 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
     tryCatch(
       do.call(DBI::dbConnect, c(list(odbc::odbc()), args, list(...))),
       error = function(e) {
-        .abort("connection_failed",
-               "dw_connect(): Could not connect to the warehouse. The driver reported a ",
-               "failure; the connection string is not shown because it may ",
-               "carry a credential. Check the DSN, server, and database.",
-               if (isTRUE(encrypt) && !isTRUE(trust_certificate)) paste0(
-                 " The server's TLS certificate was checked against this machine's CA ",
-                 "chain. If the certificate does not verify, install the institutional CA ",
-                 "chain (ask the server's administrator). `trust_certificate = TRUE` connects ",
-                 "without checking it, as a stop-gap only: it accepts any server's certificate."
-               ))
+        kind <- .connection_failure_kind(conditionMessage(e))
+        cert_checked <- isTRUE(encrypt) && !isTRUE(trust_certificate)
+        stop(errorCondition(
+          paste0(
+            "dw_connect(): Could not connect to the warehouse. The driver's message ",
+            "is not shown because it may carry a credential. ",
+            .connection_failure_advice[[kind]],
+            if (cert_checked && kind %in% c("tls", "unknown")) paste0(
+              " The server's TLS certificate was checked against this machine's CA ",
+              "chain. If the certificate does not verify, install the institutional CA ",
+              "chain (ask the server's administrator). `trust_certificate = TRUE` connects ",
+              "without checking it, as a stop-gap only: it accepts any server's certificate."
+            )
+          ),
+          kind = kind,
+          class = c("hvtiRdatabuild_connection_failed", "hvtiRdatabuild_error"),
+          call = NULL
+        ))
       }
     ),
     warning = function(w) {
@@ -94,6 +107,53 @@ dw_connect <- function(server, database, dsn = NULL, port = NULL,
     }
   )
 }
+
+#' Classify a driver's connection failure without repeating its text
+#'
+#' The driver's message can carry a credential, so it is matched here and
+#' never shown. Order matters: a driver that cannot load is checked first,
+#' and a network failure before TLS, because driver 18 reports an unreachable
+#' host with a login timeout as well.
+#'
+#' @param msg The driver's error message.
+#'
+#' @return One of `"driver"`, `"network"`, `"tls"`, `"login"` or `"unknown"`.
+#'
+#' @keywords internal
+#' @noRd
+.connection_failure_kind <- function(msg) {
+  patterns <- c(
+    driver = "Can't open lib|Data source name not found|Driver Manager\\].*not found",
+    network = paste0("TCP Provider|0x2AF9|0x2749|network-related|Server is not found|",
+                     "Name or service not known|No such host|Could not open a connection"),
+    tls = "SSL Provider|certificate verify|certificate chain|TLS|handshake",
+    login = "Login failed for user|18456"
+  )
+  for (kind in names(patterns)) {
+    if (grepl(patterns[[kind]], msg, ignore.case = TRUE)) return(kind)
+  }
+  "unknown"
+}
+
+# What to check for each kind of connection failure.
+.connection_failure_advice <- list(
+  driver = paste0(
+    "The ODBC driver or DSN could not be loaded: check that ODBC Driver 18 for SQL ",
+    "Server is installed and that the DSN names a driver library that exists ",
+    "(odbc::odbcListDrivers())."
+  ),
+  network = paste0(
+    "The server could not be reached: its name did not resolve or nothing answered. ",
+    "This is a network failure, not a certificate or login failure; check the server ",
+    "name, DNS (getent hosts <server>) and the route or firewall."
+  ),
+  tls = "The TLS handshake with the server failed.",
+  login = paste0(
+    "The server was reached and accepted the encrypted connection, but refused the ",
+    "login: check the account and its access to the database."
+  ),
+  unknown = "Check the DSN, server, and database."
+)
 
 #' Assemble DBI connection arguments
 #'

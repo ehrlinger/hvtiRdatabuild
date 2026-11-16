@@ -27,3 +27,7 @@
   - `freeze_study_pull(study_config)` is `path`.
   - `snapshot_oracle(sas_path, out_path)` are `path` and `file`.
   - `dw_pull(conn)` is `con`.
+* A failed `dw_connect()` now says what failed, in its message and in the error's `kind` field:
+  the driver or DSN would not load, the server could not be reached (DNS or route), the TLS
+  handshake failed, or the login was refused. The certificate advice appears only where a
+  certificate can be the cause. The driver's own message is still never shown.
