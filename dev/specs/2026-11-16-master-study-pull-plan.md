@@ -4,23 +4,32 @@
 > (recommended) or superpowers:executing-plans to implement this plan task by task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Let a statistical programmer pull a study's cohort from a master view in one
-consistent read, define a cohort by query, and freeze the pull with its provenance.
+**Goal:** Let a statistical programmer select a cohort and pull it from a master view in one
+consistent read, build from it, and freeze the pull with its provenance.
 
-**Architecture:** Five new exports in hvtiRdatabuild. A cohort unit is an encounter, identified
-by `cohort_unit_id()` (`"<mrn>|<YYYY-MM-DD>"`) and carried as the existing `cohort_record`'s
-`patient_id`, so `new_cohort_record()`, `append_cohort_stage()` and `build_dataset()` work
-unchanged. `pull_master()` and `define_cohort()` read inside one snapshot-isolation
-transaction, joining a session temp table of cohort keys to the master view.
-`freeze_study_pull()` publishes the pull as a parquet release, with a provenance sidecar.
+**Architecture:** A cohort unit is an encounter, identified by `cohort_unit_id()`
+(`"<mrn>|<YYYY-MM-DD>"`) and carried as the existing `cohort_record`'s `patient_id`.
+`cohort_query()` is a definition with no database access. `pull_master()` takes either a
+`cohort_query` or a supplied `cohort_record`, and **selects and reads inside one
+snapshot-isolation transaction**: a query's epoch, index and earlier-encounter flag are
+computed in SQL into a session temp table, so only the cohort's own keys leave the
+database. `build_from_master()` turns the pull into the `build_result` that
+`derive_vars()` already consumes. `freeze_study_pull()` publishes the pull as parquet with
+its provenance **inside the file's own metadata**, so one checksummed artifact carries
+both.
 
 **Tech Stack:** R (>= 4.4.0), DBI, duckdb (tests), arrow (parquet), yaml, digest, testthat 3.
 
 **Spec:** `dev/specs/2026-11-16-master-views-design.md`, §5 (study builds) and §6 (freeze
 record). **Out of this plan:** §3 corrections intake and candidates, §3.3 generated views,
 §7 parity gate (**plan 2**, hvtiRdatabuild), and the SQL model repository and warehouse
-setup (**plan 3**, blocked on data engineering). This plan tests against duckdb only; nothing
-here needs the warehouse.
+setup (**plan 3**, blocked on data engineering). This plan tests against duckdb only.
+
+**Revised 2026-11-16 after the adversarial review on #105:** stage sources use the
+constructor's `upstream`/`build` vocabulary; selection and pull share one transaction;
+selection runs in the database; a master pull reaches `derive_vars()` through
+`build_from_master()`; provenance lives inside the published bytes, so a release can never
+exist without it, and a distinct pull with identical data is its own release.
 
 ## Global constraints
 
@@ -31,12 +40,16 @@ here needs the warehouse.
   output.** Counts and verdicts only.
 - **DB errors are withheld:** wrap every DBI call in the existing `run_step(name, expr)`
   (`R/sql_dialect.R`), which replaces the driver message.
+- **Cohort stage `source` is one of `"upstream"`, `"build"`, `"derive"`**
+  (`R/cohort_record.R:270`). What a stage came from goes in its `provenance`.
 - `arrow` and `duckdb` are **Suggests**: tests call `skip_if_not_installed()`, and runtime
   code that needs arrow checks `requireNamespace("arrow", quietly = TRUE)` and stops with a
   clear message.
 - Dialects are exactly `"mssql"` and `"duckdb"`, as elsewhere (`quoter()`, `sql_types()`).
+- **SQL stays in the shared subset** (`ROW_NUMBER() OVER`, `EXISTS`, `CASE`, `BETWEEN`,
+  bound `?` parameters) so one statement runs on both dialects.
 - **No version bump.** The implementation branch writes one news fragment,
-  `news/<branch with / as ->.md`, bullets only, no heading (Task 6). This plan file is under
+  `news/<branch with / as ->.md`, bullets only, no heading (Task 7). This plan file is under
   `dev/`, which `.Rbuildignore` excludes, so the plan's own PR needs none.
 - Done means `devtools::document()` run and committed, `devtools::test()` passing, and
   `devtools::check()` 0 errors, 0 warnings, 0 notes.
@@ -63,11 +76,12 @@ views. **Record this as a one-line amendment to spec §6.1 in plan 3.**
 |---|---|
 | `R/dataset_publication.R` (modify) | accept `.parquet` drafts |
 | `R/cohort_unit.R` (new) | `cohort_unit_id()`, `split_cohort_unit()` |
-| `R/master_pull.R` (new) | `.with_snapshot_txn()`, `.qualified_name()`, `pull_master()`, `print.master_pull()` |
-| `R/master_cohort.R` (new) | `define_cohort()` |
-| `R/master_freeze.R` (new) | `freeze_study_pull()` |
+| `R/cohort_query.R` (new) | `cohort_query()`, `print.cohort_query()` |
+| `R/master_pull.R` (new) | transaction and SQL helpers, `pull_master()`, `print.master_pull()` |
+| `R/master_build.R` (new) | `build_from_master()` |
+| `R/master_freeze.R` (new) | `freeze_study_pull()`, `read_pull_provenance()` |
 | `tests/testthat/helper-master-pull.R` (new) | duckdb master fixture, unit cohort fixture |
-| `tests/testthat/test-cohort-unit.R`, `test-master-pull.R`, `test-master-cohort.R`, `test-master-freeze.R` (new) | tests |
+| `tests/testthat/test-cohort-unit.R`, `test-cohort-query.R`, `test-master-pull.R`, `test-master-build.R`, `test-master-freeze.R` (new) | tests |
 | `tests/testthat/test-dataset-publication.R` (modify) | parquet publication test |
 | `_pkgdown.yml` (modify) | new reference group |
 
@@ -226,7 +240,7 @@ test_that("a malformed unit is refused", {
 #'
 #' @return A character vector of unit identifiers, `"<mrn>|<YYYY-MM-DD>"`.
 #'
-#' @seealso [split_cohort_unit()], [pull_master()], [define_cohort()]
+#' @seealso [split_cohort_unit()], [pull_master()], [cohort_query()]
 #'
 #' @examples
 #' # Synthetic identifiers; no PHI.
@@ -302,7 +316,140 @@ git commit -m "feat: cohort units keyed by MRN and encounter date"
 
 ---
 
-### Task 3: `pull_master()`, one consistent read through a session temp table
+
+### Task 3: `cohort_query()`, a cohort definition with no database access
+
+**Files:**
+- Create: `R/cohort_query.R`
+- Test: `tests/testthat/test-cohort-query.R`
+
+**Interfaces:**
+- Produces: `cohort_query(qualifying, epoch, index = c("first", "all"),
+  prior = c("keep", "exclude"))` → object of class `cohort_query`, a list with
+  `qualifying` (chr), `epoch` (Date, length 2), `index` (chr), `prior` (chr).
+  `print.cohort_query(x, ...)`.
+
+- [ ] **Step 1: Write the failing tests.** Create `tests/testthat/test-cohort-query.R`:
+
+```r
+test_that("a cohort query records its definition", {
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+  expect_s3_class(q, "cohort_query")
+  expect_identical(q$index, "first")
+  expect_identical(q$prior, "keep")
+  expect_identical(q$epoch, as.Date(c("2000-01-01", "2024-07-31")))
+})
+
+test_that("a malformed query or epoch is refused", {
+  epoch <- as.Date(c("2000-01-01", "2024-07-31"))
+  expect_error(cohort_query("", epoch), "qualifying")
+  expect_error(cohort_query(c("a", "b"), epoch), "qualifying")
+  expect_error(cohort_query("proc = 'CABG'", rev(epoch)), "start")
+  expect_error(cohort_query("proc = 'CABG'", "2000-01-01"), "two Dates")
+  expect_error(cohort_query("proc = 'CABG'", epoch, index = "last"), "should be one of")
+})
+
+test_that("printing shows the definition", {
+  out <- capture.output(print(cohort_query("proc = 'CABG'",
+                                           as.Date(c("2000-01-01", "2024-07-31")),
+                                           index = "all", prior = "exclude")))
+  expect_true(any(grepl("proc = 'CABG'", out, fixed = TRUE)))
+  expect_true(any(grepl("2000-01-01 to 2024-07-31", out, fixed = TRUE)))
+  expect_true(any(grepl("index all", out, fixed = TRUE)))
+})
+```
+
+- [ ] **Step 2: Run them and confirm they fail.**
+  Run: `Rscript -e 'devtools::test(filter = "cohort-query")'`
+  Expected: FAIL, `could not find function "cohort_query"`.
+
+- [ ] **Step 3: Implement.** Create `R/cohort_query.R`:
+
+```r
+#' Define a cohort by a query on a master view
+#'
+#' A definition only: nothing is read until [pull_master()] runs it, inside the same
+#' transaction as the pull, so the cohort and its data describe one state of the
+#' warehouse.
+#'
+#' The cohort is every encounter in the master that meets `qualifying` and falls inside
+#' `epoch`. `index` sets the study's unit: `"first"` keeps each patient's earliest
+#' qualifying encounter in the epoch (one row per patient; later encounters remain
+#' follow-up events), and `"all"` keeps every qualifying encounter in the epoch.
+#'
+#' A patient whose qualifying encounter in the epoch was preceded by one **before** the
+#' epoch is a redo, not a first. Those units are always recorded as a cohort stage,
+#' `prior_qualifying`: `prior = "keep"` keeps them, `prior = "exclude"` drops them with a
+#' reason. Nothing is dropped silently. The earlier encounter is detected in the database;
+#' its date never leaves it.
+#'
+#' `qualifying` is SQL written by the study programmer and run as a `WHERE` condition on
+#' the master. It must never be built from data.
+#'
+#' @param qualifying Character. A SQL boolean expression over the master's columns, for
+#'   example `"proc = 'CABG'"`.
+#' @param epoch A `Date` vector of length two: first and last encounter date, inclusive.
+#' @param index `"first"` or `"all"`.
+#' @param prior `"keep"` or `"exclude"`, for units with a qualifying encounter before
+#'   the epoch.
+#'
+#' @return An object of class `cohort_query`.
+#'
+#' @seealso [pull_master()]
+#'
+#' @examples
+#' cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'
+#' @export
+cohort_query <- function(qualifying, epoch, index = c("first", "all"),
+                         prior = c("keep", "exclude")) {
+  index <- match.arg(index)
+  prior <- match.arg(prior)
+  if (!is.character(qualifying) || length(qualifying) != 1L || is.na(qualifying) ||
+        !nzchar(trimws(qualifying))) {
+    stop("'qualifying' must be one non-empty SQL condition.", call. = FALSE)
+  }
+  if (!inherits(epoch, "Date") || length(epoch) != 2L || anyNA(epoch)) {
+    stop("'epoch' must be two Dates: the first and last encounter date.", call. = FALSE)
+  }
+  if (epoch[[1]] > epoch[[2]]) {
+    stop("'epoch' must give its start before its end.", call. = FALSE)
+  }
+  structure(list(qualifying = qualifying, epoch = epoch, index = index, prior = prior),
+            class = "cohort_query")
+}
+
+#' Print a cohort query
+#'
+#' @param x A `cohort_query` from [cohort_query()].
+#' @param ... Ignored.
+#'
+#' @return `x`, invisibly.
+#'
+#' @export
+print.cohort_query <- function(x, ...) {
+  cat("Cohort query: ", x$qualifying, "\n", sep = "")
+  cat("  epoch ", format(x$epoch[[1]]), " to ", format(x$epoch[[2]]), "; index ",
+      x$index, "; earlier qualifying encounter: ", x$prior, "\n", sep = "")
+  invisible(x)
+}
+```
+
+- [ ] **Step 4: Run the tests.**
+  Run: `Rscript -e 'devtools::document(); devtools::test(filter = "cohort-query")'`
+  Expected: all PASS.
+
+- [ ] **Step 5: Commit.**
+
+```bash
+git add R/cohort_query.R man/cohort_query.Rd man/print.cohort_query.Rd NAMESPACE \
+  tests/testthat/test-cohort-query.R
+git commit -m "feat: cohort_query() defines a cohort by query, epoch and index"
+```
+
+---
+
+### Task 4: `pull_master()`, selection and pull in one transaction
 
 **Files:**
 - Create: `R/master_pull.R`
@@ -310,18 +457,24 @@ git commit -m "feat: cohort units keyed by MRN and encounter date"
 - Test: `tests/testthat/test-master-pull.R`
 
 **Interfaces:**
-- Consumes: `cohort_unit_id()`, `split_cohort_unit()` (Task 2); `quoter()`, `run_step()`
-  (`R/sql_dialect.R`); `new_cohort_record()`.
+- Consumes: `cohort_unit_id()`, `split_cohort_unit()` (Task 2); `cohort_query()` (Task 3);
+  `quoter()`, `run_step()` (`R/sql_dialect.R`); `new_cohort_record()`,
+  `append_cohort_stage()`, `cohort_summary()`.
 - Produces:
   - `.with_snapshot_txn(con, dialect, code)`: runs `code` in one transaction (SQL Server:
-    `SNAPSHOT` isolation), commits, and rolls back on error. Returns `code`'s value.
-  - `.qualified_name(name, dialect)`: quotes each dot-separated part.
-  - `pull_master(con, master, cohort, columns, mrn_col = "mrn", date_col = "encounter_date",
-    dialect = c("mssql", "duckdb"), applied_view = paste0(master, "_corrections_applied"),
-    deployment_view = paste0(master, "_deployment"))` → object of class `master_pull`:
-    `list(data = <data.frame with mrn_col, date_col, columns, cohort_unit>,
-    provenance = list(master, sql_commit, applied_correction_ids <chr>, read_at <chr ISO-8601
-    UTC>, columns, n_cohort, n_matched, n_unmatched))`.
+    `SNAPSHOT` isolation), commits, and rolls back on error.
+  - `.read_deployment(con, deployment_view, dialect)` → one `sql_commit` string.
+  - `pull_master(con, master, cohort, columns, mrn_col = "mrn",
+    date_col = "encounter_date", dialect = c("mssql", "duckdb"),
+    applied_view = paste0(master, "_corrections_applied"),
+    deployment_view = paste0(master, "_deployment"))`, where `cohort` is a `cohort_query`
+    or a `cohort_record` built on units (`patient_id_col = "cohort_unit"`). Returns class
+    `master_pull`: `list(data, cohort, provenance)`. `data` holds one row per active unit
+    with the key columns, `columns` and `cohort_unit`. `cohort` is the cohort record
+    with its stages: for a query, `qualifying` and `prior_qualifying`; always a final
+    `in_master` stage, which excludes units with no master row. `provenance` is
+    `list(master, sql_commit, applied_correction_ids, read_at, columns,
+    cohort_definition, n_cohort, n_matched, n_unmatched)`.
   - `print.master_pull(x, ...)`.
 
 - [ ] **Step 1: Write the test helper.** Create `tests/testthat/helper-master-pull.R`:
@@ -329,12 +482,9 @@ git commit -m "feat: cohort units keyed by MRN and encounter date"
 ```r
 # No PHI: identifiers and values are invented.
 
-# A duckdb stand-in for one master and the two plan-3 contract views.
-# SYN101 has a qualifying CABG before 2000 and another in 2010.
-local_master_db <- function(env = parent.frame()) {
-  testthat::skip_if_not_installed("duckdb")
-  con <- DBI::dbConnect(duckdb::duckdb())
-  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
+# One master and the two plan-3 contract views. SYN101 had a qualifying CABG in 1998,
+# before the test epoch, and another in 2010.
+seed_master <- function(con) {
   DBI::dbWriteTable(con, "master_demo", data.frame(
     mrn = c("SYN101", "SYN101", "SYN102", "SYN103", "SYN104"),
     encounter_date = as.Date(c("1998-05-01", "2010-03-01", "2012-07-15",
@@ -351,110 +501,224 @@ local_master_db <- function(env = parent.frame()) {
   ))
   DBI::dbWriteTable(con, "master_demo_deployment",
                     data.frame(sql_commit = "abc1234", stringsAsFactors = FALSE))
-  con
+  invisible(con)
 }
 
-# A one-stage cohort of encounter units.
+local_master_db <- function(env = parent.frame()) {
+  testthat::skip_if_not_installed("duckdb")
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
+  seed_master(con)
+}
+
+demo_epoch <- as.Date(c("2000-01-01", "2024-07-31"))
+
+demo_query <- function(...) cohort_query("proc = 'CABG'", demo_epoch, ...)
+
+second_cabg <- "INSERT INTO master_demo VALUES ('SYN103', DATE '2018-02-02', 'CABG', 58)"
+
+# A one-stage cohort of supplied encounter units.
 unit_cohort <- function(mrn, dates) {
   units <- cohort_unit_id(mrn, as.Date(dates))
   new_cohort_record(
-    members = data.frame(patient_id = units, stage_id = "selected", included = TRUE,
+    members = data.frame(patient_id = units, stage_id = "supplied", included = TRUE,
                          reason = NA_character_, stringsAsFactors = FALSE),
-    stages = data.frame(stage_id = "selected", order = 1L, label = "Selected",
-                        source = "synthetic", provenance = "test fixture",
+    stages = data.frame(stage_id = "supplied", order = 1L, label = "Supplied cohort",
+                        source = "upstream", provenance = "test fixture",
                         stringsAsFactors = FALSE),
     patient_id_col = "cohort_unit"
   )
+}
+
+pull_demo <- function(con, cohort, columns = "age") {
+  pull_master(con, "master_demo", cohort, columns = columns, dialect = "duckdb")
+}
+
+active_units <- function(cohort) {
+  last <- utils::tail(cohort$stages$stage_id[order(cohort$stages$order)], 1L)
+  cohort$members$patient_id[cohort$members$stage_id == last & cohort$members$included]
 }
 ```
 
 - [ ] **Step 2: Write the failing tests.** Create `tests/testthat/test-master-pull.R`:
 
 ```r
-# No PHI: identifiers and values are invented.
+# No PHI: identifiers and values are invented. Fixtures in helper-master-pull.R.
 
-pull_demo <- function(con, cohort, columns = "age") {
-  pull_master(con, "master_demo", cohort, columns = columns, dialect = "duckdb")
-}
-
-test_that("only the cohort's encounters and the study's columns come back", {
+test_that("a supplied cohort pulls only its encounters and the study's columns", {
   con <- local_master_db()
-  cohort <- unit_cohort(c("SYN101", "SYN102", "SYN999"),
-                        c("2010-03-01", "2012-07-15", "2011-01-01"))
-
-  res <- pull_demo(con, cohort)
+  res <- pull_demo(con, unit_cohort(c("SYN101", "SYN102", "SYN999"),
+                                    c("2010-03-01", "2012-07-15", "2011-01-01")))
 
   expect_s3_class(res, "master_pull")
   expect_setequal(names(res$data), c("mrn", "encounter_date", "age", "cohort_unit"))
   expect_identical(nrow(res$data), 2L)
-  expect_false("proc" %in% names(res$data))
   expect_identical(res$provenance$n_cohort, 3L)
   expect_identical(res$provenance$n_matched, 2L)
   expect_identical(res$provenance$n_unmatched, 1L)
 })
 
+test_that("a unit with no master row is excluded at the in_master stage", {
+  con <- local_master_db()
+  res <- pull_demo(con, unit_cohort(c("SYN101", "SYN999"), c("2010-03-01", "2011-01-01")))
+
+  s <- cohort_summary(res$cohort)$stages
+  expect_identical(utils::tail(s$stage_id, 1L), "in_master")
+  expect_identical(utils::tail(s$n_excluded, 1L), 1L)
+  expect_setequal(active_units(res$cohort), res$data$cohort_unit)
+  expect_true(all(res$cohort$stages$source %in% c("upstream", "build", "derive")))
+})
+
+test_that("index first takes each patient's earliest qualifying encounter in the epoch", {
+  con <- local_master_db()
+  DBI::dbExecute(con, second_cabg)
+  res <- pull_demo(con, demo_query())
+
+  expect_setequal(res$data$cohort_unit,
+                  c("SYN101|2010-03-01", "SYN103|2015-06-30", "SYN104|2020-01-10"))
+  expect_identical(cohort_summary(res$cohort)$stages$stage_id,
+                   c("qualifying", "prior_qualifying", "in_master"))
+})
+
+test_that("index all keeps every qualifying encounter in the epoch", {
+  con <- local_master_db()
+  DBI::dbExecute(con, second_cabg)
+  expect_identical(nrow(pull_demo(con, demo_query(index = "all"))$data), 4L)
+})
+
+test_that("an earlier qualifying encounter is counted and kept by default", {
+  con <- local_master_db()
+  res <- pull_demo(con, demo_query())
+  s <- cohort_summary(res$cohort)$stages
+  prior <- res$cohort$stages$provenance[res$cohort$stages$stage_id == "prior_qualifying"]
+
+  expect_identical(s$n_remaining[s$stage_id == "prior_qualifying"], 3L)
+  expect_match(prior, "1 unit(s)", fixed = TRUE)
+  expect_match(prior, "kept", fixed = TRUE)
+})
+
+test_that("prior = 'exclude' drops those units and does not pull their data", {
+  con <- local_master_db()
+  res <- pull_demo(con, demo_query(prior = "exclude"))
+  s <- cohort_summary(res$cohort)$stages
+
+  expect_identical(s$n_excluded[s$stage_id == "prior_qualifying"], 1L)
+  expect_false("SYN101|2010-03-01" %in% res$data$cohort_unit)
+  expect_identical(nrow(res$data), 2L)
+})
+
+test_that("keys outside the cohort never leave the database", {
+  con <- local_master_db()
+  DBI::dbExecute(con,
+                 "INSERT INTO master_demo VALUES ('SYN105', DATE '2025-03-03', 'CABG', 60)")
+  seen <- list()
+  real_get <- DBI::dbGetQuery
+  testthat::local_mocked_bindings(
+    dbGetQuery = function(conn, statement, ...) {
+      out <- real_get(conn, statement, ...)
+      seen[[length(seen) + 1L]] <<- out
+      out
+    },
+    .package = "DBI"
+  )
+
+  pull_demo(con, demo_query())
+
+  returned <- unlist(lapply(seen, function(d) unlist(lapply(d, as.character))))
+  expect_false("SYN105" %in% returned)       # qualifying, but after the epoch
+  expect_false("SYN102" %in% returned)       # in the epoch, but not qualifying
+  expect_false("1998-05-01" %in% returned)   # the earlier encounter's date
+})
+
+test_that("a change committed during the pull is invisible to it", {
+  skip_if_not_installed("duckdb")
+  path <- withr::local_tempfile(fileext = ".duckdb")
+  drv <- duckdb::duckdb(path)
+  con <- DBI::dbConnect(drv)
+  other <- DBI::dbConnect(drv)
+  withr::defer({
+    DBI::dbDisconnect(other)
+    DBI::dbDisconnect(con, shutdown = TRUE)
+  })
+  seed_master(con)
+  real_read <- .read_deployment
+  testthat::local_mocked_bindings(.read_deployment = function(...) {
+    DBI::dbExecute(other, second_cabg)
+    DBI::dbExecute(other, "UPDATE master_demo_deployment SET sql_commit = 'new9999'")
+    real_read(...)
+  })
+
+  res <- pull_master(con, "master_demo", demo_query(index = "all"), columns = "age",
+                     dialect = "duckdb")
+
+  expect_identical(res$provenance$sql_commit, "abc1234")
+  expect_false("SYN103|2018-02-02" %in% res$data$cohort_unit)
+  expect_false("SYN103|2018-02-02" %in% res$cohort$members$patient_id)
+})
+
 test_that("the pull records the deployment and only its own cohort's corrections", {
   con <- local_master_db()
-  res <- pull_demo(con, unit_cohort(c("SYN101", "SYN102"),
-                                    c("2010-03-01", "2012-07-15")))
+  res <- pull_demo(con, unit_cohort(c("SYN101", "SYN102"), c("2010-03-01", "2012-07-15")))
 
   expect_identical(res$provenance$sql_commit, "abc1234")
   expect_identical(res$provenance$applied_correction_ids, "C1")
-  expect_match(res$provenance$read_at, "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$")
+  expect_match(res$provenance$read_at,
+               "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$")
 })
 
-test_that("a cohort unit matching two master rows stops the pull and rolls back", {
+test_that("a unit matching two master rows stops the pull and rolls back", {
   con <- local_master_db()
-  DBI::dbExecute(con, paste(
-    "INSERT INTO master_demo VALUES ('SYN102', DATE '2012-07-15', 'AVR', 71)"
-  ))
+  DBI::dbExecute(con,
+                 "INSERT INTO master_demo VALUES ('SYN102', DATE '2012-07-15', 'AVR', 71)")
   cohort <- unit_cohort("SYN102", "2012-07-15")
 
   expect_error(pull_demo(con, cohort), "more than one master row")
 
-  # The temp table was rolled back, so a clean pull on the same connection works.
   DBI::dbExecute(con, "DELETE FROM master_demo WHERE age = 71")
   expect_identical(nrow(pull_demo(con, cohort)$data), 1L)
 })
 
 test_that("two pulls on one connection both succeed", {
   con <- local_master_db()
-  cohort <- unit_cohort("SYN103", "2015-06-30")
-  expect_identical(nrow(pull_demo(con, cohort)$data), 1L)
-  expect_identical(nrow(pull_demo(con, cohort)$data), 1L)
+  expect_identical(nrow(pull_demo(con, demo_query())$data), 3L)
+  expect_identical(nrow(pull_demo(con, demo_query())$data), 3L)
+})
+
+test_that("an epoch with no qualifying encounters is an error", {
+  con <- local_master_db()
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2021-01-01", "2021-12-31")))
+  expect_error(pull_demo(con, q), "No qualifying encounters")
 })
 
 test_that("a deployment view without exactly one commit stops the pull", {
   con <- local_master_db()
   DBI::dbExecute(con, "INSERT INTO master_demo_deployment VALUES ('def5678')")
-  expect_error(pull_demo(con, unit_cohort("SYN103", "2015-06-30")), "exactly one")
+  expect_error(pull_demo(con, demo_query()), "exactly one")
 })
 
-test_that("a cohort not built on encounter units is refused", {
+test_that("a cohort not built on encounter units, or not a cohort, is refused", {
   con <- local_master_db()
-  cohort <- new_cohort_record(
+  by_patient <- new_cohort_record(
     members = data.frame(patient_id = "SYN101", stage_id = "s", included = TRUE,
                          reason = NA_character_, stringsAsFactors = FALSE),
-    stages = data.frame(stage_id = "s", order = 1L, label = "S", source = "x",
-                        provenance = "y", stringsAsFactors = FALSE),
+    stages = data.frame(stage_id = "s", order = 1L, label = "S", source = "upstream",
+                        provenance = "fixture", stringsAsFactors = FALSE),
     patient_id_col = "masterid"
   )
-  expect_error(pull_demo(con, cohort), "cohort_unit")
+  expect_error(pull_demo(con, by_patient), "cohort_unit")
+  expect_error(pull_demo(con, list()), "cohort_query")
 })
 
 test_that("bad column requests are refused before any query", {
   con <- local_master_db()
-  cohort <- unit_cohort("SYN103", "2015-06-30")
-  expect_error(pull_demo(con, cohort, columns = character(0)), "at least one")
-  expect_error(pull_demo(con, cohort, columns = c("age", "age")), "duplicate")
-  expect_error(pull_demo(con, cohort, columns = NA_character_), "at least one")
+  expect_error(pull_demo(con, demo_query(), columns = character(0)), "at least one")
+  expect_error(pull_demo(con, demo_query(), columns = c("age", "age")), "duplicate")
 })
 
 test_that("a database error is withheld", {
   con <- local_master_db()
   err <- tryCatch(
-    pull_master(con, "no_such_master", unit_cohort("SYN103", "2015-06-30"),
-                columns = "age", dialect = "duckdb"),
+    pull_master(con, "no_such_master", demo_query(), columns = "age", dialect = "duckdb"),
     error = conditionMessage
   )
   expect_match(err, "withheld")
@@ -462,8 +726,7 @@ test_that("a database error is withheld", {
 
 test_that("printing shows counts, never identifiers", {
   con <- local_master_db()
-  res <- pull_demo(con, unit_cohort("SYN103", "2015-06-30"))
-  out <- capture.output(print(res))
+  out <- capture.output(print(pull_demo(con, demo_query())))
   expect_true(any(grepl("matched", out)))
   expect_false(any(grepl("SYN", out, fixed = TRUE)))
 })
@@ -478,12 +741,13 @@ test_that("printing shows counts, never identifiers", {
 ```r
 # master_pull.R
 #
-# Study pulls from a master view: one consistent read, joined through a session
-# temp table of cohort keys. Spec: dev/specs/2026-11-16-master-views-design.md §5, §6.1.
+# Study pulls from a master view. Selection and read run in one transaction, joined
+# through a session temp table of cohort keys. Spec: dev/specs/
+# 2026-11-16-master-views-design.md §5, §6.1.
 
 # Run `code` in one transaction. On SQL Server the transaction uses SNAPSHOT
-# isolation, so every read sees one state of the warehouse; duckdb transactions
-# are snapshots already. Rolls back on error.
+# isolation, so every read sees one state of the warehouse; a duckdb transaction is
+# a snapshot already. Rolls back on error.
 .with_snapshot_txn <- function(con, dialect, code) {
   if (identical(dialect, "mssql")) {
     run_step("set snapshot isolation",
@@ -508,12 +772,12 @@ test_that("printing shows counts, never identifiers", {
          mssql = list(
            name = "#study_cohort",
            create = paste("CREATE TABLE #study_cohort (mrn nvarchar(128) NOT NULL,",
-                          "encounter_date date NOT NULL)")
+                          "encounter_date date NOT NULL, prior_qualifying tinyint NOT NULL)")
          ),
          duckdb = list(
            name = "study_cohort",
            create = paste("CREATE TEMP TABLE study_cohort (mrn VARCHAR NOT NULL,",
-                          "encounter_date DATE NOT NULL)")
+                          "encounter_date DATE NOT NULL, prior_qualifying TINYINT NOT NULL)")
          ))
 }
 
@@ -535,10 +799,9 @@ test_that("printing shows counts, never identifiers", {
   commit
 }
 
-.active_units <- function(cohort) {
-  if (!inherits(cohort, "cohort_record") ||
-        !identical(cohort$patient_id_col, "cohort_unit")) {
-    stop("'cohort' must be a cohort_record built on cohort_unit_id() units ",
+.unit_cohort_active <- function(cohort) {
+  if (!identical(cohort$patient_id_col, "cohort_unit")) {
+    stop("A supplied cohort must be built on cohort_unit_id() units ",
          "(patient_id_col = \"cohort_unit\").", call. = FALSE)
   }
   last <- utils::tail(cohort$stages$stage_id[order(cohort$stages$order)], 1L)
@@ -551,40 +814,92 @@ test_that("printing shows counts, never identifiers", {
   units
 }
 
+# INSERT ... SELECT that puts a query's units into the temp table. Bound parameters,
+# in text order: epoch start (the EXISTS), epoch start, epoch end (the BETWEEN).
+.select_units_sql <- function(query, master_q, tmp, mrn_q, date_q) {
+  paste(
+    "INSERT INTO", tmp, "(mrn, encounter_date, prior_qualifying)",
+    "SELECT q.mrn, q.encounter_date,",
+    sprintf("CASE WHEN EXISTS (SELECT 1 FROM %s p WHERE (%s) AND p.%s = q.mrn AND p.%s < ?)",
+            master_q, query$qualifying, mrn_q, date_q),
+    "THEN 1 ELSE 0 END",
+    "FROM (",
+    sprintf("SELECT m.%s AS mrn, m.%s AS encounter_date,", mrn_q, date_q),
+    sprintf("ROW_NUMBER() OVER (PARTITION BY m.%s ORDER BY m.%s) AS rn", mrn_q, date_q),
+    sprintf("FROM %s m WHERE (%s) AND m.%s IS NOT NULL AND m.%s BETWEEN ? AND ?",
+            master_q, query$qualifying, mrn_q, date_q),
+    ") q",
+    if (identical(query$index, "first")) "WHERE q.rn = 1" else ""
+  )
+}
+
+.query_cohort <- function(query, selected, master, commit) {
+  units <- cohort_unit_id(as.character(selected$mrn), as.Date(selected$encounter_date))
+  has_prior <- selected$prior_qualifying == 1L
+  exclude <- identical(query$prior, "exclude") & has_prior
+  query_prov <- sprintf("%s where %s; epoch %s to %s; index %s; SQL commit %s",
+                        master, query$qualifying, format(query$epoch[[1]]),
+                        format(query$epoch[[2]]), query$index, commit)
+  verdict <- if (identical(query$prior, "keep")) "kept" else "excluded"
+  prior_prov <- sprintf("%d unit(s) with a qualifying encounter before the epoch; %s",
+                        sum(has_prior), verdict)
+  members <- rbind(
+    data.frame(patient_id = units, stage_id = "qualifying", included = TRUE,
+               reason = NA_character_, stringsAsFactors = FALSE),
+    data.frame(patient_id = units, stage_id = "prior_qualifying", included = !exclude,
+               reason = ifelse(exclude, "qualifying encounter before the epoch",
+                               NA_character_),
+               stringsAsFactors = FALSE)
+  )
+  stages <- data.frame(
+    stage_id = c("qualifying", "prior_qualifying"),
+    order = c(1L, 2L),
+    label = c("Qualifying encounters in the epoch",
+              "Qualifying encounter before the epoch"),
+    source = "upstream",
+    provenance = c(query_prov, prior_prov),
+    stringsAsFactors = FALSE
+  )
+  new_cohort_record(members, stages, patient_id_col = "cohort_unit")
+}
+
 #' Pull a study's cohort from a master view
 #'
-#' Reads only the cohort's encounters and the study's columns from a master view, in
-#' one consistent read. The cohort's keys go into a **session temp table**, which is
-#' joined to the master inside the database, so only the study's slice crosses the
-#' network. The temp table is dropped before the transaction commits and never
-#' outlives the connection, so no patient list persists in the warehouse.
+#' Selects a cohort and reads its rows from a master view in **one transaction under
+#' snapshot isolation**, so the cohort, its data, the corrections applied to it and the
+#' deployment it came from describe one state of the warehouse even while decisions,
+#' loads or deployments commit.
 #'
-#' Every statement runs in one transaction under snapshot isolation: the data, the
-#' corrections applied to it and the deployment it came from describe one state of
-#' the warehouse even while decisions or deployments commit. The pull records the ids
-#' of the corrections applied to its cohort's rows, never their values.
+#' The cohort's keys go into a **session temp table**, which is joined to the master
+#' inside the database. For a [cohort_query()] the epoch, the index and the earlier-
+#' encounter flag are computed in SQL, so no key outside the cohort leaves the database.
+#' For a supplied [new_cohort_record()] of [cohort_unit_id()] units, its active units are
+#' loaded. The temp table is dropped before commit and never outlives the connection, so
+#' no patient list persists in the warehouse.
 #'
-#' A cohort unit matching more than one master row stops the pull, because the key is
-#' meant to be unique. Units matching no row are counted. Nothing in an error or in
-#' printed output names a patient.
+#' The returned cohort ends with an `in_master` stage that excludes units with no master
+#' row, so the data match the active cohort exactly. A unit matching more than one
+#' master row stops the pull, because the key is meant to be unique. Nothing in an error
+#' or in printed output names a patient.
 #'
 #' @param con A [DBI::DBIConnection-class] to the warehouse, or to duckdb in tests.
 #' @param master Character. The master view, optionally schema-qualified
 #'   (`"dbo.master_cardiac"`).
-#' @param cohort A [new_cohort_record()] built on [cohort_unit_id()] units
-#'   (`patient_id_col = "cohort_unit"`). Its latest stage's included units are pulled.
+#' @param cohort A [cohort_query()], or a [new_cohort_record()] built on
+#'   [cohort_unit_id()] units (`patient_id_col = "cohort_unit"`).
 #' @param columns Character. The study's columns, besides the key.
 #' @param mrn_col,date_col Character. The master's key columns.
 #' @param dialect `"mssql"` (the warehouse) or `"duckdb"` (tests).
 #' @param applied_view,deployment_view Character. The master's applied-corrections and
-#'   deployment views (spec §6.1).
+#'   deployment views.
 #'
-#' @return An object of class `master_pull`: a list with `data` (the key columns, the
-#'   requested columns and a `cohort_unit` column) and `provenance` (`master`,
-#'   `sql_commit`, `applied_correction_ids`, `read_at`, `columns`, `n_cohort`,
+#' @return An object of class `master_pull`: a list with `data` (one row per active
+#'   unit: the key columns, `columns` and `cohort_unit`), `cohort` (the cohort record,
+#'   ending with the `in_master` stage) and `provenance` (`master`, `sql_commit`,
+#'   `applied_correction_ids`, `read_at`, `columns`, `cohort_definition`, `n_cohort`,
 #'   `n_matched`, `n_unmatched`).
 #'
-#' @seealso [define_cohort()], [freeze_study_pull()], [cohort_unit_id()]
+#' @seealso [cohort_query()], [build_from_master()], [freeze_study_pull()]
 #'
 #' @examples
 #' \donttest{
@@ -593,20 +908,15 @@ test_that("printing shows counts, never identifiers", {
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   DBI::dbWriteTable(con, "master_demo", data.frame(
 #'     mrn = c("SYN101", "SYN102"),
-#'     encounter_date = as.Date(c("2010-03-01", "2012-07-15")), age = c(62, 70)
+#'     encounter_date = as.Date(c("2010-03-01", "2012-07-15")),
+#'     proc = c("CABG", "AVR"), age = c(62, 70)
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
 #'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
-#'   cohort <- new_cohort_record(
-#'     members = data.frame(patient_id = cohort_unit_id("SYN101", as.Date("2010-03-01")),
-#'                          stage_id = "selected", included = TRUE, reason = NA_character_),
-#'     stages = data.frame(stage_id = "selected", order = 1L, label = "Selected",
-#'                         source = "synthetic", provenance = "example"),
-#'     patient_id_col = "cohort_unit"
-#'   )
-#'   pull_master(con, "master_demo", cohort, columns = "age", dialect = "duckdb")
+#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'   pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
 #' }
 #' }
@@ -624,23 +934,47 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
   if (anyDuplicated(columns)) {
     stop("'columns' contains a duplicate name.", call. = FALSE)
   }
-  units <- .active_units(cohort)
-  keys <- split_cohort_unit(units)
+  is_query <- inherits(cohort, "cohort_query")
+  if (!is_query && !inherits(cohort, "cohort_record")) {
+    stop("'cohort' must be a cohort_query or a cohort_record.", call. = FALSE)
+  }
+  supplied <- if (is_query) NULL else split_cohort_unit(.unit_cohort_active(cohort))
+
   q <- quoter(dialect)
   tmp <- .cohort_temp(dialect)
   master_q <- .qualified_name(master, dialect)
   cols <- unique(c(mrn_col, date_col, columns))
   select_sql <- paste0("m.", vapply(cols, q, character(1)), collapse = ", ")
   join_sql <- sprintf("m.%s = c.mrn AND m.%s = c.encounter_date", q(mrn_col), q(date_col))
+  if (is_query && identical(cohort$prior, "exclude")) {
+    join_sql <- paste(join_sql, "AND c.prior_qualifying = 0")
+  }
 
-  pulled <- .with_snapshot_txn(con, dialect, {
+  read <- .with_snapshot_txn(con, dialect, {
     read_at <- run_step("read time", DBI::dbGetQuery(con, .read_now_sql(dialect)))$read_at
     commit <- .read_deployment(con, deployment_view, dialect)
     run_step("create cohort temp table", DBI::dbExecute(con, tmp$create))
-    run_step("load cohort keys", DBI::dbExecute(
-      con, paste("INSERT INTO", tmp$name, "(mrn, encounter_date) VALUES (?, ?)"),
-      params = list(keys$mrn, keys$encounter_date)
-    ))
+    if (is_query) {
+      run_step("select cohort", DBI::dbExecute(
+        con, .select_units_sql(cohort, master_q, tmp$name, q(mrn_col), q(date_col)),
+        params = list(cohort$epoch[[1]], cohort$epoch[[1]], cohort$epoch[[2]])
+      ))
+      selected <- run_step("read cohort keys", DBI::dbGetQuery(
+        con, paste("SELECT mrn, encounter_date, prior_qualifying FROM", tmp$name)
+      ))
+      if (!nrow(selected)) {
+        stop("No qualifying encounters fall in the epoch. Check the cohort query.",
+             call. = FALSE)
+      }
+    } else {
+      run_step("load cohort keys", DBI::dbExecute(
+        con,
+        paste("INSERT INTO", tmp$name,
+              "(mrn, encounter_date, prior_qualifying) VALUES (?, ?, 0)"),
+        params = list(supplied$mrn, supplied$encounter_date)
+      ))
+      selected <- NULL
+    }
     data <- run_step("read master", DBI::dbGetQuery(con, sprintf(
       "SELECT %s FROM %s m INNER JOIN %s c ON %s", select_sql, master_q, tmp$name, join_sql
     )))
@@ -649,8 +983,7 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
             "ON a.mrn = c.mrn AND a.encounter_date = c.encounter_date"),
       .qualified_name(applied_view, dialect), tmp$name
     )))
-    run_step("drop cohort temp table",
-             DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
+    run_step("drop cohort temp table", DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
 
     data$cohort_unit <- cohort_unit_id(as.character(data[[mrn_col]]),
                                        as.Date(data[[date_col]]))
@@ -659,23 +992,48 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
       stop(n_dup, " cohort unit(s) matched more than one master row; the key is meant ",
            "to be unique. Nothing was pulled.", call. = FALSE)
     }
-    list(data = data, read_at = read_at, commit = commit,
+    list(data = data, selected = selected, read_at = read_at, commit = commit,
          applied = sort(unique(as.character(applied$correction_id))))
   })
 
-  n_matched <- length(unique(pulled$data$cohort_unit))
+  base <- if (is_query) .query_cohort(cohort, read$selected, master, read$commit) else cohort
+  last <- utils::tail(base$stages$stage_id[order(base$stages$order)], 1L)
+  active <- base$members$patient_id[base$members$stage_id == last & base$members$included]
+  found <- active %in% read$data$cohort_unit
+  read_at <- format(as.POSIXct(read$read_at, tz = "UTC"), "%Y-%m-%dT%H:%M:%OS6Z",
+                    tz = "UTC")
+  final <- append_cohort_stage(
+    base,
+    data.frame(stage_id = "in_master", order = max(base$stages$order) + 1L,
+               label = "Has a row in the master view", source = "upstream",
+               provenance = sprintf("%s at SQL commit %s, read %s", master, read$commit,
+                                    read_at),
+               stringsAsFactors = FALSE),
+    data.frame(patient_id = active, included = found,
+               reason = ifelse(found, NA_character_, "no row in the master view"),
+               stringsAsFactors = FALSE)
+  )
+  data <- read$data[read$data$cohort_unit %in% active[found], , drop = FALSE]
+  row.names(data) <- NULL
+
   structure(list(
-    data = pulled$data,
+    data = data,
+    cohort = final,
     provenance = list(
       master = master,
-      sql_commit = pulled$commit,
-      applied_correction_ids = pulled$applied,
-      read_at = format(as.POSIXct(pulled$read_at, tz = "UTC"), "%Y-%m-%dT%H:%M:%SZ",
-                       tz = "UTC"),
+      sql_commit = read$commit,
+      applied_correction_ids = read$applied,
+      read_at = read_at,
       columns = columns,
-      n_cohort = length(units),
-      n_matched = n_matched,
-      n_unmatched = length(units) - n_matched
+      cohort_definition = if (is_query) {
+        list(qualifying = cohort$qualifying, epoch = format(cohort$epoch),
+             index = cohort$index, prior = cohort$prior)
+      } else {
+        "supplied cohort_record"
+      },
+      n_cohort = length(active),
+      n_matched = sum(found),
+      n_unmatched = sum(!found)
     )
   ), class = "master_pull")
 }
@@ -703,156 +1061,108 @@ print.master_pull <- function(x, ...) {
 
 - [ ] **Step 5: Run the tests.**
   Run: `Rscript -e 'devtools::document(); devtools::test(filter = "master-pull")'`
-  Expected: all PASS. If the duplicate-match test fails because duckdb rejects the
-  vector-bound `INSERT`, check the installed duckdb's DBI docs
-  (`?duckdb::duckdb_connection`) before changing the bind; do not replace it with string
-  pasting of values.
+  Expected: all PASS. Three things to check against the installed versions rather than
+  work around, if they fail:
+  - **Vector-bound `INSERT`:** duckdb binds a vector of rows (`?duckdb::duckdb_connection`).
+    Never replace the bind by pasting values into SQL.
+  - **Two connections to one duckdb file:** they share a driver (`duckdb::duckdb(path)`),
+    and duckdb gives each transaction a snapshot. If the concurrency test sees the other
+    connection's write, stop and report: the property under test is false, not the test.
+  - **Mocking `.read_deployment`:** `testthat::local_mocked_bindings()` (3.3.2 here)
+    replaces package internals by default.
 
 - [ ] **Step 6: Commit.**
 
 ```bash
 git add R/master_pull.R man/pull_master.Rd man/print.master_pull.Rd NAMESPACE \
   tests/testthat/helper-master-pull.R tests/testthat/test-master-pull.R
-git commit -m "feat: pull_master() reads a cohort from a master view in one consistent read"
+git commit -m "feat: pull_master() selects and reads a cohort in one snapshot"
 ```
 
 ---
 
-### Task 4: `define_cohort()`, a cohort defined by a query on the master
+### Task 5: `build_from_master()`, the bridge to `derive_vars()`
 
 **Files:**
-- Create: `R/master_cohort.R`
-- Test: `tests/testthat/test-master-cohort.R`
+- Create: `R/master_build.R`
+- Test: `tests/testthat/test-master-build.R`
 
 **Interfaces:**
-- Consumes: `.with_snapshot_txn()`, `.qualified_name()`, `.read_deployment()`,
-  `.read_now_sql()` (Task 3); `cohort_unit_id()` (Task 2); `new_cohort_record()`.
-- Produces: `define_cohort(con, master, qualifying, epoch, index = c("first", "all"),
-  prior = c("keep", "exclude"), mrn_col = "mrn", date_col = "encounter_date",
-  dialect = c("mssql", "duckdb"), deployment_view = paste0(master, "_deployment"))` → a
-  `cohort_record` with `patient_id_col = "cohort_unit"` and two stages, `qualifying` and
-  `prior_qualifying`.
+- Consumes: `master_pull` (Task 4); `append_cohort_stage()`.
+- Produces: `build_from_master(pull)` → a `build_result`,
+  `list(data = pull$data, cohort = <cohort with a "build" stage>, tables = list())`: the
+  same shape `build_dataset()` returns, so `derive_vars()` takes it unchanged.
+  `build_dataset()` stays the module-pull path; the master is already wide, so there are
+  no modules to join.
 
-- [ ] **Step 1: Write the failing tests.** Create `tests/testthat/test-master-cohort.R`:
+- [ ] **Step 1: Write the failing tests.** Create `tests/testthat/test-master-build.R`:
 
 ```r
-# No PHI: identifiers and values are invented. Fixture in helper-master-pull.R.
+# No PHI: identifiers and values are invented. Fixtures in helper-master-pull.R.
 
-epoch <- as.Date(c("2000-01-01", "2024-07-31"))
-second_cabg <- "INSERT INTO master_demo VALUES ('SYN103', DATE '2018-02-02', 'CABG', 58)"
-
-define_demo <- function(con, ...) {
-  define_cohort(con, "master_demo", qualifying = "proc = 'CABG'", epoch = epoch,
-                dialect = "duckdb", ...)
-}
-
-test_that("index first takes each patient's earliest qualifying encounter in the epoch", {
+test_that("a master pull becomes a build_result with a build stage", {
   con <- local_master_db()
-  DBI::dbExecute(con, second_cabg)
+  pull <- pull_demo(con, unit_cohort(c("SYN101", "SYN999"), c("2010-03-01", "2011-01-01")))
 
-  cohort <- define_demo(con)
+  build <- build_from_master(pull)
 
-  expect_s3_class(cohort, "cohort_record")
-  expect_identical(cohort$patient_id_col, "cohort_unit")
-  first <- cohort$members$patient_id[cohort$members$stage_id == "qualifying"]
-  expect_setequal(first, c("SYN101|2010-03-01", "SYN103|2015-06-30", "SYN104|2020-01-10"))
+  expect_s3_class(build, "build_result")
+  expect_identical(names(build), c("data", "cohort", "tables"))
+  expect_identical(build$tables, list())
+  s <- cohort_summary(build$cohort)$stages
+  expect_identical(utils::tail(s$stage_id, 1L), "build")
+  expect_identical(utils::tail(s$n_remaining, 1L), 1L)
+  expect_setequal(active_units(build$cohort), build$data$cohort_unit)
 })
 
-test_that("index all keeps every qualifying encounter in the epoch", {
+test_that("derive_vars() accepts a master build", {
   con <- local_master_db()
-  DBI::dbExecute(con, second_cabg)
+  build <- build_from_master(pull_demo(con, demo_query()))
+  config <- structure(list(
+    study = "st0000", cohort_table = "unused", warehouse = "unused",
+    view_schema = "unused", pull_date = as.Date("2026-11-16"), modules = "base",
+    varsets = character(0), derive = stats::setNames(logical(0), character(0))
+  ), class = "study_config")
 
-  cohort <- define_demo(con, index = "all")
+  out <- derive_vars(build, config,
+                     function(data, cohort, config) list(data = data, cohort = cohort))
 
-  expect_identical(sum(cohort$members$stage_id == "qualifying"), 4L)
+  expect_identical(nrow(out$data), nrow(build$data))
 })
 
-test_that("a qualifying encounter before the epoch is a counted, kept stage by default", {
+test_that("pulled rows that disagree with the cohort are refused", {
   con <- local_master_db()
-  cohort <- define_demo(con)
-  s <- cohort_summary(cohort)$stages
-
-  expect_identical(s$stage_id, c("qualifying", "prior_qualifying"))
-  expect_identical(s$n_remaining[[2]], 3L)
-  prov <- cohort$stages$provenance[cohort$stages$stage_id == "prior_qualifying"]
-  expect_match(prov, "1 unit\\(s\\)")
-  expect_match(prov, "kept")
+  pull <- pull_demo(con, demo_query())
+  pull$data <- pull$data[-1, , drop = FALSE]
+  expect_error(build_from_master(pull), "do not match the active cohort")
 })
 
-test_that("prior = 'exclude' drops those units with a reason", {
-  con <- local_master_db()
-  s <- cohort_summary(define_demo(con, prior = "exclude"))$stages
-  expect_identical(s$n_excluded[[2]], 1L)
-  expect_identical(s$n_remaining[[2]], 2L)
-})
-
-test_that("provenance names the query, epoch, index and SQL commit", {
-  con <- local_master_db()
-  prov <- define_demo(con)$stages$provenance[[1]]
-  expect_match(prov, "proc = 'CABG'", fixed = TRUE)
-  expect_match(prov, "2000-01-01 to 2024-07-31", fixed = TRUE)
-  expect_match(prov, "index first", fixed = TRUE)
-  expect_match(prov, "abc1234", fixed = TRUE)
-})
-
-test_that("an epoch with no qualifying encounters is an error", {
-  con <- local_master_db()
-  expect_error(
-    define_cohort(con, "master_demo", "proc = 'CABG'",
-                  epoch = as.Date(c("2021-01-01", "2021-12-31")), dialect = "duckdb"),
-    "No qualifying encounters"
-  )
-})
-
-test_that("a malformed epoch or query is refused", {
-  con <- local_master_db()
-  expect_error(define_cohort(con, "master_demo", "proc = 'CABG'",
-                             epoch = rev(epoch), dialect = "duckdb"), "start")
-  expect_error(define_cohort(con, "master_demo", "proc = 'CABG'",
-                             epoch = "2000-01-01", dialect = "duckdb"), "two Dates")
-  expect_error(define_cohort(con, "master_demo", "", epoch = epoch, dialect = "duckdb"),
-               "qualifying")
+test_that("only a master_pull is built", {
+  expect_error(build_from_master(list()), "master_pull")
 })
 ```
 
 - [ ] **Step 2: Run them and confirm they fail.**
-  Run: `Rscript -e 'devtools::test(filter = "master-cohort")'`
-  Expected: FAIL, `could not find function "define_cohort"`.
+  Run: `Rscript -e 'devtools::test(filter = "master-build")'`
+  Expected: FAIL, `could not find function "build_from_master"`.
 
-- [ ] **Step 3: Implement.** Create `R/master_cohort.R`:
+- [ ] **Step 3: Implement.** Create `R/master_build.R`:
 
 ```r
-#' Define a cohort by a query on a master view
+#' Build a study dataset from a master pull
 #'
-#' Finds every encounter in a master view that meets a qualifying condition, keeps those
-#' inside an epoch, and returns them as a [new_cohort_record()] of [cohort_unit_id()]
-#' units, ready for [pull_master()].
+#' The master-view counterpart of [build_dataset()]. A master is already one wide row per
+#' encounter, so there are no modules to join: the pulled rows are the built dataset.
+#' `build_from_master()` checks they match the cohort's active units exactly and records
+#' the build as a cohort stage, returning the same `build_result` shape that
+#' [derive_vars()] consumes.
 #'
-#' `index` sets the unit of the study. `"first"` keeps each patient's earliest qualifying
-#' encounter in the epoch, one row per patient; later encounters remain reachable as
-#' follow-up events. `"all"` keeps every qualifying encounter in the epoch.
+#' @param pull A `master_pull` from [pull_master()].
 #'
-#' A patient whose qualifying encounter in the epoch was preceded by one **before** the
-#' epoch is a redo, not a first. Those units are always recorded as a second stage,
-#' `prior_qualifying`, and the study chooses: `prior = "keep"` keeps them and records
-#' their count in the stage's provenance; `prior = "exclude"` drops them with a reason.
-#' Nothing is dropped silently.
+#' @return A `build_result`: a list with `data`, `cohort` (ending with a `build` stage)
+#'   and `tables` (empty).
 #'
-#' `qualifying` is SQL written by the study programmer, run as a `WHERE` clause on the
-#' master. It must never be built from data. Only the key columns are read.
-#'
-#' @inheritParams pull_master
-#' @param qualifying Character. A SQL boolean expression over the master's columns, for
-#'   example `"proc = 'CABG'"`.
-#' @param epoch A `Date` vector of length two: first and last encounter date, inclusive.
-#' @param index `"first"` or `"all"`.
-#' @param prior `"keep"` or `"exclude"`, for units with a qualifying encounter before
-#'   the epoch.
-#'
-#' @return A `cohort_record` with `patient_id_col = "cohort_unit"` and the stages
-#'   `qualifying` and `prior_qualifying`.
-#'
-#' @seealso [pull_master()], [cohort_unit_id()], [cohort_summary()]
+#' @seealso [pull_master()], [derive_vars()], [build_dataset()]
 #'
 #' @examples
 #' \donttest{
@@ -860,178 +1170,149 @@ test_that("a malformed epoch or query is refused", {
 #'   # Synthetic data; no PHI.
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   DBI::dbWriteTable(con, "master_demo", data.frame(
-#'     mrn = c("SYN101", "SYN101", "SYN102"),
-#'     encounter_date = as.Date(c("1998-05-01", "2010-03-01", "2012-07-15")),
-#'     proc = c("CABG", "CABG", "CABG")
+#'     mrn = "SYN101", encounter_date = as.Date("2010-03-01"), proc = "CABG", age = 62
+#'   ))
+#'   DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
+#'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
-#'   cohort <- define_cohort(con, "master_demo", "proc = 'CABG'",
-#'                           epoch = as.Date(c("2000-01-01", "2024-07-31")),
-#'                           dialect = "duckdb")
-#'   cohort_summary(cohort)$stages
+#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'   pull <- pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
+#'   build_from_master(pull)
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
 #' }
 #' }
 #'
 #' @export
-define_cohort <- function(con, master, qualifying, epoch, index = c("first", "all"),
-                          prior = c("keep", "exclude"), mrn_col = "mrn",
-                          date_col = "encounter_date", dialect = c("mssql", "duckdb"),
-                          deployment_view = paste0(master, "_deployment")) {
-  index <- match.arg(index)
-  prior <- match.arg(prior)
-  dialect <- match.arg(dialect)
-  if (!is.character(qualifying) || length(qualifying) != 1L || is.na(qualifying) ||
-        !nzchar(trimws(qualifying))) {
-    stop("'qualifying' must be one non-empty SQL condition.", call. = FALSE)
+build_from_master <- function(pull) {
+  if (!inherits(pull, "master_pull")) {
+    stop("'pull' must be a master_pull from pull_master().", call. = FALSE)
   }
-  if (!inherits(epoch, "Date") || length(epoch) != 2L || anyNA(epoch)) {
-    stop("'epoch' must be two Dates: the first and last encounter date.", call. = FALSE)
+  cohort <- pull$cohort
+  last <- utils::tail(cohort$stages$stage_id[order(cohort$stages$order)], 1L)
+  active <- cohort$members$patient_id[cohort$members$stage_id == last &
+                                        cohort$members$included]
+  units <- pull$data$cohort_unit
+  if (is.null(units) || anyNA(units) || anyDuplicated(units) ||
+        !setequal(units, active)) {
+    stop("The pulled rows do not match the active cohort membership.", call. = FALSE)
   }
-  if (epoch[[1]] > epoch[[2]]) {
-    stop("'epoch' must give its start before its end.", call. = FALSE)
-  }
-  q <- quoter(dialect)
-  sql <- sprintf(
-    paste("SELECT %s AS mrn, %s AS encounter_date FROM %s",
-          "WHERE (%s) AND %s IS NOT NULL AND %s IS NOT NULL"),
-    q(mrn_col), q(date_col), .qualified_name(master, dialect), qualifying,
-    q(mrn_col), q(date_col)
-  )
-
-  read <- .with_snapshot_txn(con, dialect, {
-    commit <- .read_deployment(con, deployment_view, dialect)
-    rows <- run_step("read qualifying encounters", DBI::dbGetQuery(con, sql))
-    list(commit = commit, rows = rows)
-  })
-
-  rows <- unique(data.frame(mrn = as.character(read$rows$mrn),
-                            encounter_date = as.Date(read$rows$encounter_date),
-                            stringsAsFactors = FALSE))
-  in_epoch <- rows[rows$encounter_date >= epoch[[1]] & rows$encounter_date <= epoch[[2]], ,
-                   drop = FALSE]
-  if (!nrow(in_epoch)) {
-    stop("No qualifying encounters fall in the epoch. Check 'qualifying' and 'epoch'.",
-         call. = FALSE)
-  }
-  in_epoch <- in_epoch[order(in_epoch$mrn, in_epoch$encounter_date), , drop = FALSE]
-  if (identical(index, "first")) {
-    in_epoch <- in_epoch[!duplicated(in_epoch$mrn), , drop = FALSE]
-  }
-  units <- cohort_unit_id(in_epoch$mrn, in_epoch$encounter_date)
-  has_prior <- in_epoch$mrn %in% unique(rows$mrn[rows$encounter_date < epoch[[1]]])
-  n_prior <- sum(has_prior)
-
-  query_prov <- sprintf("%s where %s; epoch %s to %s; index %s; SQL commit %s",
-                        master, qualifying, format(epoch[[1]]), format(epoch[[2]]),
-                        index, read$commit)
-  prior_prov <- sprintf("%d unit(s) with a qualifying encounter before the epoch; %s",
-                        n_prior, if (identical(prior, "keep")) "kept" else "excluded")
-  exclude <- identical(prior, "exclude") & has_prior
-
-  members <- rbind(
-    data.frame(patient_id = units, stage_id = "qualifying", included = TRUE,
-               reason = NA_character_, stringsAsFactors = FALSE),
-    data.frame(patient_id = units, stage_id = "prior_qualifying", included = !exclude,
-               reason = ifelse(exclude, "qualifying encounter before the epoch",
-                               NA_character_),
+  cohort <- append_cohort_stage(
+    cohort,
+    data.frame(stage_id = "build", order = max(cohort$stages$order) + 1L,
+               label = "Encounter-level build", source = "build",
+               provenance = "hvtiRdatabuild::build_from_master", stringsAsFactors = FALSE),
+    data.frame(patient_id = active, included = TRUE, reason = NA_character_,
                stringsAsFactors = FALSE)
   )
-  stages <- data.frame(
-    stage_id = c("qualifying", "prior_qualifying"),
-    order = c(1L, 2L),
-    label = c("Qualifying encounters in the epoch",
-              "Qualifying encounter before the epoch"),
-    source = master,
-    provenance = c(query_prov, prior_prov),
-    stringsAsFactors = FALSE
-  )
-  new_cohort_record(members, stages, patient_id_col = "cohort_unit")
+  structure(list(data = pull$data, cohort = cohort, tables = list()),
+            class = "build_result")
 }
 ```
 
 - [ ] **Step 4: Run the tests.**
-  Run: `Rscript -e 'devtools::document(); devtools::test(filter = "master-cohort")'`
+  Run: `Rscript -e 'devtools::document(); devtools::test(filter = "master-build")'`
   Expected: all PASS.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add R/master_cohort.R man/define_cohort.Rd NAMESPACE tests/testthat/test-master-cohort.R
-git commit -m "feat: define_cohort() selects encounters by query, epoch and index"
+git add R/master_build.R man/build_from_master.Rd NAMESPACE tests/testthat/test-master-build.R
+git commit -m "feat: build_from_master() turns a master pull into a build_result"
 ```
 
 ---
 
-### Task 5: `freeze_study_pull()`, the retained pull and its provenance
+### Task 6: `freeze_study_pull()`, provenance inside the published file
 
 **Files:**
 - Create: `R/master_freeze.R`
 - Test: `tests/testthat/test-master-freeze.R`
 
 **Interfaces:**
-- Consumes: `pull_master()` → `master_pull` (Task 3); `publish_dataset()` with parquet
-  (Task 1).
+- Consumes: `master_pull` (Task 4); `build_from_master()` (Task 5, end-to-end test);
+  `publish_dataset()` with parquet (Task 1).
 - Produces: `freeze_study_pull(pull, study_config, datasets_dir, dataset_id,
-  extract_date = Sys.Date())` → invisibly `list(release = <publish_dataset() release>,
-  provenance_file = <path>)`. The sidecar `<release stem>.pull.yml` sits beside the release
-  and holds `schema: 1`, `release_id`, `release_sha256`, `master`, `sql_commit`,
-  `applied_correction_ids`, `read_at`, `columns`, `n_cohort`, `n_matched`, `n_unmatched`,
+  extract_date = Sys.Date())` → invisibly, the `publish_dataset()` release.
+  `read_pull_provenance(path)` → the provenance list stored in the file: `schema` (1),
+  every `pull$provenance` field, `cohort_stages` (stage ids and counts) and
   `study_config_sha256`.
+
+Why inside the file: the provenance is written into the parquet's key-value metadata
+under `hvtiRdatabuild.pull`, so it is covered by the release's SHA-256. `publish_dataset()`
+already moves one file into place under the catalog lock, and recovers an orphan on
+retry, so a release can never exist without its provenance. Retrying the same pull writes
+the same bytes and returns the same release. A distinct pull with identical data has
+different provenance, so different bytes, and becomes its own release (`_r2`, ...): each
+observation keeps its own record.
 
 - [ ] **Step 1: Write the failing tests.** Create `tests/testthat/test-master-freeze.R`:
 
 ```r
-# No PHI: identifiers and values are invented. Fixture in helper-master-pull.R.
+# No PHI: identifiers and values are invented. Fixtures in helper-master-pull.R.
 
-local_frozen_pull <- function(env = parent.frame()) {
+local_freeze_setup <- function(env = parent.frame()) {
   skip_if_not_installed("arrow")
   con <- local_master_db(env)
-  pull <- pull_master(con, "master_demo",
-                      unit_cohort(c("SYN101", "SYN103"), c("2010-03-01", "2015-06-30")),
-                      columns = "age", dialect = "duckdb")
   config <- withr::local_tempfile(fileext = ".yaml", .local_envir = env)
   writeLines("study: st0000", config)
-  list(pull = pull, config = config,
+  list(con = con, config = config,
        dir = withr::local_tempdir("published-", .local_envir = env))
 }
 
-test_that("the pull is published as parquet with a provenance sidecar", {
-  f <- local_frozen_pull()
-  out <- freeze_study_pull(f$pull, f$config, f$dir, "st0000_pull",
-                           extract_date = "2026-11-16")
+test_that("a query cohort runs through pull, build and freeze, end to end", {
+  f <- local_freeze_setup()
+  pull <- pull_demo(f$con, demo_query())
+  build <- build_from_master(pull)
+  release <- freeze_study_pull(pull, f$config, f$dir, "st0000_pull",
+                               extract_date = "2026-11-16")
 
-  expect_identical(tools::file_ext(out$release$file), "parquet")
-  expect_identical(out$release$n_rows, 2L)
-  side <- yaml::read_yaml(out$provenance_file)
-  expect_identical(side$schema, 1L)
-  expect_identical(side$release_id, out$release$release_id)
-  expect_identical(side$sql_commit, "abc1234")
-  expect_setequal(unlist(side$applied_correction_ids), c("C1", "C2"))
-  expect_identical(side$study_config_sha256,
+  expect_identical(tools::file_ext(release$file), "parquet")
+  expect_identical(release$n_rows, nrow(build$data))
+  prov <- read_pull_provenance(file.path(f$dir, release$file))
+  expect_identical(prov$schema, 1L)
+  expect_identical(prov$sql_commit, "abc1234")
+  expect_setequal(unlist(prov$applied_correction_ids), c("C1", "C2"))
+  expect_identical(prov$cohort_definition$index, "first")
+  expect_identical(unlist(prov$cohort_stages$stage_id),
+                   c("qualifying", "prior_qualifying", "in_master"))
+  expect_identical(prov$study_config_sha256,
                    digest::digest(f$config, algo = "sha256", file = TRUE))
 })
 
-test_that("freezing the same pull twice returns the same release", {
-  f <- local_frozen_pull()
-  a <- freeze_study_pull(f$pull, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16")
-  b <- freeze_study_pull(f$pull, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16")
-  expect_identical(a$release$release_id, b$release$release_id)
-  expect_identical(a$provenance_file, b$provenance_file)
+test_that("retrying the same pull returns the same release", {
+  f <- local_freeze_setup()
+  pull <- pull_demo(f$con, demo_query())
+  a <- freeze_study_pull(pull, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16")
+  b <- freeze_study_pull(pull, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16")
+  expect_identical(a$release_id, b$release_id)
 })
 
-test_that("a changed sidecar is never overwritten", {
-  f <- local_frozen_pull()
-  out <- freeze_study_pull(f$pull, f$config, f$dir, "st0000_pull",
-                           extract_date = "2026-11-16")
-  side <- yaml::read_yaml(out$provenance_file)
-  side$sql_commit <- "tampered"
-  yaml::write_yaml(side, out$provenance_file)
+test_that("a distinct pull with identical data keeps its own release and record", {
+  f <- local_freeze_setup()
+  first <- pull_demo(f$con, demo_query())
+  DBI::dbExecute(f$con, paste("INSERT INTO master_demo_corrections_applied",
+                              "VALUES ('C3', 'SYN104', DATE '2020-01-10')"))
+  second <- pull_demo(f$con, demo_query())
+  expect_identical(first$data, second$data)
 
-  expect_error(
-    freeze_study_pull(f$pull, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16"),
-    "never overwritten"
-  )
+  a <- freeze_study_pull(first, f$config, f$dir, "st0000_pull", extract_date = "2026-11-16")
+  b <- freeze_study_pull(second, f$config, f$dir, "st0000_pull",
+                         extract_date = "2026-11-16")
+
+  expect_false(identical(a$release_id, b$release_id))
+  expect_identical(b$revision, 2L)
+  expect_false("C3" %in% unlist(read_pull_provenance(file.path(f$dir, a$file))$
+                                  applied_correction_ids))
+  expect_true("C3" %in% unlist(read_pull_provenance(file.path(f$dir, b$file))$
+                                 applied_correction_ids))
+})
+
+test_that("a file without pull provenance is refused", {
+  skip_if_not_installed("arrow")
+  path <- withr::local_tempfile(fileext = ".parquet")
+  arrow::write_parquet(data.frame(x = 1), path)
+  expect_error(read_pull_provenance(path), "no pull provenance")
 })
 
 test_that("only a master_pull is frozen", {
@@ -1046,29 +1327,32 @@ test_that("only a master_pull is frozen", {
 - [ ] **Step 3: Implement.** Create `R/master_freeze.R`:
 
 ```r
+.pull_metadata_key <- "hvtiRdatabuild.pull"
+
 #' Freeze a study's pull from a master view
 #'
 #' Sources are not time-travelable, so the release, not the warehouse, is the record of
 #' what a study read. `freeze_study_pull()` publishes the pull as an immutable parquet
-#' release with [publish_dataset()] and writes a provenance sidecar beside it: the SQL
-#' model commit the master was deployed from, the ids of the corrections applied, when
-#' the pull read, its shape, and the study configuration's checksum.
+#' release with [publish_dataset()], with its provenance written **into the file's own
+#' metadata**: the SQL model commit, the ids of the corrections applied, when the pull
+#' read, the cohort definition and stage counts, and the study configuration's checksum.
+#' Because the provenance is part of the bytes, the release's SHA-256 covers it, and a
+#' release can never exist without it. Read it back with [read_pull_provenance()].
+#'
+#' Retrying the same pull returns the same release. A distinct pull with identical data
+#' carries different provenance, so it becomes its own release.
 #'
 #' The retained pull holds patient values. It belongs in the study's data folder under
 #' the same rules as the built dataset, never in a repository.
-#'
-#' Freezing the same pull again is idempotent. A sidecar that exists and differs is an
-#' integrity error and is never overwritten.
 #'
 #' @param pull A `master_pull` from [pull_master()].
 #' @param study_config Character. Path to the study configuration file whose checksum is
 #'   recorded.
 #' @param datasets_dir,dataset_id,extract_date As for [publish_dataset()].
 #'
-#' @return Invisibly, a list with `release` (as returned by [publish_dataset()]) and
-#'   `provenance_file`, the sidecar's path.
+#' @return Invisibly, the release, as returned by [publish_dataset()].
 #'
-#' @seealso [pull_master()], [publish_dataset()]
+#' @seealso [read_pull_provenance()], [pull_master()], [publish_dataset()]
 #'
 #' @examples
 #' \donttest{
@@ -1077,26 +1361,20 @@ test_that("only a master_pull is frozen", {
 #'   # Synthetic data; no PHI.
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   DBI::dbWriteTable(con, "master_demo", data.frame(
-#'     mrn = "SYN101", encounter_date = as.Date("2010-03-01"), age = 62
+#'     mrn = "SYN101", encounter_date = as.Date("2010-03-01"), proc = "CABG", age = 62
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
 #'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
 #'   ))
 #'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
-#'   cohort <- new_cohort_record(
-#'     members = data.frame(patient_id = cohort_unit_id("SYN101", as.Date("2010-03-01")),
-#'                          stage_id = "selected", included = TRUE, reason = NA_character_),
-#'     stages = data.frame(stage_id = "selected", order = 1L, label = "Selected",
-#'                         source = "synthetic", provenance = "example"),
-#'     patient_id_col = "cohort_unit"
-#'   )
-#'   pull <- pull_master(con, "master_demo", cohort, columns = "age", dialect = "duckdb")
+#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'   pull <- pull_master(con, "master_demo", q, columns = "age", dialect = "duckdb")
 #'   config <- tempfile(fileext = ".yaml")
 #'   writeLines("study: st0000", config)
 #'   published <- tempfile("published-")
 #'   dir.create(published)
-#'   frozen <- freeze_study_pull(pull, config, published, "st0000_pull")
-#'   basename(frozen$provenance_file)
+#'   release <- freeze_study_pull(pull, config, published, "st0000_pull")
+#'   read_pull_provenance(file.path(published, release$file))$sql_commit
 #'   DBI::dbDisconnect(con, shutdown = TRUE)
 #'   unlink(c(config, published), recursive = TRUE)
 #' }
@@ -1117,69 +1395,74 @@ freeze_study_pull <- function(pull, study_config, datasets_dir, dataset_id,
          call. = FALSE)
   }
 
+  stages <- cohort_summary(pull$cohort)$stages
+  prov <- c(
+    list(schema = 1L),
+    pull$provenance,
+    list(cohort_stages = as.list(stages[c("stage_id", "n_in", "n_excluded", "n_remaining")]),
+         study_config_sha256 = digest::digest(study_config, algo = "sha256", file = TRUE))
+  )
+  table <- arrow::arrow_table(pull$data)
+  metadata <- table$metadata
+  metadata[[.pull_metadata_key]] <- yaml::as.yaml(prov)
+  table$metadata <- metadata
+
   draft <- tempfile(fileext = ".parquet")
   on.exit(unlink(draft), add = TRUE)
-  arrow::write_parquet(pull$data, draft)
+  arrow::write_parquet(table, draft)
 
-  p <- pull$provenance
   release <- publish_dataset(
     draft, dataset_id, datasets_dir, extract_date = extract_date,
-    source = sprintf("pull_master() from %s at SQL commit %s", p$master, p$sql_commit)
+    source = sprintf("pull_master() from %s at SQL commit %s",
+                     pull$provenance$master, pull$provenance$sql_commit)
   )
+  invisible(release)
+}
 
-  side <- list(
-    schema = 1L,
-    release_id = release$release_id,
-    release_sha256 = release$sha256,
-    master = p$master,
-    sql_commit = p$sql_commit,
-    applied_correction_ids = as.list(p$applied_correction_ids),
-    read_at = p$read_at,
-    columns = as.list(p$columns),
-    n_cohort = p$n_cohort,
-    n_matched = p$n_matched,
-    n_unmatched = p$n_unmatched,
-    study_config_sha256 = digest::digest(study_config, algo = "sha256", file = TRUE)
-  )
-  text <- yaml::as.yaml(side)
-  path <- file.path(datasets_dir,
-                    paste0(tools::file_path_sans_ext(release$file), ".pull.yml"))
-
-  if (file.exists(path)) {
-    if (!identical(paste(readLines(path), collapse = "\n"), sub("\n$", "", text))) {
-      stop("The provenance sidecar for release ", release$release_id, " exists and ",
-           "differs from this pull. A sidecar is never overwritten.", call. = FALSE)
-    }
-  } else {
-    staged <- tempfile(".pull-", tmpdir = datasets_dir, fileext = ".yml")
-    writeLines(sub("\n$", "", text), staged)
-    if (!file.rename(staged, path)) {
-      unlink(staged)
-      stop("Could not move the provenance sidecar into place.", call. = FALSE)
-    }
+#' Read the provenance a frozen pull carries
+#'
+#' @param path Character. A parquet file written by [freeze_study_pull()].
+#'
+#' @return A list: `schema`, `master`, `sql_commit`, `applied_correction_ids`, `read_at`,
+#'   `columns`, `cohort_definition`, `n_cohort`, `n_matched`, `n_unmatched`,
+#'   `cohort_stages` and `study_config_sha256`.
+#'
+#' @seealso [freeze_study_pull()]
+#'
+#' @examples
+#' # See freeze_study_pull().
+#'
+#' @export
+read_pull_provenance <- function(path) {
+  if (!requireNamespace("arrow", quietly = TRUE)) {
+    stop("Reading pull provenance needs the arrow package.", call. = FALSE)
   }
-  invisible(list(release = release, provenance_file = path))
+  text <- arrow::read_parquet(path, as_data_frame = FALSE)$metadata[[.pull_metadata_key]]
+  if (is.null(text)) {
+    stop("This file carries no pull provenance.", call. = FALSE)
+  }
+  yaml::yaml.load(text, eval.expr = FALSE)
 }
 ```
 
 - [ ] **Step 4: Run the tests.**
   Run: `Rscript -e 'devtools::document(); devtools::test(filter = "master-freeze")'`
-  Expected: all PASS. If "freezing the same pull twice" fails because `publish_dataset()`
-  makes an `_r2` revision, the parquet bytes differ between writes: compare the two
-  drafts' SHA-256s, and if arrow embeds a varying value, write with
-  `arrow::write_parquet(..., compression = "snappy")` and recheck before changing anything
-  else. Do not weaken the idempotence test.
+  Expected: all PASS. If "retrying the same pull" yields `_r2`, the two writes differ in
+  bytes: compare their SHA-256s and inspect `arrow::read_parquet(..., as_data_frame =
+  FALSE)$metadata` of each for a varying entry before changing anything. Do not weaken the
+  test.
 
 - [ ] **Step 5: Commit.**
 
 ```bash
-git add R/master_freeze.R man/freeze_study_pull.Rd NAMESPACE tests/testthat/test-master-freeze.R
-git commit -m "feat: freeze_study_pull() publishes the pull with a provenance sidecar"
+git add R/master_freeze.R man/freeze_study_pull.Rd man/read_pull_provenance.Rd NAMESPACE \
+  tests/testthat/test-master-freeze.R
+git commit -m "feat: freeze_study_pull() publishes the pull with provenance in the file"
 ```
 
 ---
 
-### Task 6: reference index, news fragment and the full gate
+### Task 7: reference index, news fragment and the full gate
 
 **Files:**
 - Modify: `_pkgdown.yml` (after the "Pull: Warehouse to R" group)
@@ -1191,27 +1474,32 @@ git commit -m "feat: freeze_study_pull() publishes the pull with a provenance si
 ```yaml
 - title: "Pull: Master views to a study"
   desc: >
-    Define a cohort of encounters by query, pull its rows and the study's columns from a
-    master view in one consistent read, and freeze the pull with its provenance.
+    Define a cohort of encounters, select and pull it from a master view in one consistent
+    read, build from the pull, and freeze it with its provenance.
   contents:
   - cohort_unit_id
   - split_cohort_unit
-  - define_cohort
+  - cohort_query
+  - print.cohort_query
   - pull_master
   - print.master_pull
+  - build_from_master
   - freeze_study_pull
+  - read_pull_provenance
 ```
 
 - [ ] **Step 2: Write the news fragment** (named for the implementation branch, for example
   `news/feat-master-study-pull.md`):
 
 ```markdown
-* New `pull_master()` reads a study's cohort and columns from a master view in one
-  consistent read, joined through a session temp table, and records the SQL commit and
-  the ids of the corrections applied. `define_cohort()` selects encounters by query,
-  epoch and index (`"first"` or `"all"`), recording a qualifying encounter before the
-  epoch as a counted stage. `freeze_study_pull()` publishes the pull as a parquet release
-  with a provenance sidecar.
+* New `pull_master()` selects a cohort and reads its rows from a master view in one
+  snapshot-isolation transaction, joined through a session temp table, and records the
+  SQL commit and the ids of the corrections applied. `cohort_query()` defines a cohort by
+  query, epoch and index (`"first"` or `"all"`), computed in the database, with a
+  qualifying encounter before the epoch recorded as a counted stage.
+  `build_from_master()` turns the pull into the `build_result` that `derive_vars()`
+  consumes. `freeze_study_pull()` publishes the pull as a parquet release carrying its
+  provenance in the file, read back with `read_pull_provenance()`.
 * New `cohort_unit_id()` and `split_cohort_unit()` key a cohort by MRN and encounter date,
   so a patient with two operations is two units.
 * `publish_dataset()` accepts `.parquet` drafts.
@@ -1245,8 +1533,10 @@ git commit -m "docs: reference group and news for study pulls from master views"
 - **The warehouse side.** Snapshot isolation on the database, `tempdb` rights for
   programmers' logins, and the three contract views per master are plan 3, with data
   engineering. Until they exist, `pull_master()` runs only against duckdb.
-- **A real SQL Server rehearsal** of the consistent pull (a decision committed during a pull
-  must be absent from both the data and the applied ids; spec §9). It needs the warehouse,
-  so it is the first acceptance step of plan 3, not a unit test here.
+- **A SQL Server rehearsal** of the same properties the duckdb tests check: a change
+  committed mid-pull is invisible, and no out-of-cohort key leaves the database. It needs
+  the warehouse, so it is the first acceptance step of plan 3.
+- **A real study's derivation on a master build.** Task 5 proves `derive_vars()` accepts
+  the shape with an identity derivation; a real one is plan 3's first study migration.
 - **Corrections intake, study candidates, generated corrected views and the parity gate**:
   plan 2.
