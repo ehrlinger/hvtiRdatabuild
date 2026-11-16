@@ -44,6 +44,32 @@ and pull the modules the study declares. The pull is read-only.
 - [`print(`*`<pull_result>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
   : Print a pull result
 
+## Pull: Master views to a study
+
+Define a cohort of encounters, select and pull it from a master view in
+one consistent read, build from the pull, and freeze it with its
+provenance.
+
+- [`cohort_unit_id()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_unit_id.md)
+  : Identify a cohort unit by MRN and encounter date
+- [`split_cohort_unit()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/split_cohort_unit.md)
+  : Split cohort unit identifiers into MRN and encounter date
+- [`cohort_query()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_query.md)
+  : Define a cohort by a query on a master view
+- [`print(`*`<cohort_query>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.cohort_query.md)
+  : Print a cohort query
+- [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  : Pull a study's cohort from a master view
+- [`print(`*`<master_pull>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.master_pull.md)
+  [`str(`*`<master_pull>`*`)`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.master_pull.md)
+  : Print a master pull
+- [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+  : Build a study dataset from a master pull
+- [`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md)
+  : Freeze a study's pull from a master view
+- [`read_pull_provenance()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_pull_provenance.md)
+  : Read the provenance a frozen pull carries
+
 ## Build: Assemble and Derive
 
 Join the pulled modules into a study’s built dataset, run its

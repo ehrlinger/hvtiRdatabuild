@@ -136,6 +136,78 @@
         </dt>
         <dd>Print a pull result</dd>
       </dl></div><div class="section level2">
+      <h2 id="pull-master-views-to-a-study">Pull: Master views to a study<a class="anchor" aria-label="anchor" href="#pull-master-views-to-a-study"></a></h2>
+
+      <div class="section-desc"><p>Define a cohort of encounters, select and pull it from a master view in one consistent read, build from the pull, and freeze it with its provenance.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="cohort_unit_id.html">cohort_unit_id()</a></code>
+
+        </dt>
+        <dd>Identify a cohort unit by MRN and encounter date</dd>
+
+        <dt>
+
+          <code><a href="split_cohort_unit.html">split_cohort_unit()</a></code>
+
+        </dt>
+        <dd>Split cohort unit identifiers into MRN and encounter date</dd>
+
+        <dt>
+
+          <code><a href="cohort_query.html">cohort_query()</a></code>
+
+        </dt>
+        <dd>Define a cohort by a query on a master view</dd>
+
+        <dt>
+
+          <code><a href="print.cohort_query.html">print(<i>&lt;cohort_query&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Print a cohort query</dd>
+
+        <dt>
+
+          <code><a href="pull_master.html">pull_master()</a></code>
+
+        </dt>
+        <dd>Pull a study's cohort from a master view</dd>
+
+        <dt>
+
+          <code><a href="print.master_pull.html">print(<i>&lt;master_pull&gt;</i>)</a></code> <code><a href="print.master_pull.html">str(<i>&lt;master_pull&gt;</i>)</a></code>
+
+        </dt>
+        <dd>Print a master pull</dd>
+
+        <dt>
+
+          <code><a href="build_from_master.html">build_from_master()</a></code>
+
+        </dt>
+        <dd>Build a study dataset from a master pull</dd>
+
+        <dt>
+
+          <code><a href="freeze_study_pull.html">freeze_study_pull()</a></code>
+
+        </dt>
+        <dd>Freeze a study's pull from a master view</dd>
+
+        <dt>
+
+          <code><a href="read_pull_provenance.html">read_pull_provenance()</a></code>
+
+        </dt>
+        <dd>Read the provenance a frozen pull carries</dd>
+      </dl></div><div class="section level2">
       <h2 id="build-assemble-and-derive">Build: Assemble and Derive<a class="anchor" aria-label="anchor" href="#build-assemble-and-derive"></a></h2>
 
       <div class="section-desc"><p>Join the pulled modules into a study’s built dataset, run its study-specific derivation code, and carry the cohort’s inclusion and exclusion history through both in order.</p></div>

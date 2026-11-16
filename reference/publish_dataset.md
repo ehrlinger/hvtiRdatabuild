@@ -62,9 +62,10 @@ Invisibly, a named list containing `release_id`, `sequence`, `file`,
 SHA-256, row count, and column count. It supports the clinical-data
 formats read by
 [`hvtiRutilities::read_clinical_data()`](https://ehrlinger.github.io/hvtiRutilities/reference/read_clinical_data.html):
-`.sas7bdat`, `.csv`, `.xlsx`, `.xls`, and `.rds`. This verifies that the
-release is readable and records its shape. It does not decide whether
-the cohort or its values are clinically correct.
+`.sas7bdat`, `.csv`, `.xlsx`, `.xls`, `.rds`, and `.parquet` (which
+needs the arrow package). This verifies that the release is readable and
+records its shape. It does not decide whether the cohort or its values
+are clinically correct.
 
 The first release on a date is named `<file_stem>_YYYYMMDD.<ext>`. A
 different release published for the same extract date adds `_r2`, `_r3`,
