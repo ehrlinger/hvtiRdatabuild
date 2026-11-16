@@ -198,3 +198,11 @@ test_that("corrections in effect cover rows outside the cohort", {
   expect_false("C9" %in% res$provenance$applied_correction_ids)
   expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2", "C9"))
 })
+
+test_that("an excluded prior encounter's corrections are not attributed to the pull", {
+  con <- local_master_db()
+  res <- pull_demo(con, demo_query(prior = "exclude"))
+
+  expect_identical(res$provenance$applied_correction_ids, "C2")
+  expect_setequal(res$provenance$corrections_in_effect, c("C1", "C2"))
+})

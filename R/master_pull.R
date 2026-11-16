@@ -239,10 +239,13 @@ pull_master <- function(con, master, cohort, columns, mrn_col = "mrn",
     data <- run_step("read master", DBI::dbGetQuery(con, sprintf(
       "SELECT %s FROM %s m INNER JOIN %s c ON %s", select_sql, master_q, tmp$name, join_sql
     )))
+    applied_join <- "a.mrn = c.mrn AND a.encounter_date = c.encounter_date"
+    if (is_query && identical(cohort$prior, "exclude")) {
+      applied_join <- paste(applied_join, "AND c.prior_qualifying = 0")
+    }
     applied <- run_step("read applied corrections", DBI::dbGetQuery(con, sprintf(
-      paste("SELECT DISTINCT a.correction_id FROM %s a INNER JOIN %s c",
-            "ON a.mrn = c.mrn AND a.encounter_date = c.encounter_date"),
-      .qualified_name(applied_view, dialect), tmp$name
+      "SELECT DISTINCT a.correction_id FROM %s a INNER JOIN %s c ON %s",
+      .qualified_name(applied_view, dialect), tmp$name, applied_join
     )))
     in_effect <- run_step("read corrections in effect", DBI::dbGetQuery(con, paste(
       "SELECT DISTINCT correction_id FROM", .qualified_name(applied_view, dialect)

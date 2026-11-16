@@ -29,3 +29,8 @@ test_that("a malformed unit is refused", {
   expect_error(split_cohort_unit("SYN101|not-a-date"), "cohort_unit_id")
   expect_error(split_cohort_unit(1), "cohort_unit_id")
 })
+
+test_that("a unit cohort_unit_id() cannot produce is refused", {
+  expect_error(split_cohort_unit("|2010-03-01"), "cohort_unit_id")
+  expect_error(split_cohort_unit("SYN101|2010-03-01|"), "cohort_unit_id")
+})

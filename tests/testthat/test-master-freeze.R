@@ -59,3 +59,15 @@ test_that("a file without pull provenance is refused", {
 test_that("only a master_pull is frozen", {
   expect_error(freeze_study_pull(list(), "x", tempdir(), "x"), "master_pull")
 })
+
+test_that("provenance is read from the file's footer, not its data", {
+  f <- local_freeze_setup()
+  release <- freeze_study_pull(pull_demo(f$con, demo_query()), f$config, f$dir,
+                               "st0000_pull", extract_date = "2026-11-16")
+  testthat::local_mocked_bindings(
+    read_parquet = function(...) stop("read the data"),
+    .package = "arrow"
+  )
+  expect_identical(read_pull_provenance(file.path(f$dir, release$file))$sql_commit,
+                   "abc1234")
+})

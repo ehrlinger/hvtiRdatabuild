@@ -109,7 +109,9 @@ read_pull_provenance <- function(path) {
   if (!requireNamespace("arrow", quietly = TRUE)) {
     stop("Reading pull provenance needs the arrow package.", call. = FALSE)
   }
-  text <- arrow::read_parquet(path, as_data_frame = FALSE)$metadata[[.pull_metadata_key]]
+  # The footer holds the schema and its metadata; no column data is read.
+  schema <- arrow::ParquetFileReader$create(path)$GetSchema()
+  text <- schema$metadata[[.pull_metadata_key]]
   if (is.null(text)) {
     stop("This file carries no pull provenance.", call. = FALSE)
   }

@@ -70,7 +70,8 @@ split_cohort_unit <- function(unit) {
   mrn <- vapply(parts, `[[`, character(1), 1L)
   date_text <- vapply(parts, `[[`, character(1), 2L)
   dates <- as.Date(date_text, format = "%Y-%m-%d")
-  if (anyNA(dates) || !identical(format(dates, "%Y-%m-%d"), date_text)) {
+  if (any(!nzchar(mrn)) || anyNA(dates) ||
+        !identical(paste(mrn, format(dates, "%Y-%m-%d"), sep = "|"), unit)) {
     stop(malformed, call. = FALSE)
   }
   data.frame(mrn = mrn, encounter_date = dates, stringsAsFactors = FALSE)
