@@ -56,3 +56,12 @@ active_units <- function(cohort) {
   last <- utils::tail(cohort$stages$stage_id[order(cohort$stages$order)], 1L)
   cohort$members$patient_id[cohort$members$stage_id == last & cohort$members$included]
 }
+
+local_freeze_setup <- function(env = parent.frame()) {
+  testthat::skip_if_not_installed("arrow")
+  con <- local_master_db(env)
+  config <- withr::local_tempfile(fileext = ".yaml", .local_envir = env)
+  writeLines("study: st0000", config)
+  list(con = con, config = config,
+       dir = withr::local_tempdir("published-", .local_envir = env))
+}

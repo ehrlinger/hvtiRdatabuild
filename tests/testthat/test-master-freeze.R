@@ -1,14 +1,5 @@
 # No PHI: identifiers and values are invented. Fixtures in helper-master-pull.R.
 
-local_freeze_setup <- function(env = parent.frame()) {
-  skip_if_not_installed("arrow")
-  con <- local_master_db(env)
-  config <- withr::local_tempfile(fileext = ".yaml", .local_envir = env)
-  writeLines("study: st0000", config)
-  list(con = con, config = config,
-       dir = withr::local_tempdir("published-", .local_envir = env))
-}
-
 test_that("a query cohort runs through pull, build and freeze, end to end", {
   f <- local_freeze_setup()
   pull <- pull_demo(f$con, demo_query())
