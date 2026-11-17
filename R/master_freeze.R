@@ -134,8 +134,7 @@ freeze_study_pull <- function(pull, path, dir, dataset_id,
 #'
 #' @seealso [freeze_study_pull()]
 #'
-#' @examples
-#' # See freeze_study_pull().
+#' @inherit freeze_study_pull examples
 #'
 #' @export
 read_pull_provenance <- function(path) {

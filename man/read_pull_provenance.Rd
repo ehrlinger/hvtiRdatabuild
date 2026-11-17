@@ -21,7 +21,34 @@ and \code{cohort_stages}.
 Read the provenance a frozen pull carries
 }
 \examples{
-# See freeze_study_pull().
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE) &&
+      requireNamespace("arrow", quietly = TRUE)) {
+  # Synthetic data; no PHI.
+  con <- DBI::dbConnect(duckdb::duckdb())
+  DBI::dbWriteTable(con, "master_demo", data.frame(
+    mrn = "SYN101", encounter_date = as.Date("2010-03-01"), proc = "CABG", age = 62
+  ))
+  DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
+    correction_id = character(), mrn = character(), encounter_date = as.Date(character())
+  ))
+  DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+  ))
+  config <- tempfile(fileext = ".yaml")
+  writeLines("study: st0000", config)
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+  pull <- pull_master(con, "master_demo", q, var_cols = "age", path = config,
+                      dialect = "duckdb")
+  published <- tempfile("published-")
+  dir.create(published)
+  release <- freeze_study_pull(pull, config, published, "st0000_pull")
+  read_pull_provenance(file.path(published, release$file))$sql_commit
+  DBI::dbDisconnect(con, shutdown = TRUE)
+  unlink(c(config, published), recursive = TRUE)
+}
+}
 
 }
 \seealso{

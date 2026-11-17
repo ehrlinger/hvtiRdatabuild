@@ -41,7 +41,50 @@
 #' @seealso [propose_corrections()], [freeze_study_pull()]
 #'
 #' @examples
-#' # Needs a frozen pull and the warehouse; see freeze_study_pull().
+#' \donttest{
+#' if (requireNamespace("duckdb", quietly = TRUE) &&
+#'       requireNamespace("arrow", quietly = TRUE)) {
+#'   # Synthetic data; no PHI. A master, its lineage to one source, and a frozen pull.
+#'   con <- DBI::dbConnect(duckdb::duckdb())
+#'   DBI::dbWriteTable(con, "master_demo", data.frame(
+#'     mrn = c("SYN101", "SYN102"), encounter_date = as.Date(c("2010-03-01", "2011-05-02")),
+#'     proc = "CABG", age = c(62, 70)
+#'   ))
+#'   DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
+#'     correction_id = character(), mrn = character(), encounter_date = as.Date(character())
+#'   ))
+#'   DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+#'   DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+#'     sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+#'   ))
+#'   DBI::dbWriteTable(con, "master_demo_lineage", data.frame(
+#'     master_column = "age", source = "stg_demo", source_column = "age_years"
+#'   ))
+#'   study_cfg <- tempfile(fileext = ".yaml")
+#'   writeLines("study: st0000", study_cfg)
+#'   q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+#'   pull <- pull_master(con, "master_demo", q, var_cols = c("proc", "age"),
+#'                       path = study_cfg, dialect = "duckdb")
+#'   published <- tempfile("published-")
+#'   dir.create(published)
+#'   frozen <- file.path(published, freeze_study_pull(pull, study_cfg, published,
+#'                                                    "st0000_pull")$file)
+#'
+#'   # The study corrects one age; that fix becomes a candidate correction to stg_demo.
+#'   cfg_path <- tempfile(fileext = ".yml")
+#'   writeLines(c("name: master_demo", "key: [mrn, encounter_date]", "snapshots: snaps",
+#'                "current: x.sas7bdat", "build_program: x.sas",
+#'                "sources:", "  stg_demo: {key: [mrn, encounter_date]}"), cfg_path)
+#'   data <- as.data.frame(arrow::read_parquet(frozen))
+#'   data$age[data$mrn == "SYN102"] <- 71
+#'   out <- study_correction_candidates(read_master_config(cfg_path), con, frozen, data,
+#'                                      tempfile(fileext = ".csv"), dialect = "duckdb")
+#'   utils::read.csv(out$path)
+#'
+#'   DBI::dbDisconnect(con, shutdown = TRUE)
+#'   unlink(c(study_cfg, cfg_path, published, out$path, out$derived_path), recursive = TRUE)
+#' }
+#' }
 #'
 #' @export
 study_correction_candidates <- function(config, con, pull, data, path,
