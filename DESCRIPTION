@@ -1,7 +1,7 @@
 Package: hvtiRdatabuild
 Type: Package
 Title: Build and Verify Analytic Datasets for the HVTI CORR Group
-Version: 0.3.5
+Version: 0.3.6
 Date: 2026-11-17
 Authors@R: c(
     person(
