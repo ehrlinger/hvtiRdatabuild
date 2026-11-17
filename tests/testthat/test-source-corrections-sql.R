@@ -50,3 +50,76 @@ test_that("the R reference applies each rule of the case matrix", {
                                           ref$stale$correction_id,
                                           ref$conflicts$correction_id)))
 })
+
+test_that("the generated views agree with the R reference on every rule", {
+  con <- local_sources_db()
+  deploy_echo(con)
+  key <- c("mrn", "encounter_date")
+  base <- DBI::dbGetQuery(con, "SELECT * FROM stg_echo ORDER BY mrn")
+  ref <- resolve_source_corrections(base, case_corrections(), case_decisions(), key)
+  srt <- function(d) {
+    d <- d[do.call(order, unname(as.list(d))), , drop = FALSE]
+    rownames(d) <- NULL
+    d
+  }
+  expect_equal(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrected ORDER BY mrn"),
+               ref$data, ignore_attr = TRUE)
+  expect_equal(srt(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrections_applied")),
+               srt(ref$applied), ignore_attr = TRUE)
+  expect_equal(srt(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrections_stale")),
+               srt(ref$stale), ignore_attr = TRUE)
+  expect_equal(srt(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrections_conflicts")),
+               srt(ref$conflicts), ignore_attr = TRUE)
+})
+
+test_that("a first correction to an untouched column is live with no redeployment", {
+  con <- local_sources_db()
+  deploy_echo(con, case_corrections()[0, ], case_decisions()[0, ])
+  before <- DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrected ORDER BY mrn")
+  expect_identical(before$seen_on, DBI::dbGetQuery(con, "SELECT seen_on FROM stg_echo
+                                                     ORDER BY mrn")$seen_on)
+  DBI::dbAppendTable(con, "stg_echo_corrections",
+                     corr_row("c50", "SYN202", "2020-02-01", "seen_on", NA, 1L,
+                              "2020-01-15", 0L))
+  DBI::dbAppendTable(con, "stg_echo_correction_decisions", dec_row("d50", "c50"))
+  after <- DBI::dbGetQuery(con, "SELECT seen_on FROM stg_echo_corrected ORDER BY mrn")
+  expect_identical(after$seen_on[[2]], as.Date("2020-01-15"))
+})
+
+test_that("the corrected view keeps the source's columns, order and types", {
+  con <- local_sources_db()
+  deploy_echo(con)
+  expect_identical(table_types(con, "stg_echo_corrected"), table_types(con, "stg_echo"))
+})
+
+test_that("a supersede decision settles a G1 conflict", {
+  con <- local_sources_db()
+  decisions <- rbind(case_decisions(),
+                     dec_row("d70", "c04", "supersede", on = "2026-04-01"))
+  deploy_echo(con, decisions = decisions)
+  got <- DBI::dbGetQuery(con, "SELECT lvef FROM stg_echo_corrected WHERE mrn = 'SYN203'")
+  expect_identical(got$lvef, 41)
+  conflicts <- DBI::dbGetQuery(con, "SELECT correction_id FROM stg_echo_corrections_conflicts")
+  expect_false(any(c("c03", "c04") %in% conflicts$correction_id))
+})
+
+test_that("a key duplicated after acceptance changes no row, in SQL and in R", {
+  con <- local_sources_db()
+  deploy_echo(con)
+  DBI::dbExecute(con, paste("INSERT INTO stg_echo VALUES",
+                            "('SYN201', DATE '2020-01-01', 30, '2', NULL)"))
+  got <- DBI::dbGetQuery(con, "SELECT lvef, mr_grade FROM stg_echo_corrected
+                               WHERE mrn = 'SYN201'")
+  expect_identical(got$lvef, c(30, 30))           # c01 no longer applies to either row
+  expect_identical(got$mr_grade, c("2", "2"))     # nor do c05 and c06
+  expect_identical(nrow(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrected")), 6L)
+  stale <- DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrections_stale")
+  expect_setequal(stale$correction_id[stale$reason == "ambiguous_record"],
+                  c("c01", "c05", "c06"))
+  ref <- resolve_source_corrections(DBI::dbGetQuery(con, "SELECT * FROM stg_echo"),
+                                    case_corrections(), case_decisions(),
+                                    c("mrn", "encounter_date"))
+  expect_setequal(ref$stale$correction_id[ref$stale$reason == "ambiguous_record"],
+                  c("c01", "c05", "c06"))
+  expect_false(any(c("c01", "c05", "c06") %in% ref$applied$correction_id))
+})
