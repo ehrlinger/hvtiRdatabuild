@@ -213,3 +213,32 @@ test_that("a key the column would round names no row, and cannot correct another
                                    dry_run = FALSE, dialect = "duckdb"),
                class = "hvtiRdatabuild_corrections_refused")
 })
+
+test_that("a key or value with a malformed suffix is refused, not cut to a prefix", {
+  s <- propose_setup()
+  f <- write_submission(s$cfg, list(
+    good_row(encounter_date = "2020-01-01junk"),                         # would name row 1
+    good_row(variable = "seen_on", expected_prior = "2019-12-01",
+             new_value = "2019-12-05x"),
+    good_row(new_value = "0x23"),                                        # hex for 35
+    good_row(encounter_date = "2020-01-01")
+  ))
+  out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict,
+                   c("unknown_key", "does_not_cast", "does_not_cast", "appendable"))
+})
+
+test_that("submitted text must be the whole of a supported form", {
+  ok <- function(x, cls) !is.na(.parse_submitted(x, cls))
+  expect_true(ok("2020-01-01", "Date"))
+  expect_false(ok("2020-01-01junk", "Date"))
+  expect_false(ok("2020-1-1", "Date"))
+  expect_true(ok("2020-01-01 10:30", "POSIXct"))
+  expect_true(ok("2020-01-01 10:30:05.123456", "POSIXct"))
+  expect_false(ok("2020-01-01 10:30junk", "POSIXct"))
+  expect_true(ok("-1.5e3", "numeric"))
+  expect_true(ok("30.0", "numeric"))
+  expect_false(ok("0x23", "integer"))
+  expect_false(ok("30 ", "numeric"))
+  expect_identical(.parse_submitted(" 2", "character"), " 2")
+})
