@@ -55,9 +55,52 @@ Output is verdicts and counts, never a key or a value.
 and the tables unchanged. Replaces the deprecated \code{\link[=propose_correction]{propose_correction()}}.
 }
 \examples{
-# See the generate_corrections_sql() example and the reference group "Corrections to
-# source views (interim)"; the round trip needs a warehouse connection with the source
-# views.
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE)) {
+  # Synthetic data; no PHI. One source view, its master, and a deployed corrections layer.
+  con <- DBI::dbConnect(duckdb::duckdb())
+  DBI::dbWriteTable(con, "stg_demo", data.frame(mrn = c("SYN1", "SYN2"), lvef = c(30, NA)))
+  DBI::dbWriteTable(con, "master_demo", data.frame(mrn = c("SYN1", "SYN2"), lvef = c(30, NA)))
+  cfg_path <- tempfile(fileext = ".yml")
+  writeLines(c("name: master_demo", "key: [mrn]", "snapshots: snaps",
+               "current: x.sas7bdat", "build_program: x.sas",
+               "sources:", "  stg_demo: {key: [mrn]}", "deciders: [dm_one]"), cfg_path)
+  cfg <- read_master_config(cfg_path)
+  sql_dir <- tempfile("sql-")
+  dir.create(sql_dir)
+  for (p in generate_corrections_sql(cfg, con, sql_dir, dialect = "duckdb")) {
+    for (s in strsplit(paste(readLines(p), collapse = "\n"), "\nGO\n?")[[1]]) {
+      DBI::dbExecute(con, s)
+    }
+  }
+
+  # A correction to SYN1 and a fill-in for SYN2's missing value.
+  sub <- tempfile(fileext = ".csv")
+  utils::write.csv(data.frame(
+    source = "stg_demo", mrn = c("SYN1", "SYN2"), variable = "lvef",
+    expected_prior = c("30", ""), expected_prior_missing = c("0", "1"),
+    new_value = c("35", "40"), new_value_missing = "0", evidence_type = "chart_review",
+    evidence_ref = "invented note", asserted_by = "reviewer_a"
+  ), sub, row.names = FALSE)
+  propose_corrections(cfg, con, sub, dialect = "duckdb")$verdicts   # a dry run
+  ids <- propose_corrections(cfg, con, sub, dry_run = FALSE,
+                             dialect = "duckdb")$correction_ids
+
+  # A named decider, not the asserter, accepts both; they apply on the next query.
+  decide_corrections(cfg, con, data.frame(
+    source = "stg_demo", correction_id = ids, decision = "accept", decided_by = "dm_one",
+    reason = "chart confirms"
+  ), dry_run = FALSE, dialect = "duckdb")
+  DBI::dbGetQuery(con, "SELECT * FROM stg_demo_corrected ORDER BY mrn")
+
+  # Upstream fills SYN2 with the same value: the fill-in is retired.
+  DBI::dbExecute(con, "UPDATE stg_demo SET lvef = 40 WHERE mrn = 'SYN2'")
+  retire_filled_corrections(cfg, con, "stg_demo", dry_run = FALSE, dialect = "duckdb")
+
+  DBI::dbDisconnect(con, shutdown = TRUE)
+  unlink(c(cfg_path, sub, sql_dir), recursive = TRUE)
+}
+}
 
 }
 \seealso{
