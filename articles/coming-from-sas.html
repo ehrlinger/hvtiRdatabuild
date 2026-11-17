@@ -106,35 +106,42 @@
 <td><code>build_dataset(raw, config, cohort)</code></td>
 </tr>
 <tr class="even">
+<td>
+<code>tp.bd.data.master.sas</code>, reading a master view</td>
+<td>
+<code><a href="../reference/pull_master.html">pull_master()</a></code>, then <code><a href="../reference/build_from_master.html">build_from_master()</a></code>
+</td>
+</tr>
+<tr class="odd">
 <td><code>libname library "&amp;STUDY/datasets"</code></td>
 <td>paths in <code>study.yaml</code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>%macro skip; ... %mend skip;</code></td>
 <td>
 <code>modules:</code> / named shared <code>derive:</code> flags in <code>study.yaml</code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>%vars(in=built, out=built, transf=1)</code></td>
 <td><code>derive_vars(build, config, study_derive)</code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>data x; set y; ... run;</code></td>
 <td>a <code>dplyr</code> pipeline</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td><code>PROC CONTENTS</code></td>
 <td><code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/data_dictionary.html" class="external-link">hvtiRutilities::data_dictionary()</a></code></td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td><code>label x = 'Age at surgery';</code></td>
 <td>
 <code>labelled</code> + <code><a href="https://ehrlinger.github.io/hvtiRutilities/reference/label_map.html" class="external-link">hvtiRutilities::label_map()</a></code>
 </td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>
 <code>first.id</code> / <code>last.id</code>
 </td>
@@ -142,7 +149,7 @@
 <code>group_by()</code> + <code>slice_head()</code> / <code>slice_tail()</code>
 </td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td>
 <code>libname out xport</code> then <code>read.xport()</code>
 </td>
@@ -240,7 +247,7 @@
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">event</span><span class="kw">:</span><span class="at"> event</span></span>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="at">    </span><span class="fu">expect</span><span class="kw">:</span></span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="at">      </span><span class="fu">n</span><span class="kw">:</span><span class="at"> </span><span class="dv">1200</span></span></code></pre></div>
-<p>The names and counts above are synthetic. Name a set for the dataset contract, such as <code>primary_analysis</code>, rather than for its first consumer, such as a particular plot. Add another set only when the study has a different population or variable contract. If the SAS step keeps every row, omit <code>exclude</code>; the <code>vars</code> list alone expresses its projection. <code>event</code> names the set’s own event column, which must be one of its <code>vars</code>; from it <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> counts each code: <code>n_censored</code> (0), <code>n_events</code> (1), <code>n_other_events</code> (any other code, such as a competing risk) and <code>n_event_missing</code> (<code>NA</code>). Only a set with an <code>event</code> may add expectations for them.</p>
+<p>The names and counts above are synthetic. Name a set for the dataset contract, such as <code>primary_analysis</code>, rather than for its first consumer, such as a particular plot. Add another set only when the study has a different population or variable contract. If the SAS step keeps every row, omit <code>exclude</code>; the <code>vars</code> list alone expresses its projection. <code>event</code> names the set’s own event column, which must be one of its <code>vars</code>; from it <code><a href="../reference/write_analysis_set.html">write_analysis_set()</a></code> counts each code: <code>n_censored</code> (0), <code>n_events</code> (1), <code>n_other_events</code> (any other code, such as a competing risk) and <code>n_event_missing</code> (<code>NA</code>). Only a set with an <code>event</code> may add expectations for them. A row whose <code>exclude</code> rule evaluates to <code>NA</code> is kept, and counted in the attrition table’s <code>n_na_kept</code>. SAS’s <code>if bmi &lt; 18.5 then delete</code> drops a missing <code>bmi</code>, because missing sorts low; to match it, write the missing case into the rule, <code>is.na(bmi) | bmi &lt; 18.5</code>.</p>
 <p>Write the checkpoint explicitly after the built dataset is ready:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb3"><pre class="downlit sourceCode r">
@@ -278,7 +285,7 @@
 <span><span class="fu"><a href="https://rdrr.io/r/base/trimws.html" class="external-link">trimws</a></span><span class="op">(</span><span class="st">"Smith   "</span><span class="op">)</span> <span class="op">==</span> <span class="st">"Smith"</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
-<p>This bites hardest on merges keyed by a character id. <code><a href="../reference/compare_built.html">compare_built()</a></code> trims before comparing, for exactly this reason.</p>
+<p>This bites hardest on merges keyed by a character id. <code><a href="../reference/compare_built.html">compare_built()</a></code> trims character values before comparing them, but matches ids exactly: trim a padded id yourself before comparing.</p>
 </section><section class="level3"><h3 id="sas-has-no-missing-character-value">SAS has no missing character value<a class="anchor" aria-label="anchor" href="#sas-has-no-missing-character-value"></a>
 </h3>
 <p>R distinguishes <code>NA</code> from <code>""</code>. SAS does not: a missing character <strong>is</strong> the empty string. Read a SAS dataset and every missing character comes back as <code>""</code>:</p>

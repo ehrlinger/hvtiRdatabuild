@@ -10,27 +10,40 @@ verifies them against the legacy SAS datasets they replace.
 
 ## Status
 
-Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4.
 [`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md)
 and
 [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
 verify an R-built dataset against its SAS oracle.
 [`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
 [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
-[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
-[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md),
+[`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md)
 and
-[`print.pull_result()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/print.pull_result.md)
+[`dw_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_pull.md)
 read a study’s warehouse modules into R.
+[`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
+and
+[`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md)
+assemble and derive the study dataset, recording each cohort step in a
+`cohort_record`. Master datasets are snapshotted with
+[`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md),
+lifted into the warehouse as views with
+[`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md),
+and read into a study with
+[`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md),
+whose cohort
+[`cohort_query()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_query.md)
+and its criteria define;
+[`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+turns the pull into a build.
+[`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md)
+and
+[`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md)
+publish a release.
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
 materializes a declared selection from a built dataset, and
 [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
 reads a stale checkpoint only in a draft, with a note, and refuses it in
-a final render. The build and derivation stages
-([`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
-and
-[`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md))
-remain future work.
+a final render.
 
 ## Installation
 
@@ -81,10 +94,10 @@ eda <- read_analysis_set("eda", set_config)
 ```
 
 The sidecar records the parent dataset, declaration hash, row counts,
-and per-rule attrition. If the parent or declaration changes, reading
-stops and names the
+and per-rule attrition. If the parent or declaration changes, a draft
+render reads the old cut with a note naming the
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
-call that refreshes it.
+call that refreshes it, and a final render stops.
 
 ## Pulling warehouse modules for a study
 
@@ -153,6 +166,13 @@ reoperation), where a given `patid` legitimately repeats, so a direct
 per-identifier comparison errors on them by design. Verifying those
 three needs a composite-key comparison, deferred to a later slice.
 
+Printing a
+[`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
+result never shows identifiers unless `show_ids = TRUE`, or
+`options(hvtiRdatabuild.show_ids = TRUE)`, because `ccfidu` is a medical
+record number combined with a date of surgery. Do not enable it in a
+session whose output is logged or shared.
+
 ## Local integration testing
 
 The committed fixtures are synthetic. To exercise the read path against
@@ -166,15 +186,13 @@ That directory holds PHI. It must live outside this repository, and
 nothing in the test suite copies from it. With the variable unset (the
 default, and what CI sees), these tests skip.
 
-[`print()`](https://rdrr.io/r/base/print.html) never emits identifiers
-unless `show_ids = TRUE`, because `ccfidu` is a medical record number
-combined with a date of surgery. Do not enable it in a session whose
-output is logged or shared.
-
 ## Documentation
 
 - [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md):
   the migration guide for SAS users. Start here.
+- [`vignette("master-datasets")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/master-datasets.md):
+  snapshotting a SAS master, lifting it into the warehouse as a view,
+  and the deprecated corrections tables.
 - [`vignette("registered-datasets", package = "hvtiRutilities")`](https://ehrlinger.github.io/hvtiRutilities/articles/registered-datasets.html):
   for analysts running jobs on a study. What registering a dataset does,
   why its versions are named `<name>_YYYYMMDD_rN.parquet`, which version

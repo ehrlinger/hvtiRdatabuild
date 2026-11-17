@@ -32,6 +32,7 @@ change; changing a study-specific rule is a code change.
 | `%include "<dbcreds>.sas"` + `CONNECT TO ODBC` | [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md) |
 | `PROC SQL; SELECT ... FROM connection to ODBC` | `dw_pull(config, con)` |
 | `tp.bd.data.master.sas` | `build_dataset(raw, config, cohort)` |
+| `tp.bd.data.master.sas`, reading a master view | [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md), then [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md) |
 | `libname library "&STUDY/datasets"` | paths in `study.yaml` |
 | `%macro skip; ... %mend skip;` | `modules:` / named shared `derive:` flags in `study.yaml` |
 | `%vars(in=built, out=built, transf=1)` | `derive_vars(build, config, study_derive)` |
@@ -166,7 +167,11 @@ of its `vars`; from it
 [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
 counts each code: `n_censored` (0), `n_events` (1), `n_other_events`
 (any other code, such as a competing risk) and `n_event_missing` (`NA`).
-Only a set with an `event` may add expectations for them.
+Only a set with an `event` may add expectations for them. A row whose
+`exclude` rule evaluates to `NA` is kept, and counted in the attrition
+table’s `n_na_kept`. SAS’s `if bmi < 18.5 then delete` drops a missing
+`bmi`, because missing sorts low; to match it, write the missing case
+into the rule, `is.na(bmi) | bmi < 18.5`.
 
 Write the checkpoint explicitly after the built dataset is ready:
 
@@ -235,7 +240,8 @@ trimws("Smith   ") == "Smith"
 
 This bites hardest on merges keyed by a character id.
 [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
-trims before comparing, for exactly this reason.
+trims character values before comparing them, but matches ids exactly:
+trim a padded id yourself before comparing.
 
 ### SAS has no missing character value
 

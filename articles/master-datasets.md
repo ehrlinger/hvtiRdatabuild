@@ -35,9 +35,9 @@ warehouse-wide layer, is
 
 ## `master.yml`
 
-Everything the six exports need to know about one master lives in a
-`master.yml` kept outside the package, next to the study configs,
-because it names paths on a shared volume.
+Everything the six exports that take a `master.yml` need to know about
+one master lives in a `master.yml` kept outside the package, next to the
+study configs, because it names paths on a shared volume.
 [`read_master_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.md)
 reads and validates it:
 
@@ -147,13 +147,13 @@ found the answer, never the answer’s underlying data.
 
 [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
 moves a snapshot into the warehouse. It checks the key is unique,
-creates a base table named for the snapshot’s release, loads the parquet
-a row group at a time, and only then proves the load equal to the
-snapshot: a quick check first (counts, aggregates, a sample), a full
-column-by-column comparison second. The master’s view is created only
-after both pass. `dry_run = TRUE`, the default, stops after writing the
-DDL next to the snapshot, so a hand-off to whoever holds warehouse write
-rights costs nothing to try:
+creates a base table named for the snapshot’s release and checksum,
+loads the parquet a row group at a time, and only then proves the load
+equal to the snapshot: a quick check first (counts, aggregates, a
+sample), a full column-by-column comparison second. The master’s view is
+created only after both pass. `dry_run = TRUE`, the default, stops after
+writing the DDL next to the snapshot, so a hand-off to whoever holds
+warehouse write rights costs nothing to try:
 
 ``` r
 
@@ -170,7 +170,7 @@ writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmpf3HSy7/duckdb
+#> ℹ /tmp/Rtmpi4NLia/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -179,7 +179,7 @@ con <- DBI::dbConnect(duckdb::duckdb())
 #> ℹ See ?duckdb_storage for details and alternatives.
 dry <- lift_master(read_master_config(cfg_path), con, pq, dialect = "duckdb")
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/Rtmpf3HSy7/master22264408a146/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/Rtmpi4NLia/master20f04d480388/built_demo.parquet.ddl.sql
 dry$dry_run
 #> [1] TRUE
 ```
@@ -262,9 +262,10 @@ backfill_corrections(cfg2, con, dialect = "duckdb")
 The dry run above reports one fix resolved (the `age` fix) and writes
 nothing. The `ccfid` remap is a key change, not a cell correction, so it
 is not counted among the resolved facts; identity corrections of that
-kind are designed separately (see the last section). Run it for real and
-the correction and its `bake` decision land in the tables, and the
-master’s view is regenerated:
+kind are designed separately (see the last section). It also warns, with
+class `hvtiRdatabuild_incomplete_backfill`, giving the program line of
+the unresolved remap. Run it for real and the correction and its `bake`
+decision land in the tables, and the master’s view is regenerated:
 
 ``` r
 
@@ -290,12 +291,10 @@ is how that reaches the table:
 ``` r
 
 prop <- propose_correction(cfg2, con,
-                           key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
+                           key_values = list(emrn = "E3"), alt_key = "epic", var_col = "age",
                            expected_prior = 70, new_value = 71, evidence_type = "chart_review",
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
-#> Warning: propose_correction(): `variable` is renamed `var_col`. This will be an
-#> error in the next release.
-#> Correction c66227d4b60a4aba7 appended.
+#> Correction c417b7d44d916b990 appended.
 prop$verdict
 #> [1] "appended"
 ```
@@ -309,7 +308,7 @@ someone accepts it:
 ``` r
 
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
-#> Decision d77961584e7c7f011 (accept) recorded on c66227d4b60a4aba7.
+#> Decision dea7ab06df4aa1011 (accept) recorded on c417b7d44d916b990.
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 #>   age
 #> 1  71
@@ -338,12 +337,20 @@ DBI::dbGetQuery(con, "SELECT * FROM master_c_corrections_stale")
 
 ## What is not done yet
 
-Three things this vignette does not show, because the package does not
-do them yet:
+Three things this vignette does not show:
 
-- **The port.** Nothing here writes a study’s `bd.R`/`vars.R` against a
-  master view; that is the next spec in the replacement path, once a
-  master read function exists.
+- **The port.** A study reads a master view with
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md),
+  and
+  [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+  hands
+  [`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md)
+  the same `build_result` that
+  [`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
+  does;
+  [`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md)
+  publishes the pull. Porting an individual study’s `bd.R`/`vars.R` onto
+  that path is not shown here.
 - **Identity corrections.**
   [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md)
   finds `ccfid`-remap statements and reports them unresolved rather than
