@@ -148,3 +148,330 @@ write_corrections_template <- function(config, path) {
   utils::write.csv(empty, path, row.names = FALSE)
   invisible(path)
 }
+
+#' Read a submission file once: its rows and the SHA-256 of the same bytes
+#'
+#' @param config A `master_config` with `sources`.
+#' @param file Character. The filled template.
+#'
+#' @return A list: `rows` (a character data frame, blanks as `NA`) and `sha256`.
+#'
+#' @keywords internal
+#' @noRd
+.read_template <- function(config, file) {
+  if (!file.exists(file)) .abort("no_file", "propose_corrections(): `file` does not exist.")
+  bytes <- readBin(file, "raw", file.size(file))
+  sha <- digest::digest(bytes, algo = "sha256", serialize = FALSE)
+  # Nothing becomes NA on reading: the two value columns are kept exactly as written, and
+  # their flags, not an empty cell, say whether a value is missing.
+  rows <- utils::read.csv(text = rawToChar(bytes), colClasses = "character",
+                          na.strings = character(), check.names = FALSE)
+  if (!identical(names(rows), .template_columns(config))) {
+    .abort("template_columns", "propose_corrections(): the file's columns are not the ",
+           "template's. Start from write_corrections_template().")
+  }
+  # Trim only the structural fields. Keys and values stay verbatim: a prior of " A" is not
+  # "A", and parse_value()/value_text() preserve character text. Outside the two value
+  # columns an empty cell is missing; inside them an empty cell is an empty string unless
+  # its flag says missing, so "" and "   " are both representable.
+  structural <- c("source", "variable", "expected_prior_missing", "new_value_missing",
+                  "evidence_type", "asserted_by")
+  rows[structural] <- lapply(rows[structural], trimws)
+  other <- setdiff(names(rows), c("expected_prior", "new_value"))
+  rows[other] <- lapply(rows[other], function(x) {
+    x[!nzchar(x)] <- NA_character_
+    x
+  })
+  list(rows = rows, sha256 = sha)
+}
+
+#' The intake key temp table for one source
+#'
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#' @param key_types A named character vector of the source's key columns' SQL types.
+#'
+#' @return A list: `name` and `create`.
+#'
+#' @keywords internal
+#' @noRd
+.intake_temp <- function(dialect, key_types) {
+  q <- quoter(dialect)
+  cols <- paste0(", ", q(names(key_types)), " ", key_types, collapse = "")
+  switch(dialect,
+         mssql = list(name = "#correction_intake",
+                      create = paste0("CREATE TABLE #correction_intake (row_id int NOT NULL",
+                                      cols, ")")),
+         duckdb = list(name = "correction_intake",
+                       create = paste0("CREATE TEMP TABLE correction_intake (row_id INTEGER",
+                                       " NOT NULL", cols, ")")))
+}
+
+#' Propose a batch of corrections from a filled template
+#'
+#' Validates every row of a submission made from [write_corrections_template()] and returns
+#' a verdict per row:
+#'
+#' - `appendable`: the row passed every check below.
+#' - `rule_not_fact`: a key or the variable holds a pattern, a comparison, or "all".
+#' - `unknown_source`: the source is not declared in `master.yml`.
+#' - `invalid_field`: a flag is not 0 or 1 or disagrees with its value, the evidence type
+#'   is unknown, or a required field is blank.
+#' - `no_variable`: the source has no such column, or the column is a key.
+#' - `derived_variable`: the column is the master's, derived from sources; correct the
+#'   sources or change the derivation.
+#' - `unknown_key`: the key is incomplete, carries another source's key column, or matches
+#'   no row.
+#' - `ambiguous_key`: the key matches more than one row.
+#' - `does_not_cast`: a value is not of the column's type, or the warehouse's cast to the
+#'   column's SQL type would round, overflow or truncate it. This last check runs after
+#'   the prior check.
+#' - `prior_mismatch`: the source no longer holds `expected_prior`.
+#'
+#' With `dry_run = FALSE`, an all-`appendable` file is appended in one transaction, and a
+#' file with any other verdict is refused whole, with nothing written. Values are stored in
+#' a canonical text form, so `"30.0"` and `"30"` are the same assertion. A proposed
+#' correction applies only once accepted with [decide_corrections()].
+#'
+#' Output is verdicts and counts, never a key or a value.
+#'
+#' **Interim.** Superseded by the HVTR registry's intake, which takes over the template
+#' and the tables unchanged. Replaces the deprecated [propose_correction()].
+#'
+#' @param config A `master_config` from [read_master_config()], with `sources`.
+#' @param con A DBI connection to the warehouse.
+#' @param file Character. The filled template, as CSV.
+#' @param dry_run If `TRUE`, the default, validate only.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return Invisibly, a list: `verdicts` (a data frame of `row`, `source`, `verdict`),
+#'   `appended` (an integer), `correction_ids` and `file_sha256`.
+#'
+#' @seealso [write_corrections_template()], [decide_corrections()]
+#'
+#' @examples
+#' # See the "Corrections" section of the package reference; the round trip needs a
+#' # warehouse connection with the source views.
+#'
+#' @export
+propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "mssql") {
+  tpl <- .read_template(config, file)
+  rows <- tpl$rows
+  n <- nrow(rows)
+  verdict <- rep(NA_character_, n)
+  # Give rows `i` (logical, or integer positions) verdict `v` unless they already have one,
+  # so each row keeps the first verdict it earns.
+  set <- function(i, v) {
+    if (!is.logical(i)) i <- seq_len(n) %in% i
+    verdict[i & is.na(verdict)] <<- v
+  }
+  keys_all <- unique(unlist(lapply(config$sources, `[[`, "key"), use.names = FALSE))
+
+  # Checks that need no database.
+  pattern <- "[*%?<>=,;]|^(all|any)$"
+  ruled <- Reduce(`|`, lapply(c(keys_all, "variable"), function(k) {
+    !is.na(rows[[k]]) & grepl(pattern, rows[[k]], ignore.case = TRUE)
+  }))
+  set(ruled, "rule_not_fact")
+  set(!rows$source %in% names(config$sources), "unknown_source")
+  # A flag is 0 or 1, and a missing value (flag 1) leaves its cell empty. With flag 0 any
+  # text is the value, the empty string included.
+  flag_ok <- function(f, value) {
+    f %in% c("0", "1") & (f %in% "0" | !nzchar(value))
+  }
+  bad <- is.na(rows$variable) | is.na(rows$evidence_ref) | is.na(rows$asserted_by) |
+    !rows$evidence_type %in% setdiff(EVIDENCE_TYPES, "legacy_sas_inline") |
+    !flag_ok(rows$expected_prior_missing, rows$expected_prior) |
+    !flag_ok(rows$new_value_missing, rows$new_value)
+  set(bad, "invalid_field")
+  rows$expected_prior[rows$expected_prior_missing %in% "1"] <- NA_character_
+  rows$new_value[rows$new_value_missing %in% "1"] <- NA_character_
+
+  master_cols <- names(run_step("read master columns", table_types(con, config$name)))
+  out_rows <- list()
+  now <- Sys.time()
+  write_all <- function() {
+    for (s in intersect(names(config$sources), rows$source[is.na(verdict)])) {
+      idx <- which(rows$source == s & is.na(verdict))
+      key <- config$sources[[s]]$key
+      types <- run_step("read source columns", table_types(con, s))
+      proto <- run_step("read source types", DBI::dbGetQuery(
+        con, paste("SELECT * FROM", quoter(dialect)(s), "WHERE 1 = 0")
+      ))
+      var <- rows$variable[idx]
+      in_source <- var %in% setdiff(names(types), key)
+      set(idx[!in_source & var %in% setdiff(master_cols, names(types))], "derived_variable")
+      set(idx[!in_source], "no_variable")
+
+      # The key: exactly this source's columns, each parsing to its column's type.
+      other <- setdiff(keys_all, key)
+      typed <- lapply(key, function(k) {
+        cls <- class(proto[[k]])[[1]]
+        vapply(rows[[k]][idx], function(x) {
+          if (is.na(x)) return(NA_character_)
+          # as.POSIXct() errors on text it cannot read; that is an unknown key, not a crash.
+          tryCatch(value_text(parse_value(x, cls)), error = function(e) NA_character_)
+        }, character(1), USE.NAMES = FALSE)
+      })
+      names(typed) <- key
+      incomplete <- Reduce(`|`, lapply(typed, is.na)) |
+        (if (length(other)) Reduce(`|`, lapply(other, function(k) !is.na(rows[[k]][idx])))
+         else FALSE)
+      set(idx[incomplete], "unknown_key")
+      live <- idx[is.na(verdict[idx])]
+      if (!length(live)) next
+
+      tmp <- .intake_temp(dialect, types[key])
+      run_step("create intake table", DBI::dbExecute(con, tmp$create))
+      run_step("load intake keys", DBI::dbExecute(
+        con, sprintf("INSERT INTO %s VALUES (%s)", tmp$name,
+                     paste(rep("?", length(key) + 1L), collapse = ", ")),
+        params = c(list(live), lapply(key, function(k) {
+          parse_value_vec(typed[[k]][match(live, idx)], class(proto[[k]])[[1]])
+        }))
+      ))
+      q <- quoter(dialect)
+      wanted <- unique(rows$variable[live])
+      found <- run_step("look up source rows", DBI::dbGetQuery(con, sprintf(
+        "SELECT t.row_id, %s FROM %s t JOIN %s b ON %s",
+        paste0("b.", q(wanted), collapse = ", "), tmp$name, q(s),
+        paste(sprintf("b.%s = t.%s", q(key), q(key)), collapse = " AND ")
+      )))
+      run_step("drop intake table", DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
+      hits <- tabulate(match(found$row_id, live), nbins = length(live))
+      set(live[hits == 0L], "unknown_key")
+      set(live[hits > 1L], "ambiguous_key")
+
+      for (i in live[hits == 1L]) {
+        v <- rows$variable[[i]]
+        cls <- class(proto[[v]])[[1]]
+        cur <- found[[v]][[match(i, found$row_id)]]
+        parsed <- function(x) tryCatch(parse_value(x, cls), error = function(e) NA)
+        prior <- if (rows$expected_prior_missing[[i]] == "1") NA else
+          parsed(rows$expected_prior[[i]])
+        new <- if (rows$new_value_missing[[i]] == "1") NA else parsed(rows$new_value[[i]])
+        if ((rows$expected_prior_missing[[i]] == "0" && is.na(prior)) ||
+              (rows$new_value_missing[[i]] == "0" && is.na(new))) {
+          set(i, "does_not_cast")
+          next
+        }
+        same <- if (is.na(prior)) is.na(cur) else
+          !is.na(cur) && identical(value_text(cur), value_text(prior))
+        if (!same) {
+          set(i, "prior_mismatch")
+          next
+        }
+        r <- data.frame(correction_id = NA_character_, source = s,
+                        stringsAsFactors = FALSE)
+        for (k in key) r[[k]] <- parse_value(typed[[k]][[match(i, idx)]],
+                                             class(proto[[k]])[[1]])
+        r$variable <- v
+        r$expected_prior <- if (is.na(prior)) NA_character_ else value_text(prior)
+        r$expected_prior_missing <- as.integer(rows$expected_prior_missing[[i]])
+        r$new_value <- if (is.na(new)) NA_character_ else value_text(new)
+        r$new_value_missing <- as.integer(rows$new_value_missing[[i]])
+        r$evidence_type <- rows$evidence_type[[i]]
+        r$evidence_ref <- rows$evidence_ref[[i]]
+        r$asserted_by <- rows$asserted_by[[i]]
+        r$asserted_on <- now
+        r$correction_id <- paste0("c", substr(digest::digest(
+          list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")), algo = "sha1"
+        ), 1, 20))
+        r$.row <- i
+        out_rows[[length(out_rows) + 1L]] <<- r
+      }
+
+      # The warehouse's own cast decides, through the column's SQL type, so a value R
+      # accepts but the column would round, overflow or truncate is refused here, not
+      # discovered as a silently different value in the corrected view.
+      mine <- out_rows[vapply(out_rows, `[[`, character(1), "source") == s]
+      for (v in unique(vapply(mine, `[[`, character(1), "variable"))) {
+        rv <- mine[vapply(mine, `[[`, character(1), "variable") == v]
+        texts <- c(vapply(rv, `[[`, character(1), "expected_prior"),
+                   vapply(rv, `[[`, character(1), "new_value"))
+        rid <- rep(vapply(rv, `[[`, integer(1), ".row"), 2L)
+        keep <- !is.na(texts)  # a missing-to-missing row has nothing to cast
+        ok <- .casts_losslessly(con, texts[keep], types[[v]])
+        set(unique(rid[keep][!ok]), "does_not_cast")
+      }
+      set(vapply(mine, `[[`, integer(1), ".row"), "appendable")
+    }
+    out_rows <<- out_rows[verdict[vapply(out_rows, `[[`, integer(1), ".row")] ==
+                            "appendable"]
+    out_rows <<- lapply(out_rows, function(r) r[setdiff(names(r), ".row")])
+    stopifnot(!anyNA(verdict))
+    if (dry_run || any(verdict != "appendable")) return(invisible(NULL))
+    for (s in unique(vapply(out_rows, `[[`, character(1), "source"))) {
+      batch <- do.call(rbind, out_rows[vapply(out_rows, `[[`, character(1), "source") == s])
+      run_step("append corrections",
+               DBI::dbAppendTable(con, .source_tables(s)$corrections, batch))
+    }
+    invisible(NULL)
+  }
+  .with_snapshot_txn(con, dialect, write_all())
+
+  verdicts <- data.frame(row = seq_len(n), source = rows$source, verdict = verdict,
+                         stringsAsFactors = FALSE)
+  counts <- table(verdict)
+  .hvti_inform("propose_corrections(): ",
+               paste(sprintf("%s %d", names(counts), counts), collapse = ", "), ".")
+  if (!dry_run && any(verdict != "appendable")) {
+    .abort("corrections_refused", "propose_corrections(): the file was refused whole and ",
+           "nothing was written: ", sum(verdict != "appendable"), " of ", n,
+           " row(s) are not appendable. See the dry run's verdicts.")
+  }
+  ids <- vapply(out_rows, `[[`, character(1), "correction_id")
+  invisible(list(verdicts = verdicts,
+                 appended = if (dry_run) 0L else length(ids),
+                 correction_ids = if (dry_run) character() else ids,
+                 file_sha256 = tpl$sha256))
+}
+
+#' Which canonical texts the warehouse casts to a SQL type without loss
+#'
+#' Each text goes through `TRY_CAST(... AS type)` in the warehouse, the cast the generated
+#' views use. A text passes when the cast succeeds and the result's canonical text is the
+#' text itself: `1.239` into `decimal(10,2)` comes back `1.24` and fails, as does an
+#' overflow (`NULL`) or a truncation. Batches of 500 keep under SQL Server's 2,100
+#' parameters.
+#'
+#' @param con A DBI connection.
+#' @param texts Character. Canonical texts, none missing.
+#' @param type Character. The column's SQL type, from `table_types()`.
+#'
+#' @return A logical vector the length of `texts`.
+#'
+#' @keywords internal
+#' @noRd
+.casts_losslessly <- function(con, texts, type) {
+  ok <- rep(FALSE, length(texts))
+  if (!length(texts)) return(ok)  # seq(1, 0, by = 500) would error
+  for (start in seq(1L, length(texts), by = 500L)) {
+    i <- start:min(start + 499L, length(texts))
+    params <- vector("list", 2L * length(i))
+    params[c(TRUE, FALSE)] <- as.list(i)
+    params[c(FALSE, TRUE)] <- as.list(texts[i])
+    got <- run_step("check casts", DBI::dbGetQuery(con, sprintf(
+      "SELECT i, TRY_CAST(txt AS %s) AS x FROM (VALUES %s) AS t(i, txt)", type,
+      paste(rep("(?, ?)", length(i)), collapse = ", ")
+    ), params = params))
+    x <- got$x[match(i, got$i)]
+    ok[i] <- vapply(seq_along(i), function(j) {
+      !is.na(x[[j]]) && identical(value_text(x[[j]]), texts[i][[j]])
+    }, logical(1))
+  }
+  ok
+}
+
+#' Parse a vector of canonical texts to one class
+#'
+#' @param x Character. Canonical texts, possibly `NA`.
+#' @param r_class Character. The target class.
+#'
+#' @return A vector of class `r_class`.
+#'
+#' @keywords internal
+#' @noRd
+parse_value_vec <- function(x, r_class) {
+  out <- lapply(x, parse_value, r_class = r_class)
+  do.call(c, out)
+}

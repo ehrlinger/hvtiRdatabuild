@@ -110,3 +110,35 @@ deploy_echo <- function(con, corrections = case_corrections(),
   for (s in source_views_sql("stg_echo", key, types, "duckdb")) DBI::dbExecute(con, s)
   invisible(con)
 }
+
+# Generate and deploy every declared source's correction objects.
+deploy_sources <- function(con, cfg) {
+  for (s in names(cfg$sources)) {
+    st <- .corrections_statements(cfg, con, "duckdb")[[s]]
+    for (x in c(st$tables, st$views)) DBI::dbExecute(con, x)
+  }
+  invisible(con)
+}
+
+# Write a filled template; `rows` are its rows as named character vectors.
+write_submission <- function(cfg, rows, env = parent.frame()) {
+  path <- withr::local_tempfile(fileext = ".csv", .local_envir = env)
+  cols <- .template_columns(cfg)
+  df <- do.call(rbind, lapply(rows, function(r) {
+    out <- stats::setNames(as.list(rep(NA_character_, length(cols))), cols)
+    out[names(r)] <- as.list(r)
+    as.data.frame(out, check.names = FALSE, stringsAsFactors = FALSE)
+  }))
+  utils::write.csv(df, path, row.names = FALSE, na = "")
+  path
+}
+
+good_row <- function(...) {
+  r <- c(source = "stg_echo", mrn = "SYN201", encounter_date = "2020-01-01",
+         variable = "lvef", expected_prior = "30", expected_prior_missing = "0",
+         new_value = "35", new_value_missing = "0", evidence_type = "chart_review",
+         evidence_ref = "invented note 1", asserted_by = "reviewer_a")
+  over <- c(...)
+  r[names(over)] <- over
+  r
+}
