@@ -133,7 +133,8 @@ test_that("the mssql views compare names, character keys and counted values exac
     expect_match(view, "DATALENGTH(a.variable) = DATALENGTH(N'lvef')", fixed = TRUE)
     expect_match(view, paste0("b.[mrn] ", bin2, " = a.[mrn] ", bin2), fixed = TRUE)
     expect_match(view, paste0("k.variable ", bin2, " = a.variable ", bin2), fixed = TRUE)
-    expect_match(view, "CONCAT(DATALENGTH(new_value), '|', new_value COLLATE", fixed = TRUE)
+    expect_match(view, paste0("CONCAT(DATALENGTH(new_value), '|', ",
+                              "CAST(new_value AS nvarchar(max)) COLLATE"), fixed = TRUE)
     expect_no_match(view, "NOT IN", fixed = TRUE)
     # The numeric key is joined plainly, never collated.
     expect_match(view, "b.[visit_no] = a.[visit_no]", fixed = TRUE)

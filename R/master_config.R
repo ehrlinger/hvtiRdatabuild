@@ -134,8 +134,8 @@ read_master_config <- function(path) {
       stop("Source '", s, "' must be a plain view name (letters, digits, underscores).",
            call. = FALSE)
     }
-    k <- sources[[s]][["key"]]
-    if (!is.character(k) || !length(k) || anyNA(k) || !all(nzchar(k))) {
+    k <- if (is.list(sources[[s]])) sources[[s]][["key"]]
+    if (!is.character(k) || !length(k) || anyNA(k) || !all(nzchar(k)) || anyDuplicated(k)) {
       stop("Source '", s, "' must declare its key as one or more column names.",
            call. = FALSE)
     }
@@ -146,6 +146,11 @@ read_master_config <- function(path) {
   if (!is.null(deciders) &&
         (!is.character(deciders) || !length(deciders) || anyNA(deciders))) {
     stop("'deciders' must list who may decide corrections.", call. = FALSE)
+  }
+  if (!is.null(deciders) && (!all(nzchar(trimws(deciders))) ||
+                               FILLED_UPSTREAM_DECIDER %in% deciders)) {
+    stop("'deciders' must be non-empty names, and may not include 'filled_upstream'.",
+         call. = FALSE)
   }
 
   structure(list(

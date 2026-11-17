@@ -50,7 +50,12 @@ person has reviewed it and filled them in.
 \item \strong{Derived columns.} A differing cell in any other column is a candidate derivation,
 not a correction. It is counted per column in the \code{-derived.csv} file beside \code{path}.
 \item \strong{Patient-level sources.} When encounters of one patient disagree on such a source's
-cell, the candidates are dropped and counted as inconsistent.
+cell, the candidates are dropped and counted as inconsistent. Agreement is checked
+over the encounters present in \code{data}; an encounter dropped from \code{data} carries no
+study value, so it cannot contradict a candidate, and intake rechecks
+\code{expected_prior} against the source.
+\item \strong{Undeclared sources.} A lineage source not declared in \code{master.yml} is counted as
+derived, because this intake cannot correct it.
 }
 
 If the source has changed since the pull, intake refuses the row as \code{prior_mismatch}.

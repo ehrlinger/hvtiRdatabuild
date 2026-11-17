@@ -71,7 +71,7 @@ FILLED_UPSTREAM_DECIDER <- "filled_upstream" # nolint: object_name_linter.
 #'   con <- DBI::dbConnect(duckdb::duckdb())
 #'   DBI::dbWriteTable(con, "stg_demo", data.frame(mrn = "SYN1", lvef = 30))
 #'   cfg_path <- tempfile(fileext = ".yml")
-#'   writeLines(c("name: master_demo", "key: [mrn]", "snapshots: .",
+#'   writeLines(c("name: master_demo", "key: [mrn]", "snapshots: snaps",
 #'                "current: x.sas7bdat", "build_program: x.sas",
 #'                "sources:", "  stg_demo: {key: [mrn]}"), cfg_path)
 #'   generate_corrections_sql(read_master_config(cfg_path), con, tempdir(),
@@ -132,7 +132,7 @@ generate_corrections_sql <- function(config, con, dir, dialect = "mssql") {
 #'
 #' @examples
 #' cfg_path <- tempfile(fileext = ".yml")
-#' writeLines(c("name: master_demo", "key: [mrn]", "snapshots: .",
+#' writeLines(c("name: master_demo", "key: [mrn]", "snapshots: snaps",
 #'              "current: x.sas7bdat", "build_program: x.sas",
 #'              "sources:", "  stg_demo: {key: [mrn]}"), cfg_path)
 #' write_corrections_template(read_master_config(cfg_path), tempfile(fileext = ".csv"))
@@ -273,8 +273,9 @@ write_corrections_template <- function(config, path) {
 #' @seealso [write_corrections_template()], [decide_corrections()]
 #'
 #' @examples
-#' # See the "Corrections" section of the package reference; the round trip needs a
-#' # warehouse connection with the source views.
+#' # See the generate_corrections_sql() example and the reference group "Corrections to
+#' # source views (interim)"; the round trip needs a warehouse connection with the source
+#' # views.
 #'
 #' @export
 propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "mssql") {
@@ -353,7 +354,6 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
           parse_value_vec(typed[[k]][match(live, idx)], class(proto[[k]])[[1]])
         }))
       ))
-      q <- quoter(dialect)
       wanted <- unique(rows$variable[live])
       found <- run_step("look up source rows", DBI::dbGetQuery(
         con, .intake_lookup_sql(tmp$name, s, key, types, wanted, dialect)
@@ -566,6 +566,8 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
     for (s in intersect(names(config$sources), decisions$source)) {
       idx <- which(decisions$source == s)
       ids <- unique(decisions$correction_id[idx])
+      # The R match() below makes the comparison exact; a very large batch can hit SQL
+      # Server's 2100-parameter limit, which fails loud and rolls back.
       known <- run_step("look up corrections", DBI::dbGetQuery(con, sprintf(
         "SELECT correction_id, asserted_by FROM %s WHERE correction_id IN (%s)",
         q(.source_tables(s)$corrections), paste(rep("?", length(ids)), collapse = ", ")
@@ -573,8 +575,10 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
       asserter <- known$asserted_by[match(decisions$correction_id[idx], known$correction_id)]
       set(idx[is.na(asserter)], "unknown_correction")
       set(idx[!decisions$decision[idx] %in% DECISIONS], "invalid_decision")
-      set(idx[!decisions$decided_by[idx] %in% config$deciders], "not_decider")
-      set(idx[!is.na(asserter) & asserter == decisions$decided_by[idx]], "self_accepted")
+      who <- function(x) tolower(trimws(x))
+      set(idx[!who(decisions$decided_by[idx]) %in% who(config$deciders)], "not_decider")
+      set(idx[!is.na(asserter) & who(asserter) == who(decisions$decided_by[idx])],
+          "self_accepted")
       set(idx, "recordable")
     }
     if (dry_run || any(verdict != "recordable")) return(invisible(NULL))

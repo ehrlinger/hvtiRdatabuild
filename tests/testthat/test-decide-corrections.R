@@ -88,3 +88,14 @@ test_that("a fill-in upstream has caught up with is retired with a bake decision
                                        "decided_by = 'filled_upstream'"))
   expect_identical(last$decision, "bake")
 })
+
+test_that("asserter and decider are compared without case or padding", {
+  s <- decide_setup()
+  DBI::dbExecute(s$con, "UPDATE stg_echo_corrections SET asserted_by = 'JSmith'
+                         WHERE correction_id = 'c04'")
+  s$cfg$deciders <- c(s$cfg$deciders, "jsmith")
+  out <- decide_corrections(s$cfg, s$con,
+                            decisions_df(correction_id = "c04", decided_by = " jsmith "),
+                            dialect = "duckdb")
+  expect_identical(out$verdicts$verdict, "self_accepted")
+})

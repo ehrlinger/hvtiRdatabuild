@@ -55,8 +55,9 @@ Output is verdicts and counts, never a key or a value.
 and the tables unchanged. Replaces the deprecated \code{\link[=propose_correction]{propose_correction()}}.
 }
 \examples{
-# See the "Corrections" section of the package reference; the round trip needs a
-# warehouse connection with the source views.
+# See the generate_corrections_sql() example and the reference group "Corrections to
+# source views (interim)"; the round trip needs a warehouse connection with the source
+# views.
 
 }
 \seealso{

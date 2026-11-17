@@ -29,7 +29,7 @@ never commit it to a repository.
 }
 \examples{
 cfg_path <- tempfile(fileext = ".yml")
-writeLines(c("name: master_demo", "key: [mrn]", "snapshots: .",
+writeLines(c("name: master_demo", "key: [mrn]", "snapshots: snaps",
              "current: x.sas7bdat", "build_program: x.sas",
              "sources:", "  stg_demo: {key: [mrn]}"), cfg_path)
 write_corrections_template(read_master_config(cfg_path), tempfile(fileext = ".csv"))

@@ -86,11 +86,13 @@ Names are indicative; the schema layout is agreed with data engineering.
 - **Intake stores a canonical text form.** Each value is parsed against the source column's
   type and written back as canonical text, so text agreement (G1) is value agreement, and
   `"3.0"` and `"3"` corroborate.
-- **Names and keys compare exactly on SQL Server.** The generated views, intake and
-  decisions compare variable names and character keys with `Latin1_General_BIN2` collation
+- **Names and keys compare exactly on SQL Server.** The generated views and intake
+  compare variable names and character keys with `Latin1_General_BIN2` collation
   plus a `DATALENGTH` check, in every comparison, join, distinct count and `GROUP BY`. A
   key that differs only in case or trailing spaces is a different key, as in the R
-  reference.
+  reference. Decisions compare `correction_id`, not keys or variable
+  names: the SQL lookup uses the default collation, and the R `match()` that follows makes
+  the comparison exact.
 - **The views assume intake-canonical values.** They cast stored text with `TRY_CAST` at the
   column's declared type, and intake refuses any value that does not cast back unchanged.
   If a column's type changes after a correction is accepted, the SQL may round where the R
@@ -385,7 +387,7 @@ A master whose current deployment has no passing gate record is not offered to s
   row fails: `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact`,
   `derived_variable`, `unknown_source`, `invalid_field`, `no_variable` or `prior_mismatch`.
   A decision by the correction's own asserter is refused
-  (`self_accepted`). Verdicts only, no values in any message.
+  (`self_accepted`); decisions also refuse `not_decider` and `repeated_correction`. Verdicts only, no values in any message.
 - A cohort match with duplicates stops the pull (§5.4).
 
 ## 9. Testing and PHI

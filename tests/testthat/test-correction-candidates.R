@@ -88,3 +88,17 @@ test_that("a study row not in the pull stops, and no value is printed", {
   expect_s3_class(err, "hvtiRdatabuild_unknown_units")
   expect_false(grepl("SYN", conditionMessage(err)))
 })
+
+test_that("a master column with two lineage sources stops, naming only the column", {
+  s <- candidates_setup()
+  DBI::dbAppendTable(s$con, "master_demo_lineage", data.frame(
+    master_column = "age", source = "stg_pat", source_column = "age_group",
+    stringsAsFactors = FALSE
+  ))
+  err <- tryCatch(study_correction_candidates(s$cfg, s$con, s$frozen, s$data,
+                                              withr::local_tempfile(fileext = ".csv"),
+                                              dialect = "duckdb"),
+                  error = function(e) e)
+  expect_s3_class(err, "hvtiRdatabuild_ambiguous_lineage")
+  expect_false(grepl("stg_pat|SYN", conditionMessage(err)))
+})

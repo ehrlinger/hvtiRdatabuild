@@ -130,3 +130,15 @@ test_that("a source needs a key and a plain name", {
   expect_error(read_master_config(write_cfg(c(base_cfg, "deciders: []"))),
                "'deciders' must list")
 })
+
+test_that("a malformed source or decider is refused", {
+  expect_error(read_master_config(write_cfg(c(base_cfg, "sources:", "  stg_echo: mrn"))),
+               "must declare its key")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "sources:",
+                                              "  stg_echo: {key: [mrn, mrn]}"))),
+               "must declare its key")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "deciders: ['']"))),
+               "non-empty")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "deciders: [filled_upstream]"))),
+               "filled_upstream")
+})

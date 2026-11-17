@@ -13,7 +13,12 @@
 #' - **Derived columns.** A differing cell in any other column is a candidate derivation,
 #'   not a correction. It is counted per column in the `-derived.csv` file beside `path`.
 #' - **Patient-level sources.** When encounters of one patient disagree on such a source's
-#'   cell, the candidates are dropped and counted as inconsistent.
+#'   cell, the candidates are dropped and counted as inconsistent. Agreement is checked
+#'   over the encounters present in `data`; an encounter dropped from `data` carries no
+#'   study value, so it cannot contradict a candidate, and intake rechecks
+#'   `expected_prior` against the source.
+#' - **Undeclared sources.** A lineage source not declared in `master.yml` is counted as
+#'   derived, because this intake cannot correct it.
 #'
 #' If the source has changed since the pull, intake refuses the row as `prior_mismatch`.
 #' Nothing is appended here, and only counts are printed. The files hold identifiers and
@@ -64,7 +69,8 @@ study_correction_candidates <- function(config, con, pull, data, path,
     commit = .read_deployment(con, paste0(config$name, "_deployment"), dialect),
     lineage = run_step("read lineage", DBI::dbGetQuery(con, paste(
       "SELECT master_column, source, source_column FROM",
-      q(paste0(config$name, "_lineage"))
+      q(paste0(config$name, "_lineage")),
+      "ORDER BY master_column, source, source_column"
     )))
   ))
   if (!identical(read$commit, prov$sql_commit)) {
@@ -72,6 +78,12 @@ study_correction_candidates <- function(config, con, pull, data, path,
            "since the pull, so its lineage may differ. Re-pull, then compare.")
   }
   lineage <- read$lineage
+  pairs <- unique(lineage[c("master_column", "source", "source_column")])
+  if (anyDuplicated(pairs$master_column)) {
+    .abort("ambiguous_lineage", "study_correction_candidates(): a master column ",
+           "has more than one lineage source, e.g. `",
+           pairs$master_column[anyDuplicated(pairs$master_column)], "`.")
+  }
   base <- as.data.frame(arrow::read_parquet(pull))
   if (!all(key %in% names(base)) || !all(key %in% names(data))) {
     .abort("key_columns", "study_correction_candidates(): the pull and `data` must both ",

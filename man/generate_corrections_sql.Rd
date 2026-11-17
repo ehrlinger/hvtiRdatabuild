@@ -43,7 +43,7 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   con <- DBI::dbConnect(duckdb::duckdb())
   DBI::dbWriteTable(con, "stg_demo", data.frame(mrn = "SYN1", lvef = 30))
   cfg_path <- tempfile(fileext = ".yml")
-  writeLines(c("name: master_demo", "key: [mrn]", "snapshots: .",
+  writeLines(c("name: master_demo", "key: [mrn]", "snapshots: snaps",
                "current: x.sas7bdat", "build_program: x.sas",
                "sources:", "  stg_demo: {key: [mrn]}"), cfg_path)
   generate_corrections_sql(read_master_config(cfg_path), con, tempdir(),

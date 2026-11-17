@@ -249,7 +249,8 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
   # SQL Server's default collation would count "Yes" and "yes" as one value.
   # BIN2 still ignores trailing spaces, so the byte length joins the value counted.
   distinct_value <- if (identical(dialect, "mssql")) {
-    "CONCAT(DATALENGTH(new_value), '|', new_value COLLATE Latin1_General_BIN2)"
+    paste0("CONCAT(DATALENGTH(new_value), '|', ",
+           "CAST(new_value AS nvarchar(max)) COLLATE Latin1_General_BIN2)")
   } else {
     "new_value"
   }
