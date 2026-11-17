@@ -1,3 +1,38 @@
+# hvtiRdatabuild 0.3.6
+
+* New interim tools for correcting warehouse source views, superseded by the HVTR
+  registry: `generate_corrections_sql()` writes each declared source's corrections tables
+  and its corrected, applied, stale and conflicts views, covering every column;
+  `write_corrections_template()`, `propose_corrections()` and `decide_corrections()` take
+  a whole submission and refuse it whole if any row fails, with a verdict per row and no
+  values in any message; `retire_filled_corrections()` retires fill-ins upstream has
+  caught up with; and `study_correction_candidates()` turns a study's own fixes into
+  candidate corrections against its frozen pull. In these views, accepted corrections to one cell
+  that disagree do not resolve to the latest: neither applies until one is superseded.
+* `read_master_config()` reads `sources` (correctable source views and their keys) and
+  `deciders` from `master.yml`.
+* On SQL Server, `table_types()` now carries a decimal column's precision and scale, so the
+  master corrections view built by `lift_master()` no longer casts to a bare `decimal`,
+  which SQL Server reads as `decimal(18,0)` and rounds.
+* `parse_value()` now parses logical columns.
+
+* `propose_corrections()` now checks that each key survives the warehouse's cast to its
+  key column unchanged, as it already did for values. Before, an integer key `1.2` loaded
+  as `1`, so a correction could name, and after acceptance change, a different row. Such
+  a key is now `unknown_key`. A submitted date, timestamp or number must also be the
+  whole of its supported form (`YYYY-MM-DD`, that plus `HH:MM[:SS[.fff]]`, or a plain
+  decimal): `2020-01-01junk` was read as `2020-01-01` and could name that row, and
+  `0x23` was read as 35. Such a key is `unknown_key` and such a value `does_not_cast`.
+* `study_correction_candidates()` refuses a missing key in the pull or in `data`
+  (`missing_key`); before, a missing key read as the text `"NA"` and could match a real
+  key of that value. Its composite keys are now collision-safe, whatever the values
+  contain.
+
+* `propose_corrections()`, `decide_corrections()`, `retire_filled_corrections()`,
+  `study_correction_candidates()` and `read_pull_provenance()` now have examples that
+  run, on synthetic data in DuckDB: a whole propose, decide and retire round trip, and a
+  study fix turned into a candidate correction. Their examples were comments only.
+
 # hvtiRdatabuild 0.3.5
 
 * New `pull_master()` selects a cohort and reads its rows from a master view in one
