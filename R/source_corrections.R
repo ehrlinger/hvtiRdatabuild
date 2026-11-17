@@ -9,6 +9,19 @@
 # Who records a G7 retirement. Not a person, so it can never be in `deciders`.
 FILLED_UPSTREAM_DECIDER <- "filled_upstream" # nolint: object_name_linter.
 
+#' A short id: a prefix and the first 20 hex digits of the SHA-1 of `parts`
+#'
+#' @param prefix Character. One letter.
+#' @param parts A list to hash.
+#'
+#' @return A length-one character.
+#'
+#' @keywords internal
+#' @noRd
+.short_id <- function(prefix, parts) {
+  paste0(prefix, substr(digest::digest(parts, algo = "sha1"), 1, 20))
+}
+
 #' Each declared source's correction statements
 #'
 #' @param config A `master_config`.
@@ -282,12 +295,13 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
   tpl <- .read_template(config, file)
   rows <- tpl$rows
   n <- nrow(rows)
-  verdict <- rep(NA_character_, n)
+  st <- new.env(parent = emptyenv())
+  st$verdict <- rep(NA_character_, n)
   # Give rows `i` (logical, or integer positions) verdict `v` unless they already have one,
   # so each row keeps the first verdict it earns.
   set <- function(i, v) {
     if (!is.logical(i)) i <- seq_len(n) %in% i
-    verdict[i & is.na(verdict)] <<- v
+    st$verdict[i & is.na(st$verdict)] <- v
   }
   keys_all <- unique(unlist(lapply(config$sources, `[[`, "key"), use.names = FALSE))
 
@@ -312,11 +326,11 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
   rows$new_value[rows$new_value_missing %in% "1"] <- NA_character_
 
   master_cols <- names(run_step("read master columns", table_types(con, config$name)))
-  out_rows <- list()
+  st$out_rows <- list()
   now <- Sys.time()
   write_all <- function() {
-    for (s in intersect(names(config$sources), rows$source[is.na(verdict)])) {
-      idx <- which(rows$source == s & is.na(verdict))
+    for (s in intersect(names(config$sources), rows$source[is.na(st$verdict)])) {
+      idx <- which(rows$source == s & is.na(st$verdict))
       key <- config$sources[[s]]$key
       types <- run_step("read source columns", table_types(con, s))
       proto <- run_step("read source types", DBI::dbGetQuery(
@@ -342,7 +356,7 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         (if (length(other)) Reduce(`|`, lapply(other, function(k) !is.na(rows[[k]][idx])))
          else FALSE)
       set(idx[incomplete], "unknown_key")
-      live <- idx[is.na(verdict[idx])]
+      live <- idx[is.na(st$verdict[idx])]
       if (!length(live)) next
 
       tmp <- .intake_temp(dialect, types[key])
@@ -395,17 +409,15 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         r$evidence_ref <- rows$evidence_ref[[i]]
         r$asserted_by <- rows$asserted_by[[i]]
         r$asserted_on <- now
-        r$correction_id <- paste0("c", substr(digest::digest(
-          list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")), algo = "sha1"
-        ), 1, 20))
+        r$correction_id <- .short_id("c", list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")))
         r$.row <- i
-        out_rows[[length(out_rows) + 1L]] <<- r
+        st$out_rows[[length(st$out_rows) + 1L]] <- r
       }
 
       # The warehouse's own cast decides, through the column's SQL type, so a value R
       # accepts but the column would round, overflow or truncate is refused here, not
       # discovered as a silently different value in the corrected view.
-      mine <- out_rows[vapply(out_rows, `[[`, character(1), "source") == s]
+      mine <- st$out_rows[vapply(st$out_rows, `[[`, character(1), "source") == s]
       for (v in unique(vapply(mine, `[[`, character(1), "variable"))) {
         rv <- mine[vapply(mine, `[[`, character(1), "variable") == v]
         texts <- c(vapply(rv, `[[`, character(1), "expected_prior"),
@@ -417,13 +429,14 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
       }
       set(vapply(mine, `[[`, integer(1), ".row"), "appendable")
     }
-    out_rows <<- out_rows[verdict[vapply(out_rows, `[[`, integer(1), ".row")] ==
-                            "appendable"]
-    out_rows <<- lapply(out_rows, function(r) r[setdiff(names(r), ".row")])
-    stopifnot(!anyNA(verdict))
-    if (dry_run || any(verdict != "appendable")) return(invisible(NULL))
-    for (s in unique(vapply(out_rows, `[[`, character(1), "source"))) {
-      batch <- do.call(rbind, out_rows[vapply(out_rows, `[[`, character(1), "source") == s])
+    row_of <- vapply(st$out_rows, `[[`, integer(1), ".row")
+    st$out_rows <- st$out_rows[st$verdict[row_of] == "appendable"]
+    st$out_rows <- lapply(st$out_rows, function(r) r[setdiff(names(r), ".row")])
+    stopifnot(!anyNA(st$verdict))
+    if (dry_run || any(st$verdict != "appendable")) return(invisible(NULL))
+    for (s in unique(vapply(st$out_rows, `[[`, character(1), "source"))) {
+      from_s <- vapply(st$out_rows, `[[`, character(1), "source") == s
+      batch <- do.call(rbind, st$out_rows[from_s])
       run_step("append corrections",
                DBI::dbAppendTable(con, .source_tables(s)$corrections, batch))
     }
@@ -431,17 +444,17 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
   }
   .with_snapshot_txn(con, dialect, write_all())
 
-  verdicts <- data.frame(row = seq_len(n), source = rows$source, verdict = verdict,
+  verdicts <- data.frame(row = seq_len(n), source = rows$source, verdict = st$verdict,
                          stringsAsFactors = FALSE)
-  counts <- table(verdict)
+  counts <- table(st$verdict)
   .hvti_inform("propose_corrections(): ",
                paste(sprintf("%s %d", names(counts), counts), collapse = ", "), ".")
-  if (!dry_run && any(verdict != "appendable")) {
+  if (!dry_run && any(st$verdict != "appendable")) {
     .abort("corrections_refused", "propose_corrections(): the file was refused whole and ",
-           "nothing was written: ", sum(verdict != "appendable"), " of ", n,
+           "nothing was written: ", sum(st$verdict != "appendable"), " of ", n,
            " row(s) are not appendable. See the dry run's verdicts.")
   }
-  ids <- vapply(out_rows, `[[`, character(1), "correction_id")
+  ids <- vapply(st$out_rows, `[[`, character(1), "correction_id")
   invisible(list(verdicts = verdicts,
                  appended = if (dry_run) 0L else length(ids),
                  correction_ids = if (dry_run) character() else ids,
@@ -550,10 +563,11 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
   }
   if (!"reason" %in% names(decisions)) decisions$reason <- NA_character_
   n <- nrow(decisions)
-  verdict <- rep(NA_character_, n)
+  st <- new.env(parent = emptyenv())
+  st$verdict <- rep(NA_character_, n)
   set <- function(i, v) {
     if (!is.logical(i)) i <- seq_len(n) %in% i
-    verdict[i & is.na(verdict)] <<- v
+    st$verdict[i & is.na(st$verdict)] <- v
   }
   set(!decisions$source %in% names(config$sources), "unknown_source")
   # One correction, one decision per batch: rows sharing a decided_on would be ordered by
@@ -581,14 +595,15 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
           "self_accepted")
       set(idx, "recordable")
     }
-    if (dry_run || any(verdict != "recordable")) return(invisible(NULL))
+    if (dry_run || any(st$verdict != "recordable")) return(invisible(NULL))
     for (s in unique(decisions$source)) {
       idx <- which(decisions$source == s)
       rows <- data.frame(
-        decision_id = vapply(idx, function(i) paste0("d", substr(digest::digest(
-          list(decisions$correction_id[[i]], decisions$decision[[i]],
-               decisions$decided_by[[i]], i, format(now, "%Y-%m-%d %H:%M:%OS6")),
-          algo = "sha1"), 1, 20)), character(1)),
+        decision_id = vapply(idx, function(i) {
+          .short_id("d", list(decisions$correction_id[[i]], decisions$decision[[i]],
+                              decisions$decided_by[[i]], i,
+                              format(now, "%Y-%m-%d %H:%M:%OS6")))
+        }, character(1)),
         correction_id = decisions$correction_id[idx], decision = decisions$decision[idx],
         decided_by = decisions$decided_by[idx], decided_on = now,
         reason = as.character(decisions$reason[idx]), stringsAsFactors = FALSE
@@ -599,15 +614,15 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
     invisible(NULL)
   }
   .with_snapshot_txn(con, dialect, record())
-  counts <- table(verdict)
+  counts <- table(st$verdict)
   .hvti_inform("decide_corrections(): ",
                paste(sprintf("%s %d", names(counts), counts), collapse = ", "), ".")
-  if (!dry_run && any(verdict != "recordable")) {
+  if (!dry_run && any(st$verdict != "recordable")) {
     .abort("decisions_refused", "decide_corrections(): the batch was refused whole and ",
-           "nothing was written: ", sum(verdict != "recordable"), " of ", n,
+           "nothing was written: ", sum(st$verdict != "recordable"), " of ", n,
            " row(s) are not recordable.")
   }
-  invisible(list(verdicts = data.frame(row = seq_len(n), verdict = verdict,
+  invisible(list(verdicts = data.frame(row = seq_len(n), verdict = st$verdict,
                                        stringsAsFactors = FALSE),
                  recorded = if (dry_run) 0L else n))
 }
@@ -652,9 +667,10 @@ retire_filled_corrections <- function(config, con, source, dry_run = TRUE,
     )))$correction_id
     if (!dry_run && length(ids)) {
       rows <- data.frame(
-        decision_id = vapply(ids, function(id) paste0("d", substr(digest::digest(
-          list(id, "bake", FILLED_UPSTREAM_DECIDER, format(now, "%Y-%m-%d %H:%M:%OS6")),
-          algo = "sha1"), 1, 20)), character(1)),
+        decision_id = vapply(ids, function(id) {
+          .short_id("d", list(id, "bake", FILLED_UPSTREAM_DECIDER,
+                              format(now, "%Y-%m-%d %H:%M:%OS6")))
+        }, character(1)),
         correction_id = ids, decision = "bake", decided_by = FILLED_UPSTREAM_DECIDER,
         decided_on = now, reason = "The source now holds the corrected value.",
         stringsAsFactors = FALSE
