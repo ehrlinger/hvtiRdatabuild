@@ -121,7 +121,7 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   unlink(c(cfg_path, sub, sql_dir), recursive = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpBgss9g/duckdb
+#> ℹ /tmp/RtmpEjXK56/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
