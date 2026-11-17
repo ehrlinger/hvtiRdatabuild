@@ -162,3 +162,31 @@ test_that("str on cohort records reports counts without member values", {
   expect_match(printed, "cohort_record")
   expect_false(grepl("SYN001|SYN002", printed))
 })
+
+test_that("a review stage is a valid stage source", {
+  # No PHI: identifiers are invented.
+  rec <- new_cohort_record(
+    members = data.frame(patient_id = c("SYN1", "SYN2"), stage_id = "s1",
+                         included = TRUE, reason = NA_character_),
+    stages = data.frame(stage_id = "s1", order = 1L, label = "Selected",
+                        source = "upstream", provenance = "fixture"),
+    patient_id_col = "id"
+  )
+  rec <- append_cohort_stage(
+    rec,
+    data.frame(stage_id = "r1", order = 2L, label = "Chart review", source = "review",
+               provenance = "decisions file sha256 0"),
+    data.frame(patient_id = c("SYN1", "SYN2"), included = c(TRUE, FALSE),
+               reason = c(NA, "excluded at review: R1"))
+  )
+  expect_identical(rec$stages$source, c("upstream", "review"))
+  expect_error(
+    append_cohort_stage(
+      rec,
+      data.frame(stage_id = "x", order = 3L, label = "X", source = "chart",
+                 provenance = "p"),
+      data.frame(patient_id = "SYN1", included = TRUE, reason = NA_character_)
+    ),
+    "upstream, build, derive, or review"
+  )
+})

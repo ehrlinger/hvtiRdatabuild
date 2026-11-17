@@ -51,6 +51,21 @@ reference:
   - freeze_study_pull
   - read_pull_provenance
 
+- title: "Pull: Cohort criteria"
+  desc: >
+    Declare inclusion and exclusion criteria for a cohort query. Each is evaluated in
+    the warehouse inside the pull, counted as its own stage, and states every clinical
+    choice itself.
+  contents:
+  - criterion
+  - master_row
+  - view_rows
+  - any_of
+  - local_criterion
+  - review_criterion
+  - review_list
+  - apply_review
+
 - title: "Build: Assemble and Derive"
   desc: >
     Join the pulled modules into a study's built dataset, run its study-specific

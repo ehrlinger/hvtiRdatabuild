@@ -52,7 +52,11 @@ ending with the \code{in_master} stage) and \code{meta}: the family's provenance
 (\code{package}, \code{version}, \code{sha}, \code{method}, \code{seed}, \code{rng_kind}, \code{time}), then \code{master},
 \code{sql_commit}, \code{applied_correction_ids}, \code{corrections_in_effect},
 \code{parity_verified_at}, \code{read_at}, \code{columns}, \code{cohort_definition},
-\code{study_config_sha256}, \code{n_cohort}, \code{n_matched} and \code{n_unmatched}. The same pull
+\code{study_config_sha256}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched}, \code{status}
+(\code{"complete"}, or \code{"awaiting review"} while chart review is pending; see
+\code{\link[=apply_review]{apply_review()}}) and \code{review_decisions_sha256} (\code{NA} until review is applied).
+\code{review} holds the review \code{queue} (\code{cohort_unit}, \code{criterion_id}) and the declared
+\code{criteria} (\code{criterion_id}, \code{label}, \code{role}, \code{kind}). The same pull
 fields without the provenance record are also in \code{provenance}, which is deprecated
 and goes in the next release; read \code{meta}.
 \code{corrections_in_effect} holds every correction id applied anywhere in the master in
@@ -81,8 +85,14 @@ The study configuration's SHA-256 is recorded when the pull runs, so
 
 The returned cohort ends with an \code{in_master} stage that excludes units with no master
 row, so the data match the active cohort exactly. A unit matching more than one
-master row stops the pull, because the key is meant to be unique. Nothing in an error
-or in printed output names a patient.
+master row stops the pull, because the key is meant to be unique; this is checked
+before any criterion runs, so a criterion cannot filter a duplicate out of sight.
+Nothing in an error or in printed output names a patient.
+
+A query's criteria are evaluated in the warehouse, inside the same transaction: each
+sets a flag on the session cohort table, and only the keys and flags are read back.
+The pull refuses itself if the stages R rebuilds from the flags disagree with the
+warehouse.
 }
 \examples{
 \donttest{

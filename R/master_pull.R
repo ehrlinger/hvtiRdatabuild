@@ -26,17 +26,25 @@
   paste(vapply(strsplit(name, ".", fixed = TRUE)[[1]], q, character(1)), collapse = ".")
 }
 
-.cohort_temp <- function(dialect) {
+.cohort_temp <- function(dialect, n_flags = 0L) {
+  flag_cols <- function(type) {
+    if (!n_flags) return("")
+    paste0(", crit_", seq_len(n_flags), " ", type, collapse = "")
+  }
   switch(dialect,
          mssql = list(
            name = "#study_cohort",
-           create = paste("CREATE TABLE #study_cohort (mrn nvarchar(128) NOT NULL,",
-                          "encounter_date date NOT NULL, prior_qualifying tinyint NOT NULL)")
+           create = paste0("CREATE TABLE #study_cohort (mrn nvarchar(128) NOT NULL, ",
+                           "encounter_date date NOT NULL, prior_qualifying tinyint NOT ",
+                           "NULL, active tinyint NOT NULL DEFAULT 1",
+                           flag_cols("tinyint NULL"), ")")
          ),
          duckdb = list(
            name = "study_cohort",
-           create = paste("CREATE TEMP TABLE study_cohort (mrn VARCHAR NOT NULL,",
-                          "encounter_date DATE NOT NULL, prior_qualifying TINYINT NOT NULL)")
+           create = paste0("CREATE TEMP TABLE study_cohort (mrn VARCHAR NOT NULL, ",
+                           "encounter_date DATE NOT NULL, prior_qualifying TINYINT NOT ",
+                           "NULL, active TINYINT NOT NULL DEFAULT 1",
+                           flag_cols("TINYINT"), ")")
          ))
 }
 
@@ -109,7 +117,24 @@
     sprintf("FROM %s m WHERE (%s) AND m.%s IS NOT NULL AND m.%s BETWEEN ? AND ?",
             master_q, query$qualifying, mrn_q, date_q),
     ") q",
-    if (identical(query$index, "first")) "WHERE q.rn = 1" else ""
+    if (identical(query$index, "first") && !identical(query$index_on, "eligible")) {
+      "WHERE q.rn = 1"
+    } else {
+      ""
+    }
+  )
+}
+
+# Count the candidate units that match more than one master row. Run before any
+# criterion: a criterion aggregates a unit's rows, so a duplicate could otherwise be
+# filtered out of sight.
+.duplicate_keys_sql <- function(tmp, master_q, mrn_q, date_q) {
+  paste(
+    "SELECT COUNT(*) AS n FROM (SELECT c.mrn, c.encounter_date",
+    "FROM (SELECT DISTINCT mrn, encounter_date FROM", tmp, ") c",
+    sprintf("INNER JOIN %s m ON m.%s = c.mrn AND m.%s = c.encounter_date", master_q,
+            mrn_q, date_q),
+    "GROUP BY c.mrn, c.encounter_date HAVING COUNT(*) > 1) d"
   )
 }
 
@@ -166,8 +191,14 @@
 #'
 #' The returned cohort ends with an `in_master` stage that excludes units with no master
 #' row, so the data match the active cohort exactly. A unit matching more than one
-#' master row stops the pull, because the key is meant to be unique. Nothing in an error
-#' or in printed output names a patient.
+#' master row stops the pull, because the key is meant to be unique; this is checked
+#' before any criterion runs, so a criterion cannot filter a duplicate out of sight.
+#' Nothing in an error or in printed output names a patient.
+#'
+#' A query's criteria are evaluated in the warehouse, inside the same transaction: each
+#' sets a flag on the session cohort table, and only the keys and flags are read back.
+#' The pull refuses itself if the stages R rebuilds from the flags disagree with the
+#' warehouse.
 #'
 #' @param con A [DBI::DBIConnection-class] to the warehouse, or to duckdb in tests.
 #' @param master Character. The master view, optionally schema-qualified
@@ -190,7 +221,11 @@
 #'   (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, `time`), then `master`,
 #'   `sql_commit`, `applied_correction_ids`, `corrections_in_effect`,
 #'   `parity_verified_at`, `read_at`, `columns`, `cohort_definition`,
-#'   `study_config_sha256`, `n_cohort`, `n_matched` and `n_unmatched`. The same pull
+#'   `study_config_sha256`, `n_cohort`, `n_matched`, `n_unmatched`, `status`
+#'   (`"complete"`, or `"awaiting review"` while chart review is pending; see
+#'   [apply_review()]) and `review_decisions_sha256` (`NA` until review is applied).
+#'   `review` holds the review `queue` (`cohort_unit`, `criterion_id`) and the declared
+#'   `criteria` (`criterion_id`, `label`, `role`, `kind`). The same pull
 #'   fields without the provenance record are also in `provenance`, which is deprecated
 #'   and goes in the next release; read `meta`.
 #'   `corrections_in_effect` holds every correction id applied anywhere in the master in
@@ -255,17 +290,25 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     stop("'cohort' must be a cohort_query or a cohort_record.", call. = FALSE)
   }
   supplied <- if (is_query) NULL else split_cohort_unit(.unit_cohort_active(cohort))
+  compiled <- .compile_criteria(if (is_query) cohort$criteria else list())
 
   q <- quoter(dialect)
-  tmp <- .cohort_temp(dialect)
+  tmp <- .cohort_temp(dialect, compiled$n_flags)
   master_q <- .qualified_name(master, dialect)
   cols <- unique(c(mrn_col, date_col, var_cols))
   select_sql <- paste0("m.", vapply(cols, q, character(1)), collapse = ", ")
-  join_sql <- sprintf("m.%s = c.mrn AND m.%s = c.encounter_date", q(mrn_col), q(date_col))
-  if (is_query && identical(cohort$prior, "exclude")) {
-    join_sql <- paste(join_sql, "AND c.prior_qualifying = 0")
-  }
+  join_sql <- sprintf("m.%s = c.mrn AND m.%s = c.encounter_date AND c.active = 1",
+                      q(mrn_col), q(date_col))
 
+  check_keys <- function() {
+    n <- run_step("check master keys", DBI::dbGetQuery(
+      con, .duplicate_keys_sql(tmp$name, master_q, q(mrn_col), q(date_col))
+    ))$n
+    if (n > 0) {
+      stop(n, " cohort unit(s) matched more than one master row; the key is meant to be ",
+           "unique. Nothing was pulled.", call. = FALSE)
+    }
+  }
   read <- .with_snapshot_txn(con, dialect, {
     read_at <- run_step("read time", DBI::dbGetQuery(con, .read_now_sql(dialect)))$read_at
     commit <- .read_deployment(con, deployment_view, dialect)
@@ -276,8 +319,30 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
         con, .select_units_sql(cohort, master_q, tmp$name, q(mrn_col), q(date_col)),
         params = list(cohort$epoch[[1]], cohort$epoch[[1]], cohort$epoch[[2]])
       ))
-      selected <- run_step("read cohort keys", DBI::dbGetQuery(
-        con, paste("SELECT mrn, encounter_date, prior_qualifying FROM", tmp$name)
+      check_keys()
+      if (identical(cohort$prior, "exclude")) {
+        run_step("set aside earlier-qualifying units", DBI::dbExecute(
+          con, paste("UPDATE", tmp$name, "SET active = 0 WHERE prior_qualifying = 1")
+        ))
+      }
+      for (st in compiled$stages) {
+        for (leaf in .node_leaves(st$node)) {
+          run_step(paste("evaluate criterion", st$id), DBI::dbExecute(
+            con, .leaf_update_sql(leaf, tmp$name, master_q, q(mrn_col), q(date_col),
+                                  dialect)
+          ))
+        }
+        run_step(paste("apply criterion", st$id),
+                 DBI::dbExecute(con, .deactivate_sql(tmp$name, st)))
+      }
+      flag_sql <- if (compiled$n_flags) {
+        paste0(", crit_", seq_len(compiled$n_flags), collapse = "")
+      } else {
+        ""
+      }
+      selected <- run_step("read cohort keys and flags", DBI::dbGetQuery(
+        con, paste0("SELECT mrn, encounter_date, prior_qualifying, active", flag_sql,
+                    " FROM ", tmp$name)
       ))
       if (!nrow(selected)) {
         stop("No qualifying encounters fall in the epoch. Check the cohort query.",
@@ -290,15 +355,13 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
               "(mrn, encounter_date, prior_qualifying) VALUES (?, ?, 0)"),
         params = list(supplied$mrn, supplied$encounter_date)
       ))
+      check_keys()
       selected <- NULL
     }
     data <- run_step("read master", DBI::dbGetQuery(con, sprintf(
       "SELECT %s FROM %s m INNER JOIN %s c ON %s", select_sql, master_q, tmp$name, join_sql
     )))
-    applied_join <- "a.mrn = c.mrn AND a.encounter_date = c.encounter_date"
-    if (is_query && identical(cohort$prior, "exclude")) {
-      applied_join <- paste(applied_join, "AND c.prior_qualifying = 0")
-    }
+    applied_join <- "a.mrn = c.mrn AND a.encounter_date = c.encounter_date AND c.active = 1"
     applied <- run_step("read applied corrections", DBI::dbGetQuery(con, sprintf(
       "SELECT DISTINCT a.correction_id FROM %s a INNER JOIN %s c ON %s",
       .qualified_name(applied_view, dialect), tmp$name, applied_join
@@ -321,7 +384,26 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
          in_effect = sort(unique(as.character(in_effect$correction_id))))
   })
 
-  base <- if (is_query) .query_cohort(cohort, read$selected, master, read$commit) else cohort
+  queue <- data.frame(cohort_unit = character(), criterion_id = character(),
+                      stringsAsFactors = FALSE)
+  if (is_query) {
+    staged <- .criteria_stages(.query_cohort(cohort, read$selected, master, read$commit),
+                               compiled, read$selected)
+    base <- staged$cohort
+    queue <- staged$queue
+    sql_units <- cohort_unit_id(as.character(read$selected$mrn),
+                                as.Date(read$selected$encounter_date))
+    sql_active <- sql_units[read$selected$active == 1L]
+    if (!setequal(sql_active, .active_units(base))) {
+      .abort("criteria_disagree",
+             "pull_master(): the warehouse and R disagree on the active cohort (",
+             length(setdiff(sql_active, .active_units(base))), " and ",
+             length(setdiff(.active_units(base), sql_active)), " unit(s)). This is a ",
+             "package defect; nothing was pulled.")
+    }
+  } else {
+    base <- cohort
+  }
   last <- utils::tail(base$stages$stage_id[order(base$stages$order)], 1L)
   active <- base$members$patient_id[base$members$stage_id == last & base$members$included]
   found <- active %in% read$data$cohort_unit
@@ -335,10 +417,33 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
                                     read_at),
                stringsAsFactors = FALSE),
     data.frame(patient_id = active, included = found,
-               reason = ifelse(found, NA_character_, "no row in the master view"),
+               reason = replace(rep(NA_character_, length(active)), !found,
+                                "no row in the master view"),
                stringsAsFactors = FALSE)
   )
-  data <- read$data[read$data$cohort_unit %in% active[found], , drop = FALSE]
+  locals <- Filter(function(cr) identical(cr$kind, "local"),
+                   if (is_query) cohort$criteria else list())
+  if (length(locals)) {
+    local_out <- .local_stages(final, locals)
+    final <- local_out$cohort
+    queue <- rbind(queue, local_out$queue)
+  }
+  final_active <- .active_units(final)
+  # A routed unit stays queued even if a later stage excluded it: until review, which
+  # stage removed it first is not known. apply_review() settles it.
+  criteria <- if (is_query) cohort$criteria else list()
+  has_review <- any(vapply(criteria, function(cr) identical(cr$kind, "review"),
+                           logical(1)))
+  status <- if (nrow(queue) || (has_review && length(final_active))) {
+    "awaiting review"
+  } else {
+    "complete"
+  }
+  # First eligible is chosen last. With review pending, apply_review() chooses it.
+  if (is_query && identical(cohort$index_on, "eligible") && identical(status, "complete")) {
+    final <- .index_eligible_stage(final)
+  }
+  data <- read$data[read$data$cohort_unit %in% .active_units(final), , drop = FALSE]
   row.names(data) <- NULL
 
   fields <- list(
@@ -351,14 +456,17 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     columns = var_cols,
     cohort_definition = if (is_query) {
       list(qualifying = cohort$qualifying, epoch = format(cohort$epoch),
-           index = cohort$index, prior = cohort$prior)
+           index = cohort$index, prior = cohort$prior, index_on = cohort$index_on,
+           criteria = vapply(cohort$criteria, .describe_criterion, character(1)))
     } else {
       "supplied cohort_record"
     },
     study_config_sha256 = config_sha256,
     n_cohort = length(active),
     n_matched = sum(found),
-    n_unmatched = sum(!found)
+    n_unmatched = sum(!found),
+    status = status,
+    review_decisions_sha256 = NA_character_
   )
   # `provenance` is the pre-rubric element, kept for one release; `meta` leads
   # with the family's seven-field provenance record.
@@ -366,7 +474,17 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     data = data,
     cohort = final,
     meta = c(.provenance_record("pull_master"), fields),
-    provenance = fields
+    provenance = fields,
+    review = list(
+      queue = queue,
+      criteria = data.frame(
+        criterion_id = vapply(criteria, `[[`, character(1), "id"),
+        label = vapply(criteria, `[[`, character(1), "label"),
+        role = vapply(criteria, `[[`, character(1), "role"),
+        kind = vapply(criteria, `[[`, character(1), "kind"),
+        stringsAsFactors = FALSE
+      )
+    )
   ), class = "master_pull")
 }
 
@@ -399,6 +517,9 @@ print.master_pull <- function(x, ...) {
       "; unmatched: ", p$n_unmatched, "\n", sep = "")
   cat("  columns: ", length(p$columns), "; corrections applied: ",
       length(p$applied_correction_ids), "; read at ", p$read_at, "\n", sep = "")
+  if (identical(p$status, "awaiting review")) {
+    cat("  awaiting review: ", nrow(x$review$queue), " routed unit(s)\n", sep = "")
+  }
   invisible(x)
 }
 

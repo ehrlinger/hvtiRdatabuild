@@ -4,7 +4,7 @@
 #' encounter, so there are no modules to join: the pulled rows are the built dataset.
 #' `build_from_master()` checks they match the cohort's active units exactly and records
 #' the build as a cohort stage, returning the same `build_result` shape that
-#' [derive_vars()] consumes.
+#' [derive_vars()] consumes. A pull awaiting chart review is refused.
 #'
 #' @param pull A `master_pull` from [pull_master()].
 #'
@@ -43,6 +43,10 @@ build_from_master <- function(pull) {
   if (!inherits(pull, "master_pull")) {
     stop("'pull' must be a master_pull from pull_master().", call. = FALSE)
   }
+  if (identical(.pull_meta(pull)$status, "awaiting review")) {
+    .abort("awaiting_review", "build_from_master(): this pull is awaiting chart review; ",
+           "record the decisions with apply_review() first.")
+  }
   cohort <- pull$cohort
   last <- utils::tail(cohort$stages$stage_id[order(cohort$stages$order)], 1L)
   active <- cohort$members$patient_id[cohort$members$stage_id == last &
@@ -57,8 +61,8 @@ build_from_master <- function(pull) {
     data.frame(stage_id = "build", order = max(cohort$stages$order) + 1L,
                label = "Encounter-level build", source = "build",
                provenance = "hvtiRdatabuild::build_from_master", stringsAsFactors = FALSE),
-    data.frame(patient_id = active, included = TRUE, reason = NA_character_,
-               stringsAsFactors = FALSE)
+    data.frame(patient_id = active, included = rep(TRUE, length(active)),
+               reason = rep(NA_character_, length(active)), stringsAsFactors = FALSE)
   )
   structure(list(data = pull$data, cohort = cohort, tables = list()),
             class = "build_result")

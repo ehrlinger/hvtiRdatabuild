@@ -41,7 +41,8 @@ release can never exist without it. Read it back with \code{\link[=read_pull_pro
 }
 \details{
 The configuration must be unchanged since the pull: if its checksum no longer matches
-the one \code{\link[=pull_master]{pull_master()}} recorded, nothing is published.
+the one \code{\link[=pull_master]{pull_master()}} recorded, nothing is published. A pull awaiting chart review is
+refused.
 
 Retrying the same pull returns the same release. A distinct pull with identical data
 carries different provenance, so it becomes its own release.

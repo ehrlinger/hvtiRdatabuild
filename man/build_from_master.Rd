@@ -18,7 +18,7 @@ The master-view counterpart of \code{\link[=build_dataset]{build_dataset()}}. A 
 encounter, so there are no modules to join: the pulled rows are the built dataset.
 \code{build_from_master()} checks they match the cohort's active units exactly and records
 the build as a cohort stage, returning the same \code{build_result} shape that
-\code{\link[=derive_vars]{derive_vars()}} consumes.
+\code{\link[=derive_vars]{derive_vars()}} consumes. A pull awaiting chart review is refused.
 }
 \examples{
 \donttest{

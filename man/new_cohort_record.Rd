@@ -11,7 +11,9 @@ new_cohort_record(members, stages, patient_id_col)
 \code{reason} columns. Identifiers are runtime data and are never printed.}
 
 \item{stages}{A data frame with \code{stage_id}, \code{order}, \code{label}, \code{source}, and
-\code{provenance} columns, ordered by \code{order}.}
+\code{provenance} columns, ordered by \code{order}. \code{source} is \code{"upstream"}, \code{"build"},
+\code{"derive"} or \code{"review"}. \code{review} is a decision made at chart review, recorded by
+\code{\link[=apply_review]{apply_review()}}.}
 
 \item{patient_id_col}{Name of the patient identifier column in associated
 patient-level data.}
