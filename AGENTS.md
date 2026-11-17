@@ -2,7 +2,7 @@
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and
 verifies them against the legacy SAS datasets they replace. Forty-three
-exports after 0.3.5, in nine groups: pull
+exports as of 0.3.6, in nine groups: pull
 ([`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
 [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
 [`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
