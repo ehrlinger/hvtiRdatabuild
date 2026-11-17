@@ -51,6 +51,14 @@ review_list <- function(pull) {
 #' is then its own stage, with source `review`. The file's SHA-256 is recorded in the
 #' pull's metadata, and the pull is then complete.
 #'
+#' Each later criterion's tally of met, not met and undetermined units is rebuilt from
+#' the units that reached it, using the outcomes [pull_master()] keeps in
+#' `review$outcomes`. A pull saved before that field existed has none, so decisions that
+#' would change a counted stage are refused with an error of class
+#' `hvtiRdatabuild_review_outcomes_missing`: pull again with [pull_master()] and apply
+#' the decisions to the new pull. Decisions that change no counted stage are applied as
+#' usual.
+#'
 #' @param pull A `master_pull` awaiting review.
 #' @param path Character. The decisions file, as CSV.
 #' @param reason_codes Character. The study's declared reason codes.
@@ -135,7 +143,8 @@ apply_review <- function(pull, path, reason_codes) {
   routed <- dec[dec$criterion_id %in% pull$review$queue$criterion_id &
                   key %in% paste(pull$review$queue$cohort_unit,
                                  pull$review$queue$criterion_id, sep = "\r"), ]
-  record <- .settle_routed(record, routed, sha, pull$review$outcomes)
+  counted <- crit$criterion_id[crit$kind %in% c("warehouse", "local")]
+  record <- .settle_routed(record, routed, sha, pull$review$outcomes, counted)
   for (i in which(crit$kind == "review")) {
     rows <- dec[dec$criterion_id == crit$criterion_id[[i]], , drop = FALSE]
     record <- review_stage(record, crit$criterion_id[[i]], crit$label[[i]], rows)
@@ -161,7 +170,7 @@ apply_review <- function(pull, path, reason_codes) {
 # Settle each unit routed to review at the criterion that routed it. If review excludes
 # it, that criterion removed it first: the exclusion is recorded there and its rows at
 # later stages go. If review keeps it, every later outcome stands.
-.settle_routed <- function(record, routed, sha, outcomes) {
+.settle_routed <- function(record, routed, sha, outcomes, counted) {
   hit <- routed[!is.na(routed$reason), , drop = FALSE]
   if (!nrow(hit)) return(record)
   stages <- record$stages
@@ -174,7 +183,15 @@ apply_review <- function(pull, path, reason_codes) {
   here <- !is.na(at) & stage_order == at
   m$included[here] <- FALSE
   m$reason[here] <- hit$reason[match(m$patient_id[here], hit$cohort_unit)]
-  m <- m[is.na(at) | stage_order <= at, , drop = FALSE]
+  dropped <- !is.na(at) & stage_order > at
+  # A pull made before per-criterion outcomes were kept cannot recount its stages.
+  if (is.null(outcomes) && any(m$stage_id[dropped] %in% counted)) {
+    .abort("review_outcomes_missing",
+           "apply_review(): this pull predates the per-criterion outcomes needed to ",
+           "recount the criteria stages these decisions change. Pull again with ",
+           "pull_master() and apply the decisions to the new pull.")
+  }
+  m <- m[!dropped, , drop = FALSE]
   stages <- .recount_stages(stages, m, outcomes)
   n <- table(hit$criterion_id)
   i <- match(names(n), stages$stage_id)

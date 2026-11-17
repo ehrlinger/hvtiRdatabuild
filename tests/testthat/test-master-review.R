@@ -231,3 +231,31 @@ test_that("a stage review did not change keeps its text", {
                       reason_codes = "NO_ECHO")
   expect_identical(stage_prov(out$cohort, "age"), stage_prov(pull$cohort, "age"))
 })
+
+# A pull saved while awaiting review under #114 (squash f169ab4). That release built the
+# same object as now, without review$outcomes: the elements, metadata and stage text are
+# otherwise unchanged, so dropping the field gives exactly the #114 shape.
+as_114_pull <- function(pull) {
+  pull$review$outcomes <- NULL
+  testthat::expect_identical(names(pull), c("data", "cohort", "meta", "provenance", "review"))
+  testthat::expect_identical(names(pull$review), c("queue", "criteria"))
+  pull
+}
+
+test_that("a #114 pull refuses review that would change a counted stage", {
+  pull <- as_114_pull(routed_then_age())
+  rl <- decide_all(pull, "SYN104|2020-01-10", "NO_ECHO")
+  err <- expect_error(apply_review(pull, write_decisions(rl), reason_codes = "NO_ECHO"),
+                      class = "hvtiRdatabuild_review_outcomes_missing")
+  expect_match(conditionMessage(err), "pull_master()", fixed = TRUE)
+  expect_no_match(conditionMessage(err), "SYN")
+})
+
+test_that("a #114 pull completes review that changes no counted stage", {
+  pull <- as_114_pull(routed_then_age())
+  met <- c("SYN103|2015-06-30", "SYN104|2020-01-10")
+  out <- apply_review(pull, write_decisions(decide_all(pull, met, "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  expect_identical(out$meta$status, "complete")
+  expect_identical(stage_prov(out$cohort, "age"), stage_prov(pull$cohort, "age"))
+})
