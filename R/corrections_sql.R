@@ -31,7 +31,7 @@ value_text <- function(x) {
 #'
 #' @param text Character. The stored text form, or `NA` for missing.
 #' @param r_class Character. The target R class (`"numeric"`, `"integer"`,
-#'   `"haven_labelled"`, `"Date"`, `"POSIXct"` or `"character"`).
+#'   `"haven_labelled"`, `"Date"`, `"POSIXct"`, `"character"` or `"logical"`).
 #'
 #' @return A length-one value of class `r_class`, or an error for an
 #'   unsupported class.
@@ -41,13 +41,15 @@ value_text <- function(x) {
 parse_value <- function(text, r_class) {
   if (is.na(text)) {
     return(switch(r_class, Date = as.Date(NA), POSIXct = as.POSIXct(NA),
-                  character = NA_character_, NA_real_))
+                  character = NA_character_, logical = NA, NA_real_))
   }
   switch(r_class,
          numeric = , integer = , haven_labelled = suppressWarnings(as.numeric(text)),
          Date = as.Date(text, format = "%Y-%m-%d"),
          POSIXct = as.POSIXct(text, tz = "UTC"),
          character = text,
+         logical = switch(toupper(text), "1" = , "TRUE" = , "T" = TRUE,
+                          "0" = , "FALSE" = , "F" = FALSE, NA),
          stop("No text form for class '", r_class, "'.", call. = FALSE))
 }
 

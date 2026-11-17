@@ -14,7 +14,8 @@ An object of class \code{master_config}: a list with \code{name}, \code{key},
 \code{alt_keys} (a named list, possibly empty), \code{parent} (\code{NULL} or a list with
 \code{master} and \code{libref}), \code{parent_release} (\code{NULL} or a string), \code{snapshots},
 \code{current}, \code{history} (\code{NULL} or a regular expression), \code{build_program},
-and \code{file}.
+\code{sources} (a named list of \code{list(key = )}, possibly empty), \code{deciders} (\code{NULL} or a
+character vector), and \code{file}.
 }
 \description{
 A master dataset is a clinical dataset that other builds read, such as the
@@ -29,6 +30,9 @@ The primary key is what corrections match on and what the view joins on.
 Alternate keys are bridges to other systems: each is checked unique where it
 is non-null, and its columns are carried on every correction, but nothing
 matches on them.
+
+\code{sources} declares the warehouse source views whose cells may be corrected, each with its
+unique key, and \code{deciders} names who may decide a correction (see \code{\link[=propose_corrections]{propose_corrections()}}).
 }
 \examples{
 cfg <- read_master_config(system.file("extdata", "master-example.yml",

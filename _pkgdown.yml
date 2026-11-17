@@ -105,6 +105,18 @@ reference:
   - snapshot_master
   - lift_master
 
+- title: "Corrections to source views (interim)"
+  desc: >
+    Interim intake for corrections to warehouse source views, superseded by the HVTR
+    registry, which takes over the template and the tables unchanged.
+  contents:
+  - generate_corrections_sql
+  - write_corrections_template
+  - propose_corrections
+  - decide_corrections
+  - retire_filled_corrections
+  - study_correction_candidates
+
 - title: Deprecated
   desc: >
     Corrections to master datasets move to the HVTR registry; this package will
