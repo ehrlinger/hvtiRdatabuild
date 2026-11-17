@@ -70,6 +70,32 @@ Names are indicative; the schema layout is agreed with data engineering.
 | Review | `<master>_corrections_stale`, `<master>_corrections_conflicts` views | For data management. Never read by a study build. |
 | Answer key | `<master>_oracle_<date>` table | A SAS build over the gate's database snapshot, loaded by `load_oracle()`, which publishes nothing. Restricted; read only by the parity gate (§7). |
 
+**Amended 2026-11-17 (plan 2a).** These decisions change the table above.
+
+- **Corrections tables are per source:** `<source>_corrections` and
+  `<source>_correction_decisions`, not one shared pair. A source's key columns are typed and
+  the corrected view joins on them, so a shared table would need text-encoded keys and a
+  cast in every join.
+- **`master.yml` declares the sources and the deciders:** `sources: {<view>: {key: [...]}}`
+  and `deciders: [...]`. The SQL repository's model metadata (plan 3) becomes the authority
+  later, and the yml mirrors it until then.
+- **Lineage is a contract with plan 3.** `<master>_lineage` (`master_column`, `source`,
+  `source_column`) lists exactly the master columns that pass a source column through by
+  rename only. A source's key columns carry the same names in the master, and therefore in a
+  frozen pull.
+- **Intake stores a canonical text form.** Each value is parsed against the source column's
+  type and written back as canonical text, so text agreement (G1) is value agreement, and
+  `"3.0"` and `"3"` corroborate.
+- **Names and keys compare exactly on SQL Server.** The generated views, intake and
+  decisions compare variable names and character keys with `Latin1_General_BIN2` collation
+  plus a `DATALENGTH` check, in every comparison, join, distinct count and `GROUP BY`. A
+  key that differs only in case or trailing spaces is a different key, as in the R
+  reference.
+- **The views assume intake-canonical values.** They cast stored text with `TRY_CAST` at the
+  column's declared type, and intake refuses any value that does not cast back unchanged.
+  If a column's type changes after a correction is accepted, the SQL may round where the R
+  reference does not. The two agree only on intake-canonical values.
+
 ### 3.2 Corrections apply to source values
 
 A correction made to a derived value goes stale whenever its derivation changes, and a
@@ -122,6 +148,14 @@ And two from #101:
   the source now holds a value, is split into `filled_upstream_agrees` (the source holds the
   correction's value: retired automatically with a `bake` decision) and
   `filled_upstream_disagrees` (a different value: to the conflicts view).
+- **Status order.** A cell gets the first status that holds, in this order: `no_variable`,
+  `no_record`, `ambiguous_record` (the key now matches several source rows, so none is
+  changed; intake refuses such a key, but a refresh can break uniqueness after a correction
+  is accepted), `accepted_disagree` (G1), `prior_unknown`, `does_not_cast`,
+  `filled_upstream_agrees` or `filled_upstream_disagrees` (G7), `prior_mismatch`, then
+  `apply`. The stale view lists `no_variable` through `prior_mismatch` plus
+  `filled_upstream_agrees`; the conflicts view lists `accepted_disagree` and
+  `filled_upstream_disagrees`.
 
 G2 (no self-acceptance, a named deciding role) is enforced at the decision step (§3.4). G5
 gets an interim helper (§3.5). G3 and G6 remain registry design input and are out of scope
@@ -144,14 +178,29 @@ Nothing is rebuilt or re-released. The path:
    `new_value` (with its missing flag), evidence type and reference, and who asserts it. A
    row without the full key is refused here, not discovered later.
 3. **Validated.** `propose_corrections(file, dry_run = TRUE)` returns a verdict per row:
-   `appendable`, `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact` or
-   `derived_variable`. It prints verdicts and counts, never values.
+   `appendable`, `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact`,
+   `derived_variable`, `unknown_source`, `invalid_field`, `no_variable` or `prior_mismatch`.
+   It prints verdicts and counts, never values.
+
+   - `unknown_source`: the row names a source `master.yml` does not declare.
+   - `invalid_field`: a flag that is not 0 or 1, a flag that disagrees with its value, an
+     unknown evidence type, or a blank evidence reference, asserter or variable.
+   - `no_variable`: the source has no such column (§3.3), or it is a key column.
+   - `prior_mismatch`: the stored prior no longer matches the source (§3.5).
+   - `rule_not_fact`: a key or variable cell holding a pattern or comparison
+     (`* % ? < > = , ;`) or the word `all` or `any`. It is a predicate, so it is a rule.
 4. **Appended.** The same call with `dry_run = FALSE` appends the whole file to
    `corrections` in one transaction, and refuses the whole file if any row fails. Proposed
    corrections do not apply.
 5. **Decided.** `decide_corrections()` records `accept`, `reject`, `supersede` or `bake`
-   with decider, date and reason. The deciding role is named per master in `master.yml`, and
-   a decider who asserted the correction is refused (`self_accepted`, G2).
+   with decider, date and reason. The deciding role is named per master in `master.yml`.
+   G2 covers every decision, not only `accept`: a decider who asserted the correction is
+   refused (`self_accepted`), and so is one not listed in `deciders` (`not_decider`). One
+   correction decided twice in one batch is refused (`repeated_correction`), because the
+   rows share a `decided_on` and their order would be arbitrary. `retire_filled_corrections()`
+   records the G7 `bake` decision, by the reserved decider `filled_upstream`, for every
+   `filled_upstream_agrees` cell. A view cannot write, so "automatic" means one call that
+   data management can schedule.
 6. **Live.** The next query of `<master>` applies it. A study that already froze keeps its
    pull until it re-pulls, and its freeze record (§6) names the corrections it applied.
 
@@ -334,7 +383,8 @@ A master whose current deployment has no passing gate record is not offered to s
 - Stale and conflicting corrections are surfaced in their views, not raised.
 - Correction intake validates a whole file before writing anything, and refuses it if any
   row fails: `unknown_key`, `ambiguous_key`, `does_not_cast`, `rule_not_fact`,
-  or `derived_variable`. A decision by the correction's own asserter is refused
+  `derived_variable`, `unknown_source`, `invalid_field`, `no_variable` or `prior_mismatch`.
+  A decision by the correction's own asserter is refused
   (`self_accepted`). Verdicts only, no values in any message.
 - A cohort match with duplicates stops the pull (§5.4).
 
