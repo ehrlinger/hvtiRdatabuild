@@ -6,7 +6,7 @@
 \alias{hvtiRdatabuild-package}
 \title{hvtiRdatabuild: Build and Verify Analytic Datasets for the HVTI CORR Group}
 \description{
-Builds analysis-ready clinical datasets for the clinical investigations statistics group within The Heart and Vascular Institute at the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets they replace.
+Builds analysis-ready clinical datasets for the Cardiovascular Outcomes, Registries and Research (CORR) group of the Heart, Vascular and Thoracic Institute (HVTI) at the Cleveland Clinic, and verifies them against the legacy 'SAS' datasets they replace.
 }
 \section{Quiet mode}{
 
