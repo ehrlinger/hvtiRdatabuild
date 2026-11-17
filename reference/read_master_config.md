@@ -25,7 +25,8 @@ An object of class `master_config`: a list with `name`, `key`,
 `alt_keys` (a named list, possibly empty), `parent` (`NULL` or a list
 with `master` and `libref`), `parent_release` (`NULL` or a string),
 `snapshots`, `current`, `history` (`NULL` or a regular expression),
-`build_program`, and `file`.
+`build_program`, `sources` (a named list of `list(key = )`, possibly
+empty), `deciders` (`NULL` or a character vector), and `file`.
 
 ## Details
 
@@ -33,6 +34,11 @@ The primary key is what corrections match on and what the view joins on.
 Alternate keys are bridges to other systems: each is checked unique
 where it is non-null, and its columns are carried on every correction,
 but nothing matches on them.
+
+`sources` declares the warehouse source views whose cells may be
+corrected, each with its unique key, and `deciders` names who may decide
+a correction (see
+[`propose_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/propose_corrections.md)).
 
 ## See also
 

@@ -1,8 +1,8 @@
 # hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and
-verifies them against the legacy SAS datasets they replace. Thirty-seven
-exports as of 0.3.5, in eight groups: pull
+verifies them against the legacy SAS datasets they replace. Forty-three
+exports after 0.3.5, in nine groups: pull
 ([`read_study_config()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.md),
 [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md),
 [`dw_modules()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_modules.md),
@@ -20,9 +20,12 @@ and companions), build
 and the cohort record), verify
 ([`snapshot_oracle()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.md),
 [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)),
-analysis sets, dataset publication, and master datasets, plus three
-deprecated correction functions. `NAMESPACE` is the authority, and
-`_pkgdown.yml` groups the same exports by stage.
+analysis sets, dataset publication, master datasets, and source
+corrections
+([`propose_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/propose_corrections.md),
+[`decide_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/decide_corrections.md)
+and companions), plus three deprecated correction functions. `NAMESPACE`
+is the authority, and `_pkgdown.yml` groups the same exports by stage.
 
 **This is the package that touches PHI and warehouse credentials.** Most
 of its rules are about not leaking either, and they are not negotiable

@@ -358,6 +358,25 @@ Snapshot and lift the master datasets studies read.
 - [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
   : Lift a master's parquet snapshot into the warehouse as a view
 
+## Corrections to source views (interim)
+
+Interim intake for corrections to warehouse source views, superseded by
+the HVTR registry, which takes over the template and the tables
+unchanged.
+
+- [`generate_corrections_sql()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/generate_corrections_sql.md)
+  : Generate the correction tables and views for a master's sources
+- [`write_corrections_template()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_corrections_template.md)
+  : Write an empty correction submission template
+- [`propose_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/propose_corrections.md)
+  : Propose a batch of corrections from a filled template
+- [`decide_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/decide_corrections.md)
+  : Decide a batch of corrections
+- [`retire_filled_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/retire_filled_corrections.md)
+  : Retire fill-ins that upstream has caught up with
+- [`study_correction_candidates()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/study_correction_candidates.md)
+  : Turn a study's own data fixes into candidate corrections
+
 ## Deprecated
 
 Corrections to master datasets move to the HVTR registry; this package

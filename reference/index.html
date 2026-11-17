@@ -428,6 +428,57 @@
         </dt>
         <dd>Lift a master's parquet snapshot into the warehouse as a view</dd>
       </dl></div><div class="section level2">
+      <h2 id="corrections-to-source-views-interim-">Corrections to source views (interim)<a class="anchor" aria-label="anchor" href="#corrections-to-source-views-interim-"></a></h2>
+
+      <div class="section-desc"><p>Interim intake for corrections to warehouse source views, superseded by the HVTR registry, which takes over the template and the tables unchanged.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="generate_corrections_sql.html">generate_corrections_sql()</a></code>
+
+        </dt>
+        <dd>Generate the correction tables and views for a master's sources</dd>
+
+        <dt>
+
+          <code><a href="write_corrections_template.html">write_corrections_template()</a></code>
+
+        </dt>
+        <dd>Write an empty correction submission template</dd>
+
+        <dt>
+
+          <code><a href="propose_corrections.html">propose_corrections()</a></code>
+
+        </dt>
+        <dd>Propose a batch of corrections from a filled template</dd>
+
+        <dt>
+
+          <code><a href="decide_corrections.html">decide_corrections()</a></code>
+
+        </dt>
+        <dd>Decide a batch of corrections</dd>
+
+        <dt>
+
+          <code><a href="retire_filled_corrections.html">retire_filled_corrections()</a></code>
+
+        </dt>
+        <dd>Retire fill-ins that upstream has caught up with</dd>
+
+        <dt>
+
+          <code><a href="study_correction_candidates.html">study_correction_candidates()</a></code>
+
+        </dt>
+        <dd>Turn a study's own data fixes into candidate corrections</dd>
+      </dl></div><div class="section level2">
       <h2 id="deprecated">Deprecated<a class="anchor" aria-label="anchor" href="#deprecated"></a></h2>
 
       <div class="section-desc"><p>Corrections to master datasets move to the HVTR registry; this package will read corrected data from it. These still work and warn on every call.</p></div>

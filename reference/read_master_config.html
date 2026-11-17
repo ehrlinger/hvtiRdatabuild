@@ -78,7 +78,8 @@ snapshots and build program live.</p>
 <code>alt_keys</code> (a named list, possibly empty), <code>parent</code> (<code>NULL</code> or a list with
 <code>master</code> and <code>libref</code>), <code>parent_release</code> (<code>NULL</code> or a string), <code>snapshots</code>,
 <code>current</code>, <code>history</code> (<code>NULL</code> or a regular expression), <code>build_program</code>,
-and <code>file</code>.</p>
+<code>sources</code> (a named list of <code>list(key = )</code>, possibly empty), <code>deciders</code> (<code>NULL</code> or a
+character vector), and <code>file</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -86,6 +87,8 @@ and <code>file</code>.</p>
 Alternate keys are bridges to other systems: each is checked unique where it
 is non-null, and its columns are carried on every correction, but nothing
 matches on them.</p>
+<p><code>sources</code> declares the warehouse source views whose cells may be corrected, each with its
+unique key, and <code>deciders</code> names who may decide a correction (see <code><a href="propose_corrections.html">propose_corrections()</a></code>).</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
