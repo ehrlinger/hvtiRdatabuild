@@ -14,9 +14,10 @@ row hashes). `load_oracle()` loads the SAS build's parquet as `<master>_oracle_<
 through the load step it now shares with `lift_master()`, and records **oracle integrity**,
 never parity. `parity_gate()` compares the rules view in a gate schema with the oracle, every
 cell joined on the key, **inside the database** (only counts come back), explains differing
-cells by activated legacy corrections, retakes the markers, and records the outcome. Only a
-pass writes `<master>_parity`, against the commit in the gate schema's `<master>_deployment`;
-`pull_master()` already fails closed on that table.
+cells by activated legacy corrections, retakes the markers, and records the outcome. A pass
+or a fail is written to `<master>_parity`, against the commit in the gate schema's
+`<master>_deployment`; `pull_master()` already fails closed on that table, so a fail blocks
+the commit it tested until a later pass. A void run writes only to the gate's own tables.
 
 **Tech Stack:** R (>= 4.4.0), DBI, duckdb 2.0.0 (tests), arrow, jsonlite, digest,
 testthat 3.
@@ -28,12 +29,15 @@ plan 3"). **Out of this plan:** correction intake and candidates (plan 2a), and 
 that needs SQL Server or data engineering (plan 3, listed at the end).
 
 **Verified before writing.** Every code block in Tasks 1 to 6 was run in a scratch copy of
-the package at `ea9f788` with duckdb 2.0.0: the new and neighbouring test files pass (70
-tests across the gate, lift, steps and pull files, no skips); `lintr` reports nothing on the
+the package at `ea9f788` with duckdb 2.0.0 (revised and re-run after decision 2 changed): the
+new and neighbouring test files pass (72 tests across the gate, lift, steps and pull files,
+no skips); `lintr` reports nothing on the
 new files apart from `object_usage_linter`, which needs the package installed and was not
 run; and `devtools::check(args = "--no-manual")`, which runs the full suite, is 0 errors,
-0 warnings, 0 notes. The examples of the three exports run. The intermediate state between
-Task 5 and Task 6 was not run on its own, and nothing here was run on SQL Server.
+0 warnings, 0 notes. The examples of the three exports run. The state between Task 5 and
+Task 6 was also run, extracted from this file: the parity-gate tests pass and the four
+void tests fail as Task 6 Step 2 says, and Task 6's replacements applied to Task 5's code
+reproduce the verified file. Nothing here was run on SQL Server.
 
 ### Decisions the spec left open, made here
 
@@ -43,13 +47,18 @@ Task 5 and Task 6 was not run on its own, and nothing here was run on SQL Server
    without activating it. A differing cell is **explained** when an activated legacy
    correction names that row's key and that column, and its new value is the oracle's value
    (same cast and tolerance as the comparison; `new_value_missing = 1` matches a missing
-   oracle value). These are the only legacy corrections stored today; source-keyed
-   corrections (§3.2) are plan 3's, and the gate reads the master-keyed record.
-2. **Failed and void runs never write `<master>_parity`** (§8: failing the gate never
-   changes the parity records). Their evidence goes to four gate tables:
-   `<master>_gate_runs`, `<master>_gate_markers`, `<master>_gate_verdicts` and
-   `<master>_gate_outcomes`. The contract's `"fail"` verdict value is therefore never
-   written by the gate; it stays available to data engineering for revoking a pass.
+   oracle value). These are the only legacy corrections stored today. Plan 2a
+   (`2026-11-17-corrections-plan.md`) adds per-source correction tables; once plan 3
+   re-expresses the legacy fixes against source columns, the gate's reader moves to those
+   tables, and until then it reads the master-keyed record.
+2. **A failed run writes a `"fail"` row to `<master>_parity`** (with its `run_id`) for the
+   commit it tested, and a pass writes a `"pass"` row. `pull_master()` takes the latest
+   verdict for the deployed commit, so a fail blocks that commit until a later pass. **A
+   void run writes nothing to `<master>_parity`**: it says nothing about the rules, so an
+   earlier verdict for the commit stands. Every run's evidence also goes to four gate
+   tables: `<master>_gate_runs`, `<master>_gate_markers`, `<master>_gate_verdicts` and
+   `<master>_gate_outcomes`. This amends §8, which said failing the gate never changes the
+   parity records (Task 7). The gate never changes the master's view or its metadata.
 3. **`<master>_parity` is the name `lift_master()` already uses** for a table of a different
    shape (`base_table`, `parquet_sha256`, `verdict`, `checked_at`). The gate refuses such a
    table (`parity_table_shape`) rather than append to it, and writes `sql_commit`, `verdict`,
@@ -106,7 +115,7 @@ fails closed on. This plan adds:
 
 | Object | Columns | Written by |
 |---|---|---|
-| `<gate_schema>.<master>` | the rules view, deployed for the gate | plan 3's deploy step |
+| `<gate_schema>.<master>` | the rules view, deployed for the gate, **reading the uncorrected `stg_<source>` views, not `stg_<source>_corrected`** | plan 3's deploy step |
 | `<gate_schema>.<master>_deployment` | `sql_commit` (one row) | plan 3's deploy step |
 | `<master>_oracle_<YYYYMMDD>` | the SAS build's columns | `load_oracle()` |
 | `<master>_oracle_integrity` | `oracle_table`, `parquet_sha256`, `source_sha256`, `verdict`, `checked_at` | `load_oracle()` |
@@ -114,7 +123,14 @@ fails closed on. This plan adds:
 | `<master>_gate_markers` | `run_id`, `phase` (`before`/`after`), `source`, `n_rows`, `checksum`, `taken_at` | `open_gate_run()`, `parity_gate()` |
 | `<master>_gate_verdicts` | `run_id`, `variable`, `verdict`, `n_compared`, `n_differ`, `n_explained` | `parity_gate()` |
 | `<master>_gate_outcomes` | `run_id`, `sql_commit`, `gate_schema`, `oracle_table`, `outcome` (`pass`/`fail`/`void`), `closed_at` | `parity_gate()` |
-| `<master>_parity` | adds `run_id` | `parity_gate()`, on a pass only |
+| `<master>_parity` | adds `run_id` | `parity_gate()`, on a pass or a fail; never on a void run |
+
+**Plan 3 contract: the gate's rules read uncorrected sources.** The gate schema's rules
+models select from the `stg_<source>` views, never `stg_<source>_corrected`. The SAS build
+applies only its own inline fixes, so a non-legacy correction accepted after the SAS build
+would otherwise appear as an unexplained difference and fail the gate. With uncorrected
+inputs, the legacy inline fixes are the only differences the gate explains, and the
+production deployment of the same commit reads the corrected views as usual.
 
 ## File structure
 
@@ -1477,7 +1493,7 @@ git commit -m "feat: the parity gate's cell-by-cell comparison, computed in the 
 
 ---
 
-### Task 5: `parity_gate()`: record the verdicts, bind a pass to its commit
+### Task 5: `parity_gate()`: record the verdicts, bind the verdict to its commit
 
 **Files:**
 - Create: `R/parity_gate.R`
@@ -1489,28 +1505,31 @@ git commit -m "feat: the parity gate's cell-by-cell comparison, computed in the 
   (Task 2); `pull_master()`, `cohort_query()` (plan 1, tests only).
 - Produces: `parity_gate(config, con, run_id, oracle_table, gate_schema, dialect = "mssql",
   tolerance = 1e-8)` returning invisibly `list(run_id, outcome, sql_commit, verdicts)`;
-  stopping with `parity_gate_failed`, `gate_run_unknown`, `gate_run_closed`,
+  writing a `"pass"` or `"fail"` row (`sql_commit`, `verdict`, `verified_at`, `run_id`) to
+  `<master>_parity`; stopping with `parity_gate_failed`, `gate_run_unknown`, `gate_run_closed`,
   `oracle_not_verified`, `parity_table_shape`, `gate_deployment` or `gate_key_absent`.
   Internal `.open_run()` returns the run's row (Task 6 reads its `mode`). Test helper
   `gate_run(g, oracle = gate_source(), mode = "fallback", sources = c("stg_demo",
-  "stg_other"), between = NULL)`.
+  "stg_other"), between = NULL, run_date = "2026-11-17")`.
 
 - [ ] **Step 1: Extend the helper.** Append to `tests/testthat/helper-parity-gate.R`:
 
 ```r
 
 # Open a run, load an oracle, and run the gate, in a real gate run's order.
-# `between` runs after the SAS build is loaded and before the comparison.
+# `between` runs after the SAS build is loaded and before the comparison. A
+# second run in one test needs its own `run_date`, which names its oracle.
 gate_run <- function(g, oracle = gate_source(), mode = "fallback",
-                     sources = c("stg_demo", "stg_other"), between = NULL) {
+                     sources = c("stg_demo", "stg_other"), between = NULL,
+                     run_date = "2026-11-17") {
   run_id <- if (mode == "fallback") {
     open_gate_run(g$cfg, g$con, "fallback", sources = sources, dialect = "duckdb")
   } else {
     open_gate_run(g$cfg, g$con, "snapshot", snapshot_name = "dw_gate_snap",
                   dialect = "duckdb")
   }
-  pq <- write_oracle_parquet(g$dir, oracle)
-  ora <- load_oracle(g$cfg, g$con, pq, "2026-11-17", dry_run = FALSE, dialect = "duckdb")
+  pq <- write_oracle_parquet(g$dir, oracle, name = paste0("gate_build_", run_date, ".parquet"))
+  ora <- load_oracle(g$cfg, g$con, pq, run_date, dry_run = FALSE, dialect = "duckdb")
   if (!is.null(between)) between(g$con)
   parity_gate(g$cfg, g$con, run_id, ora$oracle_table, "gate", dialect = "duckdb")
 }
@@ -1550,19 +1569,42 @@ test_that("a pass gates only a master deployed from the commit it tested", {
                class = "hvtiRdatabuild_parity_gate")
 })
 
-test_that("a failing gate records its verdicts and changes nothing in production", {
+test_that("a failing gate records a fail verdict and leaves the view and metadata alone", {
   g <- local_gate_db()
   state <- production_state(g$con)
   err <- expect_error(suppressMessages(gate_run(g, fixed_oracle())),
                       class = "hvtiRdatabuild_parity_gate_failed")
-  expect_identical(production_state(g$con), state)
+  after <- production_state(g$con)
+  expect_identical(after[c("view_sql", "view", "meta")], state[c("view_sql", "view", "meta")])
+  expect_identical(after$parity[after$parity$run_id == "G0", ], state$parity)
+  fail <- after$parity[after$parity$run_id != "G0", ]
+  expect_identical(fail$verdict, "fail")
+  expect_identical(fail$sql_commit, "def5678")
   v <- DBI::dbGetQuery(g$con, "SELECT variable, verdict FROM master_demo_gate_verdicts")
   expect_identical(v$verdict[v$variable == "age"], "mismatch")
-  out <- DBI::dbGetQuery(g$con, "SELECT outcome FROM master_demo_gate_outcomes")
+  out <- DBI::dbGetQuery(g$con, "SELECT run_id, outcome FROM master_demo_gate_outcomes")
   expect_identical(out$outcome, "fail")
-  msg <- conditionMessage(err)
+  expect_identical(out$run_id, fail$run_id)
+  # The run id is random hex and may hold any digits; judge the rest of the message.
+  msg <- gsub(fail$run_id, "", conditionMessage(err), fixed = TRUE)
   expect_false(grepl("SYN", msg))
   expect_false(grepl("73|72", msg))
+})
+
+test_that("a fail after a pass on the same commit blocks study builds", {
+  g <- local_gate_db()
+  suppressMessages(gate_run(g))
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+  path <- withr::local_tempfile(fileext = ".yaml")
+  writeLines("study: st0000", path)
+  expect_s3_class(suppressMessages(pull_master(g$con, "master_demo", q, var_cols = "age",
+                                               path = path, dialect = "duckdb")),
+                  "master_pull")
+  expect_error(suppressMessages(gate_run(g, fixed_oracle(), run_date = "2026-11-18")),
+               class = "hvtiRdatabuild_parity_gate_failed")
+  expect_error(pull_master(g$con, "master_demo", q, var_cols = "age", path = path,
+                           dialect = "duckdb"),
+               class = "hvtiRdatabuild_parity_gate")
 })
 
 test_that("an activated legacy correction lets the gate pass", {
@@ -1610,7 +1652,7 @@ test_that("a snapshot run takes no markers and is judged on its verdicts", {
 
 - [ ] **Step 3: Run them and confirm they fail.**
   Run: `Rscript -e 'devtools::test(filter = "parity-gate")'`
-  Expected: 7 errors, `could not find function "parity_gate"`.
+  Expected: 8 errors, `could not find function "parity_gate"`.
 
 - [ ] **Step 4: Write `parity_gate()`.** Create `R/parity_gate.R`:
 
@@ -1748,11 +1790,12 @@ test_that("a snapshot run takes no markers and is judged on its verdicts", {
 #' it), and no key is on one side only or repeated in the rules view.
 #'
 #' Every run records its per-column verdicts in `<master>_gate_verdicts` and
-#' its outcome in `<master>_gate_outcomes`. **Only a pass writes to
-#' `<master>_parity`**, against the SQL model commit the gate schema's
-#' `<master>_deployment` names; [pull_master()] accepts a master only while its
-#' production deployment is that commit. A failed gate changes no view, no
-#' metadata and no parity record.
+#' its outcome in `<master>_gate_outcomes`. **A pass or a fail is also recorded
+#' in `<master>_parity`**, against the SQL model commit the gate schema's
+#' `<master>_deployment` names. [pull_master()] accepts a master only while the
+#' latest verdict for its production deployment's commit is a pass, so a fail
+#' blocks that commit until a later pass. The gate never changes the master's
+#' view or its metadata.
 #'
 #' @param config A `master_config` from [read_master_config()].
 #' @param con A DBI connection.
@@ -1766,8 +1809,9 @@ test_that("a snapshot run takes no markers and is judged on its verdicts", {
 #'
 #' @return Invisibly, a list with `run_id`, `outcome` (`"pass"`), `sql_commit`
 #'   and `verdicts` (a data frame of `variable`, `verdict`, `n_compared`,
-#'   `n_differ`, `n_explained`; counts only). A failed run is recorded and then
-#'   stops with class `hvtiRdatabuild_parity_gate_failed`.
+#'   `n_differ`, `n_explained`; counts only). A failed run is recorded, with a
+#'   `"fail"` verdict in `<master>_parity`, and then stops with class
+#'   `hvtiRdatabuild_parity_gate_failed`.
 #'
 #' @seealso [open_gate_run()], [load_oracle()], [pull_master()]
 #'
@@ -1835,12 +1879,13 @@ parity_gate <- function(config, con, run_id, oracle_table, gate_schema, dialect 
   outcome_row <- data.frame(run_id = run_id, sql_commit = commit, gate_schema = gate_schema,
                             oracle_table = oracle_table, outcome = outcome,
                             closed_at = closed_at, stringsAsFactors = FALSE)
-  parity_row <- data.frame(sql_commit = commit, verdict = "pass", verified_at = closed_at,
+  # A fail is recorded too, so it blocks the commit it tested.
+  parity_row <- data.frame(sql_commit = commit, verdict = outcome, verified_at = closed_at,
                            run_id = run_id, stringsAsFactors = FALSE)
   run_step("record gate outcome", DBI::dbWithTransaction(con, {
     DBI::dbWriteTable(con, tabs$gate_verdicts, verdict_rows, append = TRUE)
     DBI::dbWriteTable(con, tabs$gate_outcomes, outcome_row, append = TRUE)
-    if (outcome == "pass") DBI::dbWriteTable(con, tabs$parity, parity_row, append = TRUE)
+    DBI::dbWriteTable(con, tabs$parity, parity_row, append = TRUE)
   }))
   .hvti_inform("parity gate ", outcome, ": ", sum(failing), " of ", nrow(verdicts),
                " verdicts failing; run ", run_id)
@@ -1848,7 +1893,8 @@ parity_gate <- function(config, con, run_id, oracle_table, gate_schema, dialect 
     .abort("parity_gate_failed",
            "parity_gate(): the rules view does not reproduce the oracle: ", sum(failing),
            " of ", nrow(verdicts), " verdicts fail. Verdicts are in ", tabs$gate_verdicts,
-           " under run ", run_id, "; no parity record was written.")
+           " under run ", run_id, ". A fail verdict was recorded; commit ", commit,
+           " is blocked from study builds until a later pass.")
   }
   invisible(list(run_id = run_id, outcome = outcome, sql_commit = commit,
                  verdicts = verdicts))
@@ -1864,7 +1910,7 @@ parity_gate <- function(config, con, run_id, oracle_table, gate_schema, dialect 
 ```bash
 git add R/parity_gate.R man/parity_gate.Rd NAMESPACE \
   tests/testthat/helper-parity-gate.R tests/testthat/test-parity-gate.R
-git commit -m "feat: parity_gate() records per-column verdicts and binds a pass to its commit"
+git commit -m "feat: parity_gate() records per-column verdicts and binds its verdict to the commit"
 ```
 
 ---
@@ -1873,8 +1919,8 @@ git commit -m "feat: parity_gate() records per-column verdicts and binds a pass 
 
 A fallback run retakes every source's marker **after** the comparison. Any change voids the
 run, its verdicts and both sets of markers are kept as evidence, and nothing is written to
-`<master>_parity`. Void wins over fail, because a run whose sources moved says nothing about
-the rules either way.
+`<master>_parity`, so an earlier pass or fail for the commit stands. Void wins over fail,
+because a run whose sources moved says nothing about the rules either way.
 
 **Files:**
 - Modify: `R/gate_markers.R` (add `.read_markers()` after `.markers_changed()`)
@@ -1920,9 +1966,32 @@ test_that("an upstream write between the SAS run and the comparison voids, not f
     })),
     class = "hvtiRdatabuild_parity_gate_void"
   )
-  expect_false(grepl("SYN|90", conditionMessage(err)))
+  # The run id is random hex and may hold any digits; judge the rest of the message.
+  run_id <- DBI::dbGetQuery(g$con, "SELECT run_id FROM master_demo_gate_outcomes")$run_id
+  expect_false(grepl("SYN|90", gsub(run_id, "", conditionMessage(err), fixed = TRUE)))
   parity <- DBI::dbGetQuery(g$con, "SELECT * FROM master_demo_parity")
   expect_identical(parity$run_id, "G0")
+})
+
+test_that("a void run after a pass leaves the pass in force", {
+  g <- local_gate_db()
+  passed <- suppressMessages(gate_run(g))
+  expect_error(
+    suppressMessages(gate_run(g, run_date = "2026-11-18", between = function(con) {
+      DBI::dbExecute(con, "INSERT INTO stg_other VALUES ('C')")
+    })),
+    class = "hvtiRdatabuild_parity_gate_void"
+  )
+  parity <- DBI::dbGetQuery(g$con, paste("SELECT run_id, verdict FROM master_demo_parity",
+                                         "WHERE sql_commit = 'def5678'"))
+  expect_identical(parity$run_id, passed$run_id)
+  expect_identical(parity$verdict, "pass")
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")))
+  path <- withr::local_tempfile(fileext = ".yaml")
+  writeLines("study: st0000", path)
+  expect_s3_class(suppressMessages(pull_master(g$con, "master_demo", q, var_cols = "age",
+                                               path = path, dialect = "duckdb")),
+                  "master_pull")
 })
 
 test_that("a fallback run without its before markers cannot be gated", {
@@ -1938,8 +2007,9 @@ test_that("a fallback run without its before markers cannot be gated", {
 
 - [ ] **Step 2: Run them and confirm they fail.**
   Run: `Rscript -e 'devtools::test(filter = "gate-void")'`
-  Expected: 3 failures. The first and third: the gate passes, so no error is raised. The
-  second: the error has class `hvtiRdatabuild_parity_gate_failed`, not `_void`.
+  Expected: all 4 tests fail. The first, third and fourth: the gate passes, so no error is
+  raised (and in the third, the second run's pass is recorded beside the first). The
+  second reports an error: `parity_gate_failed` is raised where `_void` was expected.
 
 - [ ] **Step 3: Read a run's first markers.** In `R/gate_markers.R`, insert before
   `#' Open a parity gate run`:
@@ -2019,6 +2089,18 @@ test_that("a fallback run without its before markers cannot be gated", {
     }
 ```
 
+  Write no parity verdict for a void run: replace
+
+```r
+    DBI::dbWriteTable(con, tabs$parity, parity_row, append = TRUE)
+```
+
+  with
+
+```r
+    if (outcome != "void") DBI::dbWriteTable(con, tabs$parity, parity_row, append = TRUE)
+```
+
   Stop on a void run before the fail check: replace
 
 ```r
@@ -2048,36 +2130,24 @@ test_that("a fallback run without its before markers cannot be gated", {
 ```r
 #' A fallback run (see [open_gate_run()]) takes its second change marker for
 #' every source after the comparison. If any source changed, the run is
-#' **void** whatever its verdicts: both sides may have read different data.
+#' **void** whatever its verdicts: both sides may have read different data. A
+#' void run writes nothing to `<master>_parity`, so an earlier verdict for the
+#' commit stands.
 #'
 #' Every run records its per-column verdicts in `<master>_gate_verdicts` and
-```
-
-  replace
-
-```r
-#' production deployment is that commit. A failed gate changes no view, no
-#' metadata and no parity record.
-```
-
-  with
-
-```r
-#' production deployment is that commit. A failed or void gate changes no view,
-#' no metadata and no parity record.
 ```
 
   and replace
 
 ```r
-#'   stops with class `hvtiRdatabuild_parity_gate_failed`.
+#'   `hvtiRdatabuild_parity_gate_failed`.
 ```
 
   with
 
 ```r
-#'   stops with class `hvtiRdatabuild_parity_gate_failed`; a void one with
-#'   class `hvtiRdatabuild_parity_gate_void`.
+#'   `hvtiRdatabuild_parity_gate_failed`; a void one, recorded in the gate
+#'   tables only, with class `hvtiRdatabuild_parity_gate_void`.
 ```
 
 - [ ] **Step 6: Document and run the tests.**
@@ -2101,8 +2171,23 @@ git commit -m "feat: a source change during a fallback gate run voids it"
 - Modify: `_pkgdown.yml` (after the "Master datasets" group)
 - Create: `news/feat-parity-gate.md`
 
-- [ ] **Step 1: Record the parity view in spec §7.2**, as plan 1 asked. In
-  `dev/specs/2026-11-16-master-views-design.md`, replace
+- [ ] **Step 1: Amend spec §7.2 and §8**, recording the parity view as plan 1 asked and
+  the fail-verdict decision (decision 2). In `dev/specs/2026-11-16-master-views-design.md`,
+  three replacements. In §7.2, replace
+
+```markdown
+So the gate gets its own two steps, and neither touches the master view, its metadata or its
+parity records:
+```
+
+  with
+
+```markdown
+So the gate gets its own two steps. Neither touches the master view or its metadata;
+`load_oracle()` writes no parity record, and `parity_gate()` writes only its verdict:
+```
+
+  Still in §7.2, replace
 
 ```markdown
 The twelve historical snapshots remain the record of what SAS produced. They are not the gate.
@@ -2112,19 +2197,39 @@ The twelve historical snapshots remain the record of what SAS produced. They are
 
 ```markdown
 **Recorded 2026-11-17 (plan 2b).** The gate's record is `<master>_parity` (`sql_commit`,
-`verdict`, `verified_at`, `run_id`), one row per pass, written only by `parity_gate()` against
-the commit named in the gate schema's `<master>_deployment`. `pull_master()` reads it with
-the production `<master>_deployment` inside the pull's snapshot and fails closed: no verdict
-for the deployed commit, a latest verdict that is not a pass, or a pass only for another
-commit stops the pull. A failed or void run never writes there; its evidence is kept in
-`<master>_gate_runs`, `<master>_gate_markers`, `<master>_gate_verdicts` and
-`<master>_gate_outcomes`, and the oracle's load check in `<master>_oracle_integrity`. An
-**activated legacy correction** is a `legacy_sas_inline` row of the master's corrections
-table whose latest decision is `accept`; it explains a differing cell when its new value is
-the oracle's. The fallback's change marker is a row count and an XOR of row hashes:
-`CHECKSUM_AGG(BINARY_CHECKSUM(*))` on SQL Server, `bit_xor(hash(row))` on duckdb.
+`verdict`, `verified_at`, `run_id`), written only by `parity_gate()` against the commit named
+in the gate schema's `<master>_deployment`: a `pass` row for a pass and a `fail` row for a
+fail. `pull_master()` reads it with the production `<master>_deployment` inside the pull's
+snapshot and fails closed: no verdict for the deployed commit, a latest verdict that is not a
+pass, or a pass only for another commit stops the pull. **A failed gate therefore blocks the
+commit it tested until a later pass.** A void run writes nothing there, so an earlier verdict
+stands. Every run's evidence is kept in `<master>_gate_runs`, `<master>_gate_markers`,
+`<master>_gate_verdicts` and `<master>_gate_outcomes`, and the oracle's load check in
+`<master>_oracle_integrity`. The gate schema's rules read the **uncorrected** `stg_<source>`
+views, not `stg_<source>_corrected`, so a correction accepted after the SAS build cannot
+appear as an unexplained difference. An **activated legacy correction** is a
+`legacy_sas_inline` row of the master's corrections table whose latest decision is `accept`;
+it explains a differing cell when its new value is the oracle's, and legacy inline fixes are
+the only differences the gate explains. The fallback's change marker is a row count and an
+XOR of row hashes: `CHECKSUM_AGG(BINARY_CHECKSUM(*))` on SQL Server, `bit_xor(hash(row))` on
+duckdb.
 
 The twelve historical snapshots remain the record of what SAS produced. They are not the gate.
+```
+
+  In §8, replace
+
+```markdown
+- Loading the oracle or failing the gate never changes the master view, its metadata or its
+  parity records (§7.2).
+```
+
+  with
+
+```markdown
+- Loading the oracle or failing the gate never changes the master view or its metadata
+  (§7.2). Loading the oracle writes no parity record; a failed gate records a `fail` verdict
+  that blocks the commit it tested until a later pass, and a void run records none.
 ```
 
 - [ ] **Step 2: Add the reference group.** In `_pkgdown.yml`, after the `Master datasets`
@@ -2151,9 +2256,10 @@ The twelve historical snapshots remain the record of what SAS produced. They are
   as oracle integrity; it never touches the master's view, metadata or parity records.
   `parity_gate()` compares the rules view in a gate schema with the oracle cell by cell in
   the database, accepts a difference only where an activated legacy correction explains it,
-  and records a verdict per column, never a value. Only a pass is written to
-  `<master>_parity`, against the SQL model commit it tested; a source change during a
-  fallback run voids it.
+  and records a verdict per column, never a value. A pass or a fail is written to
+  `<master>_parity` against the SQL model commit it tested, so a fail blocks that commit
+  from study builds until a later pass; a source change during a fallback run voids it,
+  and a void run records no verdict.
 * `lift_master()` now shares its load and checks with `load_oracle()`; its behaviour is
   unchanged.
 ```
@@ -2205,13 +2311,14 @@ on the warehouse before the gate is trusted there:
 - **The gate rehearsal of §9**: an upstream write between the SAS run and the comparison
   voids a fallback run (tested here on duckdb), and under a database snapshot cannot reach
   either side (needs the snapshot).
-- **Accepted corrections that are not legacy.** The rules view reads `_corrected` sources,
-  so a correction accepted after the SAS build's era appears as an unexplained difference
-  and fails the gate. Whether the gate schema reads corrections as of the oracle, or legacy
-  ones only, is a deployment decision for plan 3.
-- **Revoking a pass.** Nothing here writes a `"fail"` verdict to `<master>_parity`; a pass
-  stands until a new deployment changes the commit. A revocation path, if wanted, is data
-  engineering's.
+- **The gate schema reads uncorrected sources** (the contract above). Plan 3's deploy step
+  must build the gate schema's rules over `stg_<source>`, not `stg_<source>_corrected`,
+  while the production deployment of the same commit reads the corrected views. The
+  rehearsal confirms it by accepting a non-legacy correction before a gate run and seeing no
+  unexplained difference.
+- **Legacy fixes against source columns.** Once plan 3 re-expresses the legacy inline fixes
+  against source columns (§3.2), `.legacy_cte()` moves from the master-keyed record to
+  plan 2a's per-source correction tables.
 
 ## Self-review
 
@@ -2219,9 +2326,11 @@ on the warehouse before the gate is trusted there:
   fallback (Tasks 3, 6). §7.2 `load_oracle()` sharing the DDL and load but not the tail
   (Tasks 1, 2); `parity_gate()` in the database, per-column verdicts, explained by activated
   legacy corrections, pass bound to commit and deployment (Tasks 4, 5); the §7.2 record of
-  the view (Task 7). §8: mismatch blocks study builds (Task 5, via `pull_master()`); a void
-  run never passes (Task 6); oracle loading and a failing gate leave the view, metadata and
-  parity records untouched (Tasks 2, 5, 6, `production_state()`). §9 gate isolation
+  the view (Task 7). §8 as amended: a mismatch records a fail that blocks the tested commit,
+  even after an earlier pass (Task 5, via `pull_master()`); a void run never passes and
+  leaves an earlier pass in force (Task 6); oracle loading and a failing gate leave the view
+  and metadata untouched, and loading writes no parity record (Tasks 2, 5, 6,
+  `production_state()`). §9 gate isolation
   (Tasks 2, 5) and gate rehearsal (Task 6 on duckdb; SQL Server in plan 3).
 - **No values in messages.** Every new message is built from counts, table names, run ids
   and class names. Tasks 5 and 6 assert that failure messages carry no identifier and no
