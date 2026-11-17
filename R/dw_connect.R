@@ -47,12 +47,11 @@
 #'   never shown, because it may carry a credential.
 #'
 #' @examples
-#' \donttest{
-#' if (requireNamespace("odbc", quietly = TRUE)) {
-#'   # Requires a configured DSN and warehouse access; not run in checks.
-#'   # conn <- dw_connect(server = "<DW-SERVER>", database = "<DW-DB>",
-#'   #                    dsn = "HVI_DW")
-#' }
+#' \dontrun{
+#' # Needs the ODBC driver and warehouse credentials, which no check machine has. See
+#' # dw_pull() for an example that runs, with DuckDB standing in for the warehouse.
+#' con <- dw_connect(server = "<DW-SERVER>", database = "<DW-DB>", dsn = "HVI_DW")
+#' DBI::dbDisconnect(con)
 #' }
 #'
 #' @export
