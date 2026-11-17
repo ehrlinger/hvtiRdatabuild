@@ -170,7 +170,7 @@ writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmp3ILwhH/duckdb
+#> ℹ /tmp/RtmpYwi41K/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -179,7 +179,7 @@ con <- DBI::dbConnect(duckdb::duckdb())
 #> ℹ See ?duckdb_storage for details and alternatives.
 dry <- lift_master(read_master_config(cfg_path), con, pq, dialect = "duckdb")
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/Rtmp3ILwhH/master2039e843029/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/RtmpYwi41K/master2129f0de89f/built_demo.parquet.ddl.sql
 dry$dry_run
 #> [1] TRUE
 ```
@@ -294,7 +294,7 @@ prop <- propose_correction(cfg2, con,
                            key_values = list(emrn = "E3"), alt_key = "epic", var_col = "age",
                            expected_prior = 70, new_value = 71, evidence_type = "chart_review",
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
-#> Correction c9d6a5049ba3380cd appended.
+#> Correction cae5bde8939a5e072 appended.
 prop$verdict
 #> [1] "appended"
 ```
@@ -308,7 +308,7 @@ someone accepts it:
 ``` r
 
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
-#> Decision dd8a55da7bf7054c6 (accept) recorded on c9d6a5049ba3380cd.
+#> Decision dd7691fe191996800 (accept) recorded on cae5bde8939a5e072.
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 #>   age
 #> 1  71
