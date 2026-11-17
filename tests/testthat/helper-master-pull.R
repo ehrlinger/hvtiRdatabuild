@@ -137,3 +137,21 @@ routed_then_age <- function(env = parent.frame()) {
   age <- criterion("age", "Age 60 or over", "include", master_row("age >= 60"), "exclude")
   pull_demo(con, demo_query(criteria = list(routed, age), index_on = "qualifying"))
 }
+
+candidates_setup <- function(env = parent.frame()) {
+  f <- local_freeze_setup(env)
+  DBI::dbWriteTable(f$con, "master_demo_lineage", data.frame(
+    master_column = "age", source = "stg_demo", source_column = "age_years",
+    stringsAsFactors = FALSE
+  ))
+  pull <- pull_demo(f$con, demo_query(), var_cols = c("proc", "age"))
+  release <- freeze_study_pull(pull, f$config, f$dir, "st0000_pull",
+                               extract_date = "2026-11-16")
+  frozen <- file.path(f$dir, release$file)
+  cfg_path <- withr::local_tempfile(fileext = ".yml", .local_envir = env)
+  writeLines(c("name: master_demo", "key: [mrn, encounter_date]", "snapshots: snap",
+               "current: x.sas7bdat", "build_program: x.sas", "sources:",
+               "  stg_demo: {key: [mrn, encounter_date]}"), cfg_path)
+  list(con = f$con, cfg = read_master_config(cfg_path), frozen = frozen,
+       data = as.data.frame(arrow::read_parquet(frozen)))
+}

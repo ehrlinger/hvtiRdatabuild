@@ -142,3 +142,27 @@ good_row <- function(...) {
   r[names(over)] <- over
   r
 }
+
+decide_setup <- function(env = parent.frame()) {
+  con <- local_sources_db(env)
+  cfg <- corrections_config(env)
+  deploy_sources(con, cfg)
+  DBI::dbAppendTable(con, "stg_echo_corrections", rbind(
+    corr_row("c01", "SYN201", "2020-01-01", "lvef", "30", 0L, "35", 0L,
+             asserted_by = "reviewer_a"),
+    corr_row("c02", "SYN203", "2020-03-01", "lvef", "40", 0L, "41", 0L,
+             asserted_by = "dm_two"),
+    corr_row("c03", "SYN203", "2020-03-01", "mr_grade", NA, 1L, "1", 0L,
+             asserted_by = "reviewer_a"),
+    corr_row("c04", "SYN204", "2020-04-01", "lvef", "50", 0L, "51", 0L,
+             asserted_by = "reviewer_a")
+  ))
+  list(con = con, cfg = cfg)
+}
+
+propose_setup <- function(env = parent.frame()) {
+  con <- local_sources_db(env)
+  cfg <- corrections_config(env)
+  deploy_sources(con, cfg)
+  list(con = con, cfg = cfg)
+}

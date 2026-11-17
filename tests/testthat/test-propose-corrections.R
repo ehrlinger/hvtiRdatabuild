@@ -44,13 +44,6 @@ test_that("the template has one column per declared key, and is never overwritte
   expect_error(write_corrections_template(cfg, path), class = "hvtiRdatabuild_file_exists")
 })
 
-propose_setup <- function(env = parent.frame()) {
-  con <- local_sources_db(env)
-  cfg <- corrections_config(env)
-  deploy_sources(con, cfg)
-  list(con = con, cfg = cfg)
-}
-
 test_that("a clean file is appendable on a dry run, and nothing is written", {
   s <- propose_setup()
   patient <- good_row(source = "stg_patient", encounter_date = "", variable = "sex",
