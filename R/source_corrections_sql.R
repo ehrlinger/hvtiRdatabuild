@@ -187,6 +187,32 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
   paste(conds, collapse = " AND ")
 }
 
+#' Select and group lists that group exactly on SQL Server
+#'
+#' Character columns group on their binary collation plus byte length, since BIN2 alone still
+#' ignores trailing spaces. Members of such a group are byte-identical, so the collated
+#' expression stands for the value. Other columns, and every column on duckdb, are plain.
+#'
+#' @param cols Character. Column names, in order.
+#' @param types A named character vector of SQL types covering `cols`.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A list: `select` and `group`, each a length-one character.
+#'
+#' @keywords internal
+#' @noRd
+.exact_group_sql <- function(cols, types, dialect) {
+  q <- quoter(dialect)
+  is_string <- dialect == "mssql" & grepl("^n?(var)?char\\b", types[cols], ignore.case = TRUE)
+  list(select = paste(ifelse(is_string,
+                             sprintf("%s COLLATE Latin1_General_BIN2 AS %s", q(cols), q(cols)),
+                             q(cols)), collapse = ", "),
+       group = paste(ifelse(is_string,
+                            sprintf("%s COLLATE Latin1_General_BIN2, DATALENGTH(%s)",
+                                    q(cols), q(cols)),
+                            q(cols)), collapse = ", "))
+}
+
 #' A variable name as a SQL literal that matches the `variable` column exactly
 #'
 #' @param v Character. A column name.
@@ -251,7 +277,9 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
     paste0("NOT (", .string_eq_sql("a.variable", .variable_literal(v, dialect),
                                    "nvarchar(128)", dialect), ")")
   }, character(1)), collapse = " AND ")
-  keys <- paste(q(key), collapse = ", ")
+  gtypes <- c(types, variable = "nvarchar(128)")
+  gk <- .exact_group_sql(key, gtypes, dialect)
+  gkv <- .exact_group_sql(c(key, "variable"), gtypes, dialect)
   paste0(
     "WITH latest AS (\n",
     "  SELECT correction_id, decision,\n",
@@ -263,14 +291,15 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
     "  JOIN latest l ON l.correction_id = c.correction_id\n",
     "  WHERE l.rn = 1 AND l.decision = 'accept'\n",
     "), cell AS (\n",
-    "  SELECT ", keys, ", variable,\n",
+    "  SELECT ", gkv$select, ",\n",
     "         COUNT(DISTINCT CASE WHEN new_value_missing = 1 THEN NULL ELSE ",
     distinct_value, " END)\n",
     "         + MAX(new_value_missing) AS n_values\n",
-    "  FROM accepted GROUP BY ", keys, ", variable\n",
+    "  FROM accepted GROUP BY ", gkv$group, "\n",
     # Source rows per key now: a refresh can break uniqueness after a correction is accepted.
     "), bc AS (\n",
-    "  SELECT ", keys, ", COUNT(*) AS n_rows FROM ", q(source), " GROUP BY ", keys, "\n",
+    "  SELECT ", gk$select, ", COUNT(*) AS n_rows FROM ", q(source), " GROUP BY ", gk$group,
+    "\n",
     "), checked AS (\n",
     "  SELECT a.*, CASE\n",
     "    WHEN ", not_valid, " THEN 'no_variable'\n",
@@ -327,6 +356,7 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
   }
   cte <- .checked_cte(source, key, types, dialect)
   keys <- paste(q(key), collapse = ", ")
+  gk <- .exact_group_sql(key, types, dialect)
   pivot <- unlist(lapply(seq_along(valid), function(i) {
     w <- paste0("WHEN ", .string_eq_sql("variable", .variable_literal(valid[[i]], dialect),
                                         "nvarchar(128)", dialect), " THEN")
@@ -345,8 +375,8 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
   on_p <- .key_join_sql("p", "b", key, types, dialect)
   corrected <- paste0(
     view_header(dialect), " ", q(tabs$corrected), " AS\n", cte,
-    ", p AS (\n  SELECT ", keys, ",\n    ", paste(pivot, collapse = ",\n    "),
-    "\n  FROM checked WHERE status = 'apply' GROUP BY ", keys, "\n)\n",
+    ", p AS (\n  SELECT ", gk$select, ",\n    ", paste(pivot, collapse = ",\n    "),
+    "\n  FROM checked WHERE status = 'apply' GROUP BY ", gk$group, "\n)\n",
     "SELECT\n  ", paste(select, collapse = ",\n  "), "\n",
     "FROM ", q(source), " b\nLEFT JOIN p ON ", on_p
   )

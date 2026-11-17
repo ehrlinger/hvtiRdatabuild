@@ -142,6 +142,18 @@ test_that("the mssql views compare names, character keys and counted values exac
   expect_match(v[["corrected"]], paste0("variable ", bin2, " = N'grade' ", bin2), fixed = TRUE)
   expect_match(v[["corrected"]], paste0("p.[mrn] ", bin2, " = b.[mrn] ", bin2), fixed = TRUE)
   expect_match(v[["corrected"]], "p.[visit_no] = b.[visit_no]", fixed = TRUE)
+  # Each of cell, bc and p groups the character key exactly and the numeric key plainly.
+  corrected <- v[["corrected"]]
+  groups <- regmatches(corrected, gregexpr("GROUP BY [^\n]*", corrected))[[1]]
+  expect_length(groups, 3L)
+  for (g in groups) {
+    expect_match(g, paste0("[mrn] ", bin2, ", DATALENGTH([mrn])"), fixed = TRUE)
+    expect_match(g, "[visit_no]", fixed = TRUE)
+    expect_no_match(g, "[visit_no] COLLATE", fixed = TRUE)
+    expect_no_match(g, "DATALENGTH([visit_no])", fixed = TRUE)
+  }
+  expect_match(groups[[1]], paste0("[variable] ", bin2, ", DATALENGTH([variable])"), fixed = TRUE)
+  expect_match(corrected, paste0("[mrn] ", bin2, " AS [mrn]"), fixed = TRUE)
 })
 
 test_that("source_views_sql() refuses a key outside the columns and a keys-only source", {
