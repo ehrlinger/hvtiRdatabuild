@@ -224,8 +224,10 @@
 #'   `study_config_sha256`, `n_cohort`, `n_matched`, `n_unmatched`, `status`
 #'   (`"complete"`, or `"awaiting review"` while chart review is pending; see
 #'   [apply_review()]) and `review_decisions_sha256` (`NA` until review is applied).
-#'   `review` holds the review `queue` (`cohort_unit`, `criterion_id`) and the declared
-#'   `criteria` (`criterion_id`, `label`, `role`, `kind`). The same pull
+#'   `review` holds the review `queue` (`cohort_unit`, `criterion_id`), each unit's
+#'   `outcomes` at the warehouse and local criteria (`cohort_unit`, `criterion_id`,
+#'   `outcome`: 1 met, 0 not met, `NA` undetermined) and the declared `criteria`
+#'   (`criterion_id`, `label`, `role`, `kind`). The same pull
 #'   fields without the provenance record are also in `provenance`, which is deprecated
 #'   and goes in the next release; read `meta`.
 #'   `corrections_in_effect` holds every correction id applied anywhere in the master in
@@ -386,11 +388,13 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
 
   queue <- data.frame(cohort_unit = character(), criterion_id = character(),
                       stringsAsFactors = FALSE)
+  outcomes <- .outcome_rows(character(), character(), integer())
   if (is_query) {
     staged <- .criteria_stages(.query_cohort(cohort, read$selected, master, read$commit),
                                compiled, read$selected)
     base <- staged$cohort
     queue <- staged$queue
+    outcomes <- staged$outcomes
     sql_units <- cohort_unit_id(as.character(read$selected$mrn),
                                 as.Date(read$selected$encounter_date))
     sql_active <- sql_units[read$selected$active == 1L]
@@ -427,6 +431,7 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     local_out <- .local_stages(final, locals)
     final <- local_out$cohort
     queue <- rbind(queue, local_out$queue)
+    outcomes <- rbind(outcomes, local_out$outcomes)
   }
   final_active <- .active_units(final)
   # A routed unit stays queued even if a later stage excluded it: until review, which
@@ -477,6 +482,7 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     provenance = fields,
     review = list(
       queue = queue,
+      outcomes = outcomes,
       criteria = data.frame(
         criterion_id = vapply(criteria, `[[`, character(1), "id"),
         label = vapply(criteria, `[[`, character(1), "label"),

@@ -362,6 +362,12 @@ review_criterion <- function(id, label, role) {
        review = und & identical(undetermined, "review"))
 }
 
+# The three-valued tally a criterion's provenance carries.
+.count_text <- function(s) {
+  sprintf("met %d, not met %d, undetermined %d", sum(s %in% 1L), sum(s %in% 0L),
+          sum(is.na(s)))
+}
+
 .active_units <- function(record) {
   last <- utils::tail(record$stages$stage_id[order(record$stages$order)], 1L)
   record$members$patient_id[record$members$stage_id == last & record$members$included]
@@ -425,24 +431,32 @@ review_criterion <- function(id, label, role) {
                  stringsAsFactors = FALSE)
     )
   }
+  outcomes <- .outcome_rows(character(), character(), integer())
   for (st in compiled$stages) {
     active <- .active_units(record)
     s <- .eval_node(st$node, selected[match(active, units), , drop = FALSE])
     out <- .stage_outcome(st$role, st$undetermined, s, st$label)
-    prov <- sprintf("%s; met %d, not met %d, undetermined %d", .describe_criterion(st),
-                    sum(s %in% 1L), sum(s %in% 0L), sum(is.na(s)))
+    prov <- sprintf("%s; %s", .describe_criterion(st), .count_text(s))
     record <- add_stage(record, st$id, st$label, prov, active, out)
+    outcomes <- rbind(outcomes, .outcome_rows(active, st$id, s))
     if (any(out$review)) {
       queue <- rbind(queue, data.frame(cohort_unit = active[out$review],
                                        criterion_id = st$id, stringsAsFactors = FALSE))
     }
   }
-  list(cohort = record, queue = queue)
+  list(cohort = record, queue = queue, outcomes = outcomes)
+}
+
+# Each unit's outcome at a criterion: 1 met, 0 not met, NA undetermined.
+.outcome_rows <- function(units, id, s) {
+  data.frame(cohort_unit = units, criterion_id = rep(id, length(units)),
+             outcome = as.integer(s), stringsAsFactors = FALSE)
 }
 
 .local_stages <- function(record, locals) {
   queue <- data.frame(cohort_unit = character(), criterion_id = character(),
                       stringsAsFactors = FALSE)
+  outcomes <- .outcome_rows(character(), character(), integer())
   for (cr in locals) {
     active <- .active_units(record)
     keys <- split_cohort_unit(active)
@@ -466,9 +480,9 @@ review_criterion <- function(id, label, role) {
     }
     s <- as.integer(met)
     out <- .stage_outcome(cr$role, cr$undetermined, s, cr$label)
-    prov <- sprintf("%s; met %d, not met %d, undetermined %d; read after the snapshot",
-                    .describe_criterion(cr), sum(s %in% 1L), sum(s %in% 0L),
-                    sum(is.na(s)))
+    prov <- sprintf("%s; %s; read after the snapshot", .describe_criterion(cr),
+                    .count_text(s))
+    outcomes <- rbind(outcomes, .outcome_rows(active, cr$id, s))
     record <- append_cohort_stage(
       record,
       data.frame(stage_id = cr$id, order = max(record$stages$order) + 1L,
@@ -482,5 +496,5 @@ review_criterion <- function(id, label, role) {
                                        criterion_id = cr$id, stringsAsFactors = FALSE))
     }
   }
-  list(cohort = record, queue = queue)
+  list(cohort = record, queue = queue, outcomes = outcomes)
 }

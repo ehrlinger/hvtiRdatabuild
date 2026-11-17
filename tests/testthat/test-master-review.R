@@ -190,3 +190,44 @@ test_that("a routed unit that passes later criteria is excluded at the routing c
   expect_match(prov, "2 excluded at chart review", fixed = TRUE)
   expect_identical(out$data$cohort_unit, "SYN101|2010-03-01")
 })
+
+stage_prov <- function(cohort, id) cohort$stages$provenance[cohort$stages$stage_id == id]
+
+test_that("a unit moved back by review leaves every later stage's counts", {
+  con <- criteria_db()
+  routed <- criterion("lvef", "LVEF 25% or less", "include",
+                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
+                                "lvef <= 25"),
+                      undetermined = "review")
+  adult <- criterion("adult", "Age 50 or over", "include", master_row("age >= 50"), "exclude")
+  pull <- pull_demo(con, demo_query(criteria = list(routed, adult), index_on = "qualifying"))
+  expect_match(stage_prov(pull$cohort, "adult"), "met 3, not met 0, undetermined 0",
+               fixed = TRUE)
+  out <- apply_review(pull, write_decisions(decide_all(pull, code = "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  prov <- stage_prov(out$cohort, "adult")
+  # The counts describe the stage's one remaining entrant ...
+  expect_match(prov, "; met 1, not met 0, undetermined 0;", fixed = TRUE)
+  # ... and the warehouse's own figures are kept, labelled as such.
+  expect_match(prov, "as evaluated in the warehouse before review: met 3, not met 0, ",
+               fixed = TRUE)
+  # The routing stage keeps its counts: every routed unit entered it.
+  expect_match(stage_prov(out$cohort, "lvef"), "met 1, not met 0, undetermined 2",
+               fixed = TRUE)
+})
+
+test_that("a later stage's not-met count drops a unit review moved back", {
+  pull <- routed_then_age()
+  out <- apply_review(pull, write_decisions(decide_all(pull, "SYN104|2020-01-10", "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  expect_match(stage_prov(out$cohort, "age"), "; met 2, not met 0, undetermined 0;",
+               fixed = TRUE)
+})
+
+test_that("a stage review did not change keeps its text", {
+  pull <- routed_then_age()
+  met <- c("SYN103|2015-06-30", "SYN104|2020-01-10")
+  out <- apply_review(pull, write_decisions(decide_all(pull, met, "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  expect_identical(stage_prov(out$cohort, "age"), stage_prov(pull$cohort, "age"))
+})
