@@ -89,7 +89,12 @@ study_correction_candidates <- function(config, con, pull, data, path,
     .abort("key_columns", "study_correction_candidates(): the pull and `data` must both ",
            "carry ", paste(key, collapse = ", "), ".")
   }
-  unit <- function(d) do.call(paste, c(lapply(d[key], as.character), sep = "\r"))
+  if (anyNA(base[key]) || anyNA(data[key])) {
+    .abort("missing_key", "study_correction_candidates(): ",
+           sum(!stats::complete.cases(data[key])), " row(s) of `data` and ",
+           sum(!stats::complete.cases(base[key])), " of the pull have a missing key.")
+  }
+  unit <- function(d) .composite_key(lapply(d[key], as.character))
   if (anyDuplicated(unit(base)) || anyDuplicated(unit(data))) {
     .abort("duplicate_units", "study_correction_candidates(): a unit appears twice.")
   }
@@ -127,7 +132,7 @@ study_correction_candidates <- function(config, con, pull, data, path,
     }
     # A source cell shared by several encounters (a patient-level source) is a candidate
     # only when every one of those encounters in `data` agrees on it, changed or not.
-    grp <- do.call(paste, c(lapply(s_key, function(k) as_text(base[[k]][m])), sep = "\r"))
+    grp <- .composite_key(lapply(s_key, function(k) as_text(base[[k]][m])))
     n_vals <- tapply(ifelse(is.na(after), "\001missing", after), grp,
                      function(x) length(unique(x)))
     split <- grp %in% names(n_vals)[n_vals > 1L]
@@ -155,12 +160,12 @@ study_correction_candidates <- function(config, con, pull, data, path,
   }
   # Encounters that agree on a shared cell gave identical rows: keep one. Two master
   # columns read from one source column could still clash: drop and count those.
-  cell <- do.call(paste, c(lapply(cand, function(x) x), sep = "\r"))
+  cell <- .composite_key(as.list(cand))
   cand <- cand[!duplicated(cell), , drop = FALSE]
   key_cols <- setdiff(tpl_cols, c("expected_prior", "expected_prior_missing", "new_value",
                                   "new_value_missing", "evidence_type", "evidence_ref",
                                   "asserted_by"))
-  addr <- do.call(paste, c(lapply(cand[key_cols], function(x) x), sep = "\r"))
+  addr <- .composite_key(as.list(cand[key_cols]))
   clash <- addr %in% addr[duplicated(addr)]
   inconsistent <- inconsistent + length(unique(addr[clash]))
   cand <- cand[!clash, , drop = FALSE]
@@ -171,4 +176,21 @@ study_correction_candidates <- function(config, con, pull, data, path,
                " derived-column difference(s) in ", nrow(derived), " column(s).")
   invisible(list(candidates = nrow(cand), inconsistent = inconsistent, derived = derived,
                  path = path, derived_path = derived_path))
+}
+
+#' One text per row from several key columns, without collisions
+#'
+#' Each part is written as its length in characters, a colon and the text, or as `N` when
+#' it is missing, so a missing part never matches the text `"NA"` and no separator inside
+#' a value can make two different rows read alike.
+#'
+#' @param parts List of character vectors of equal length.
+#'
+#' @return A character vector, one element per row.
+#'
+#' @keywords internal
+#' @noRd
+.composite_key <- function(parts) {
+  enc <- lapply(parts, function(x) ifelse(is.na(x), "N", paste0(nchar(x), ":", x)))
+  do.call(paste, c(enc, sep = "|"))
 }

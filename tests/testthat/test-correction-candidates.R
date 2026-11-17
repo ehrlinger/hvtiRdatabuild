@@ -84,3 +84,23 @@ test_that("a master column with two lineage sources stops, naming only the colum
   expect_s3_class(err, "hvtiRdatabuild_ambiguous_lineage")
   expect_false(grepl("stg_pat|SYN", conditionMessage(err)))
 })
+
+test_that("a missing study key stops, and is not read as the text NA", {
+  s <- candidates_setup()
+  data <- s$data
+  data$mrn[[1]] <- NA
+  err <- tryCatch(study_correction_candidates(s$cfg, s$con, s$frozen, data,
+                                              withr::local_tempfile(fileext = ".csv"),
+                                              dialect = "duckdb"),
+                  error = function(e) e)
+  expect_s3_class(err, "hvtiRdatabuild_missing_key")
+  expect_false(grepl("SYN", conditionMessage(err)))
+})
+
+test_that("composite keys keep missing apart from NA and survive any separator", {
+  expect_false(identical(.composite_key(list(NA_character_)), .composite_key(list("NA"))))
+  k <- .composite_key(list(c("a\rb", "a"), c("c", "b\rc")))
+  expect_false(k[[1]] == k[[2]])
+  k <- .composite_key(list(c("1:a", "1"), c("b", ":ab")))
+  expect_false(k[[1]] == k[[2]])
+})

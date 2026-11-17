@@ -347,11 +347,16 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         cls <- class(proto[[k]])[[1]]
         vapply(rows[[k]][idx], function(x) {
           if (is.na(x)) return(NA_character_)
-          # as.POSIXct() errors on text it cannot read; that is an unknown key, not a crash.
-          tryCatch(value_text(parse_value(x, cls)), error = function(e) NA_character_)
+          value_text(.parse_submitted(x, cls))
         }, character(1), USE.NAMES = FALSE)
       })
       names(typed) <- key
+      # The key must survive the warehouse's cast to the key column unchanged, as values
+      # must: an integer key `1.2` would load as `1` and name another row.
+      for (k in key) {
+        j <- which(!is.na(typed[[k]]))
+        typed[[k]][j[!.casts_losslessly(con, typed[[k]][j], types[[k]])]] <- NA_character_
+      }
       incomplete <- Reduce(`|`, lapply(typed, is.na)) |
         (if (length(other)) Reduce(`|`, lapply(other, function(k) !is.na(rows[[k]][idx])))
          else FALSE)
@@ -381,7 +386,7 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         v <- rows$variable[[i]]
         cls <- class(proto[[v]])[[1]]
         cur <- found[[v]][[match(i, found$intake_row_)]]
-        parsed <- function(x) tryCatch(parse_value(x, cls), error = function(e) NA)
+        parsed <- function(x) .parse_submitted(x, cls)
         prior <- if (rows$expected_prior_missing[[i]] == "1") NA else
           parsed(rows$expected_prior[[i]])
         new <- if (rows$new_value_missing[[i]] == "1") NA else parsed(rows$new_value[[i]])
@@ -495,6 +500,35 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
     }, logical(1))
   }
   ok
+}
+
+#' Parse a submitted key or value, accepting only the whole of a supported form
+#'
+#' `parse_value()` is lenient: `as.Date()` and `as.POSIXct()` keep a valid prefix and drop
+#' the rest, and `as.numeric()` reads hexadecimal. At intake that would let
+#' `2020-01-01junk` name the row keyed `2020-01-01`, so the raw text must first match its
+#' class's form in full: `YYYY-MM-DD` for a date, the same with `HH:MM`, optional seconds
+#' and fraction for a timestamp, and a plain decimal (optionally with an exponent) for a
+#' number. Character and logical text go to `parse_value()` unchanged.
+#'
+#' @param text Character. One submitted text, not `NA`.
+#' @param r_class Character. The column's R class.
+#'
+#' @return The parsed value, or `NA` when the text is not a whole supported form or does
+#'   not parse.
+#'
+#' @keywords internal
+#' @noRd
+.parse_submitted <- function(text, r_class) {
+  form <- switch(r_class,
+                 Date = "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                 POSIXct = paste0("^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}",
+                                  "(:[0-9]{2}([.][0-9]+)?)?$"),
+                 numeric = , integer = , haven_labelled =
+                   "^[+-]?([0-9]+[.]?[0-9]*|[.][0-9]+)([eE][+-]?[0-9]+)?$",
+                 NULL)
+  if (!is.null(form) && !grepl(form, text)) return(NA)
+  tryCatch(parse_value(text, r_class), error = function(e) NA)
 }
 
 #' Parse a vector of canonical texts to one class
