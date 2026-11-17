@@ -497,3 +497,170 @@ parse_value_vec <- function(x, r_class) {
   out <- lapply(x, parse_value, r_class = r_class)
   do.call(c, out)
 }
+
+#' Decide a batch of corrections
+#'
+#' Records `accept`, `reject`, `supersede` or `bake` for each row of `decisions`. A
+#' correction applies while its latest decision is `accept`. When two accepted corrections
+#' to a cell disagree, neither applies (G1): supersede the wrong one to settle the cell.
+#'
+#' Each row gets one of these verdicts:
+#'
+#' - `recordable`: the row passed every check below.
+#' - `unknown_source`: the source is not declared in `master.yml`.
+#' - `repeated_correction`: the batch decides the same correction more than once. Every row
+#'   of a batch shares one `decided_on`, so their order would be arbitrary; decide it again
+#'   in a later batch instead.
+#' - `unknown_correction`: the source has no correction with that id.
+#' - `invalid_decision`: the decision is not one of the four.
+#' - `not_decider`: the decider is not listed in `master.yml`'s `deciders`.
+#' - `self_accepted`: the decider asserted the correction (G2).
+#'
+#' With `dry_run = FALSE`, an all-`recordable` batch is recorded in one transaction, and a
+#' batch with any other verdict is refused whole.
+#'
+#' **Interim.** Superseded by the HVTR registry. Replaces the deprecated
+#' [decide_correction()].
+#'
+#' @param config A `master_config` from [read_master_config()], with `sources` and
+#'   `deciders`.
+#' @param con A DBI connection to the warehouse.
+#' @param decisions A data frame with `source`, `correction_id`, `decision`, `decided_by`
+#'   and optionally `reason`.
+#' @param dry_run If `TRUE`, the default, validate only.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return Invisibly, a list: `verdicts` (a data frame of `row`, `verdict`) and
+#'   `recorded` (an integer).
+#'
+#' @seealso [propose_corrections()], [retire_filled_corrections()]
+#'
+#' @examples
+#' # See propose_corrections().
+#'
+#' @export
+decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect = "mssql") {
+  if (!length(config$deciders)) {
+    .abort("no_deciders", "decide_corrections(): master.yml names no deciders.")
+  }
+  need <- c("source", "correction_id", "decision", "decided_by")
+  if (!is.data.frame(decisions) || !all(need %in% names(decisions))) {
+    .abort("decisions_columns", "decide_corrections(): `decisions` needs ",
+           paste(need, collapse = ", "), ".")
+  }
+  if (!"reason" %in% names(decisions)) decisions$reason <- NA_character_
+  n <- nrow(decisions)
+  verdict <- rep(NA_character_, n)
+  set <- function(i, v) {
+    if (!is.logical(i)) i <- seq_len(n) %in% i
+    verdict[i & is.na(verdict)] <<- v
+  }
+  set(!decisions$source %in% names(config$sources), "unknown_source")
+  # One correction, one decision per batch: rows sharing a decided_on would be ordered by
+  # their hash-derived decision_id, not by intent.
+  dup <- paste(decisions$source, decisions$correction_id, sep = "\r")
+  set(dup %in% dup[duplicated(dup)], "repeated_correction")
+  q <- quoter(dialect)
+  now <- Sys.time()
+  record <- function() {
+    for (s in intersect(names(config$sources), decisions$source)) {
+      idx <- which(decisions$source == s)
+      ids <- unique(decisions$correction_id[idx])
+      known <- run_step("look up corrections", DBI::dbGetQuery(con, sprintf(
+        "SELECT correction_id, asserted_by FROM %s WHERE correction_id IN (%s)",
+        q(.source_tables(s)$corrections), paste(rep("?", length(ids)), collapse = ", ")
+      ), params = as.list(ids)))
+      asserter <- known$asserted_by[match(decisions$correction_id[idx], known$correction_id)]
+      set(idx[is.na(asserter)], "unknown_correction")
+      set(idx[!decisions$decision[idx] %in% DECISIONS], "invalid_decision")
+      set(idx[!decisions$decided_by[idx] %in% config$deciders], "not_decider")
+      set(idx[!is.na(asserter) & asserter == decisions$decided_by[idx]], "self_accepted")
+      set(idx, "recordable")
+    }
+    if (dry_run || any(verdict != "recordable")) return(invisible(NULL))
+    for (s in unique(decisions$source)) {
+      idx <- which(decisions$source == s)
+      rows <- data.frame(
+        decision_id = vapply(idx, function(i) paste0("d", substr(digest::digest(
+          list(decisions$correction_id[[i]], decisions$decision[[i]],
+               decisions$decided_by[[i]], i, format(now, "%Y-%m-%d %H:%M:%OS6")),
+          algo = "sha1"), 1, 20)), character(1)),
+        correction_id = decisions$correction_id[idx], decision = decisions$decision[idx],
+        decided_by = decisions$decided_by[idx], decided_on = now,
+        reason = as.character(decisions$reason[idx]), stringsAsFactors = FALSE
+      )
+      run_step("append decisions",
+               DBI::dbAppendTable(con, .source_tables(s)$decisions, rows))
+    }
+    invisible(NULL)
+  }
+  .with_snapshot_txn(con, dialect, record())
+  counts <- table(verdict)
+  .hvti_inform("decide_corrections(): ",
+               paste(sprintf("%s %d", names(counts), counts), collapse = ", "), ".")
+  if (!dry_run && any(verdict != "recordable")) {
+    .abort("decisions_refused", "decide_corrections(): the batch was refused whole and ",
+           "nothing was written: ", sum(verdict != "recordable"), " of ", n,
+           " row(s) are not recordable.")
+  }
+  invisible(list(verdicts = data.frame(row = seq_len(n), verdict = verdict,
+                                       stringsAsFactors = FALSE),
+                 recorded = if (dry_run) 0L else n))
+}
+
+#' Retire fill-ins that upstream has caught up with
+#'
+#' A correction that filled a missing source value goes stale as `filled_upstream_agrees`
+#' once the source holds that same value (G7). This records a `bake` decision for each
+#' such correction, by the reserved decider `"filled_upstream"`, so it leaves the stale
+#' view. Schedule it beside the data load. A fill-in where upstream holds a different
+#' value is a conflict and is never retired here.
+#'
+#' **Interim.** Superseded by the HVTR registry.
+#'
+#' @param config A `master_config` from [read_master_config()], with `sources`.
+#' @param con A DBI connection to the warehouse.
+#' @param source Character. A declared source.
+#' @param dry_run If `TRUE`, the default, list what would be retired.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return Invisibly, a list: `correction_ids` and `recorded` (an integer).
+#'
+#' @seealso [decide_corrections()]
+#'
+#' @examples
+#' # See propose_corrections().
+#'
+#' @export
+retire_filled_corrections <- function(config, con, source, dry_run = TRUE,
+                                      dialect = "mssql") {
+  if (!source %in% names(config$sources)) {
+    .abort("unknown_source", "retire_filled_corrections(): ", source,
+           " is not declared in master.yml.")
+  }
+  tabs <- .source_tables(source)
+  q <- quoter(dialect)
+  now <- Sys.time()
+  retire <- function() {
+    ids <- run_step("read stale fill-ins", DBI::dbGetQuery(con, paste(
+      "SELECT correction_id FROM", q(tabs$stale),
+      "WHERE reason = 'filled_upstream_agrees'"
+    )))$correction_id
+    if (!dry_run && length(ids)) {
+      rows <- data.frame(
+        decision_id = vapply(ids, function(id) paste0("d", substr(digest::digest(
+          list(id, "bake", FILLED_UPSTREAM_DECIDER, format(now, "%Y-%m-%d %H:%M:%OS6")),
+          algo = "sha1"), 1, 20)), character(1)),
+        correction_id = ids, decision = "bake", decided_by = FILLED_UPSTREAM_DECIDER,
+        decided_on = now, reason = "The source now holds the corrected value.",
+        stringsAsFactors = FALSE
+      )
+      run_step("append bake decisions", DBI::dbAppendTable(con, tabs$decisions, rows))
+    }
+    ids
+  }
+  ids <- .with_snapshot_txn(con, dialect, retire())
+  .hvti_inform("retire_filled_corrections(): ", length(ids), " fill-in(s) ",
+               if (dry_run) "would be retired." else "retired.")
+  invisible(list(correction_ids = ids, recorded = if (dry_run) 0L else length(ids)))
+}
