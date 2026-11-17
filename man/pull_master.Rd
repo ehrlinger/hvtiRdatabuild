@@ -85,8 +85,9 @@ The study configuration's SHA-256 is recorded when the pull runs, so
 
 The returned cohort ends with an \code{in_master} stage that excludes units with no master
 row, so the data match the active cohort exactly. A unit matching more than one
-master row stops the pull, because the key is meant to be unique. Nothing in an error
-or in printed output names a patient.
+master row stops the pull, because the key is meant to be unique; this is checked
+before any criterion runs, so a criterion cannot filter a duplicate out of sight.
+Nothing in an error or in printed output names a patient.
 
 A query's criteria are evaluated in the warehouse, inside the same transaction: each
 sets a flag on the session cohort table, and only the keys and flags are read back.

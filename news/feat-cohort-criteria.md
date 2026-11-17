@@ -13,3 +13,5 @@
 * `local_criterion()` decides a criterion in R from a file outside the warehouse, after
   the snapshot, and records the file's SHA-256.
 * `review` is a fourth cohort stage source.
+* `pull_master()` checks that every candidate unit matches one master row before any
+  criterion runs, so a criterion can no longer filter a duplicate key out of sight.

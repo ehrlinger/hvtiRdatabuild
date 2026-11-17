@@ -172,3 +172,18 @@ test_that("a local criterion must return one decision per unit", {
                class = "hvtiRdatabuild_local_criterion",
                regexp = "returned 1 value\\(s\\) for 3 unit\\(s\\)")
 })
+
+test_that("a duplicate master key stops the pull before any criterion can hide it", {
+  dup <- "INSERT INTO master_demo VALUES ('SYN103', DATE '2015-06-30', 'CABG', 80)"
+  age <- criterion("age", "Age 60 or over", "include", master_row("age >= 60"), "exclude")
+  con <- criteria_db()
+  DBI::dbExecute(con, dup)
+  # Conflicting values: one row meets the criterion, the other does not.
+  expect_error(pull_demo(con, demo_query(criteria = list(age), index_on = "qualifying")),
+               "more than one master row")
+  # Both rows fail it, so the criterion would exclude the unit outright.
+  con2 <- criteria_db()
+  DBI::dbExecute(con2, sub(", 80)", ", 52)", dup, fixed = TRUE))
+  expect_error(pull_demo(con2, demo_query(criteria = list(age), index_on = "qualifying")),
+               "more than one master row")
+})

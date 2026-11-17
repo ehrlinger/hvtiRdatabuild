@@ -125,6 +125,19 @@
   )
 }
 
+# Count the candidate units that match more than one master row. Run before any
+# criterion: a criterion aggregates a unit's rows, so a duplicate could otherwise be
+# filtered out of sight.
+.duplicate_keys_sql <- function(tmp, master_q, mrn_q, date_q) {
+  paste(
+    "SELECT COUNT(*) AS n FROM (SELECT c.mrn, c.encounter_date",
+    "FROM (SELECT DISTINCT mrn, encounter_date FROM", tmp, ") c",
+    sprintf("INNER JOIN %s m ON m.%s = c.mrn AND m.%s = c.encounter_date", master_q,
+            mrn_q, date_q),
+    "GROUP BY c.mrn, c.encounter_date HAVING COUNT(*) > 1) d"
+  )
+}
+
 .query_cohort <- function(query, selected, master, commit) {
   units <- cohort_unit_id(as.character(selected$mrn), as.Date(selected$encounter_date))
   has_prior <- selected$prior_qualifying == 1L
@@ -178,8 +191,9 @@
 #'
 #' The returned cohort ends with an `in_master` stage that excludes units with no master
 #' row, so the data match the active cohort exactly. A unit matching more than one
-#' master row stops the pull, because the key is meant to be unique. Nothing in an error
-#' or in printed output names a patient.
+#' master row stops the pull, because the key is meant to be unique; this is checked
+#' before any criterion runs, so a criterion cannot filter a duplicate out of sight.
+#' Nothing in an error or in printed output names a patient.
 #'
 #' A query's criteria are evaluated in the warehouse, inside the same transaction: each
 #' sets a flag on the session cohort table, and only the keys and flags are read back.
@@ -286,6 +300,15 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
   join_sql <- sprintf("m.%s = c.mrn AND m.%s = c.encounter_date AND c.active = 1",
                       q(mrn_col), q(date_col))
 
+  check_keys <- function() {
+    n <- run_step("check master keys", DBI::dbGetQuery(
+      con, .duplicate_keys_sql(tmp$name, master_q, q(mrn_col), q(date_col))
+    ))$n
+    if (n > 0) {
+      stop(n, " cohort unit(s) matched more than one master row; the key is meant to be ",
+           "unique. Nothing was pulled.", call. = FALSE)
+    }
+  }
   read <- .with_snapshot_txn(con, dialect, {
     read_at <- run_step("read time", DBI::dbGetQuery(con, .read_now_sql(dialect)))$read_at
     commit <- .read_deployment(con, deployment_view, dialect)
@@ -296,6 +319,7 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
         con, .select_units_sql(cohort, master_q, tmp$name, q(mrn_col), q(date_col)),
         params = list(cohort$epoch[[1]], cohort$epoch[[1]], cohort$epoch[[2]])
       ))
+      check_keys()
       if (identical(cohort$prior, "exclude")) {
         run_step("set aside earlier-qualifying units", DBI::dbExecute(
           con, paste("UPDATE", tmp$name, "SET active = 0 WHERE prior_qualifying = 1")
@@ -331,6 +355,7 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
               "(mrn, encounter_date, prior_qualifying) VALUES (?, ?, 0)"),
         params = list(supplied$mrn, supplied$encounter_date)
       ))
+      check_keys()
       selected <- NULL
     }
     data <- run_step("read master", DBI::dbGetQuery(con, sprintf(
