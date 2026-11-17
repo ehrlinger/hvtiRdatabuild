@@ -114,12 +114,19 @@ run_step <- function(name, expr) {
 #' @noRd
 table_types <- function(con, table) {
   cols <- DBI::dbGetQuery(con, paste(
-                                     "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH",
+                                     "SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH,",
+                                     "NUMERIC_PRECISION, NUMERIC_SCALE",
                                      "FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?",
                                      "ORDER BY ORDINAL_POSITION"), params = list(table))
   names(cols) <- toupper(names(cols))
   len <- cols$CHARACTER_MAXIMUM_LENGTH
   type <- ifelse(is.na(len), cols$DATA_TYPE,
                  sprintf("%s(%s)", cols$DATA_TYPE, ifelse(len == -1, "max", len)))
+  # SQL Server reports a bare "decimal"; without its scale a cast would round (duckdb
+  # already writes DECIMAL(p,s) into DATA_TYPE, which has a parenthesis and is left alone).
+  dec <- tolower(cols$DATA_TYPE) %in% c("decimal", "numeric") &
+    !grepl("(", cols$DATA_TYPE, fixed = TRUE)
+  type[dec] <- sprintf("%s(%s,%s)", cols$DATA_TYPE[dec], cols$NUMERIC_PRECISION[dec],
+                       cols$NUMERIC_SCALE[dec])
   stats::setNames(type, cols$COLUMN_NAME)
 }
