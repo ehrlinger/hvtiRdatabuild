@@ -170,7 +170,7 @@ writeLines(c("name: master_demo2", "key: [id]", paste0("snapshots: ", dir),
              paste0("build_program: ", file.path(dir, "bd.sas"))), cfg_path)
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpdlVsSP/duckdb
+#> ℹ /tmp/RtmpQOVEr8/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -179,7 +179,7 @@ con <- DBI::dbConnect(duckdb::duckdb())
 #> ℹ See ?duckdb_storage for details and alternatives.
 dry <- lift_master(read_master_config(cfg_path), con, pq, dialect = "duckdb")
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/RtmpdlVsSP/master1fe37c4d9124/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo2_base_built_demo_cec1958084d9 written to /tmp/RtmpQOVEr8/master20fc690b10ed/built_demo.parquet.ddl.sql
 dry$dry_run
 #> [1] TRUE
 ```
@@ -295,7 +295,7 @@ prop <- propose_correction(cfg2, con,
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
 #> Warning: propose_correction(): `variable` is renamed `var_col`. This will be an
 #> error in the next release.
-#> Correction c7af1d2f066f56649 appended.
+#> Correction cd85224386944f512 appended.
 prop$verdict
 #> [1] "appended"
 ```
@@ -309,7 +309,7 @@ someone accepts it:
 ``` r
 
 decide_correction(cfg2, con, prop$correction_id, "accept", "tester", dialect = "duckdb")
-#> Decision d6e30d12cb0ba87cd (accept) recorded on c7af1d2f066f56649.
+#> Decision dc3d6d6598c7a265d (accept) recorded on cd85224386944f512.
 DBI::dbGetQuery(con, "SELECT age FROM master_c WHERE emrn = 'E3'")
 #>   age
 #> 1  71
