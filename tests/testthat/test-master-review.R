@@ -112,3 +112,60 @@ test_that("an empty cohort before a review criterion needs no review", {
   expect_identical(nrow(review_list(res)), 0L)
   expect_s3_class(build_from_master(res), "build_result")
 })
+
+stage_excluded <- function(cohort) {
+  s <- cohort_summary(cohort)$stages
+  stats::setNames(s$n_excluded, s$stage_id)
+}
+
+test_that("a routed unit a later criterion excludes still waits for review", {
+  pull <- routed_then_age()
+  expect_identical(pull$meta$status, "awaiting review")
+  expect_setequal(review_list(pull)$cohort_unit, c("SYN103|2015-06-30", "SYN104|2020-01-10"))
+})
+
+test_that("a routed unit excluded at review is attributed to the routing criterion", {
+  pull <- routed_then_age()
+  out <- apply_review(pull, write_decisions(decide_all(pull, "SYN104|2020-01-10", "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  n <- stage_excluded(out$cohort)
+  expect_identical(n[["lvef"]], 1L)
+  expect_identical(n[["age"]], 0L)
+  expect_identical(n[["review_undetermined"]], 0L)
+  reasons <- cohort_summary(out$cohort)$reasons
+  expect_identical(reasons$reason[reasons$stage_id == "lvef"],
+                   "LVEF 25% or less at review: NO_ECHO")
+  expect_setequal(out$data$cohort_unit, c("SYN101|2010-03-01", "SYN104|2020-01-10"))
+})
+
+test_that("a routed unit kept at review stays excluded by the later criterion", {
+  pull <- routed_then_age()
+  met <- c("SYN103|2015-06-30", "SYN104|2020-01-10")
+  out <- apply_review(pull, write_decisions(decide_all(pull, met, "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  n <- stage_excluded(out$cohort)
+  expect_identical(n[["lvef"]], 0L)
+  expect_identical(n[["age"]], 1L)
+  expect_setequal(out$data$cohort_unit, c("SYN101|2010-03-01", "SYN104|2020-01-10"))
+})
+
+test_that("the recorded checksum is of the decisions that were applied", {
+  pull <- review_pull()
+  # Applied: every routed unit meets lvef and none is a planned alternative, so all stay.
+  rl <- review_list(pull)
+  rl$outcome <- ifelse(rl$criterion_id == "lvef", "met", "not_met")
+  rl$reason_code <- NA_character_
+  f <- write_decisions(rl)
+  original <- digest::digest(f, algo = "sha256", file = TRUE)
+  swap <- decide_all(pull, code = "NO_ECHO")
+  read_bytes <- .read_file_bytes
+  # The file is replaced the moment it has been read.
+  local_mocked_bindings(.read_file_bytes = function(path) {
+    bytes <- read_bytes(path)
+    utils::write.csv(swap, path, row.names = FALSE, na = "")
+    bytes
+  })
+  out <- apply_review(pull, f, reason_codes = c("NO_ECHO", "PLANNED"))
+  expect_identical(out$meta$review_decisions_sha256, original)
+  expect_identical(nrow(out$data), 3L)
+})

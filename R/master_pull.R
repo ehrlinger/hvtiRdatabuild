@@ -429,7 +429,8 @@ pull_master <- function(con, master, cohort, var_cols, path, mrn_col = "mrn",
     queue <- rbind(queue, local_out$queue)
   }
   final_active <- .active_units(final)
-  queue <- queue[queue$cohort_unit %in% final_active, , drop = FALSE]
+  # A routed unit stays queued even if a later stage excluded it: until review, which
+  # stage removed it first is not known. apply_review() settles it.
   criteria <- if (is_query) cohort$criteria else list()
   has_review <- any(vapply(criteria, function(cr) identical(cr$kind, "review"),
                            logical(1)))

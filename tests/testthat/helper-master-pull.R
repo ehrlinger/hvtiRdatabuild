@@ -124,3 +124,16 @@ review_pull <- function(env = parent.frame()) {
   strategy <- review_criterion("strategy", "Planned alternative support", "exclude")
   pull_demo(con, demo_query(criteria = list(routed, strategy), index_on = "qualifying"))
 }
+
+# SYN103 and SYN104 are routed to review at lvef; SYN103 (age 55) also fails the later
+# age criterion, SYN104 (age 66) passes it.
+routed_then_age <- function(env = parent.frame()) {
+  con <- local_master_db(env)
+  seed_criteria_views(con)
+  routed <- criterion("lvef", "LVEF 25% or less", "include",
+                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
+                                "lvef <= 25"),
+                      undetermined = "review")
+  age <- criterion("age", "Age 60 or over", "include", master_row("age >= 60"), "exclude")
+  pull_demo(con, demo_query(criteria = list(routed, age), index_on = "qualifying"))
+}

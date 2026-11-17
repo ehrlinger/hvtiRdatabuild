@@ -44,8 +44,11 @@ review_list <- function(pull) {
 #' needs a code from `reason_codes`. Codes, never free text: chart notes are PHI.
 #'
 #' Routed units are decided in one `review_undetermined` stage, then each review criterion
-#' is its own stage, all with source `review`. The file's SHA-256 is recorded in the
-#' pull's metadata, and the pull is then complete.
+#' is its own stage, all with source `review`. A routed unit that a later criterion
+#' excluded while its review was pending is still listed: if review excludes it, the
+#' exclusion is recorded at the criterion that routed it, which came first, and the later
+#' stages no longer count it; if review keeps it, the later exclusion stands. The file's
+#' SHA-256 is recorded in the pull's metadata, and the pull is then complete.
 #'
 #' @param pull A `master_pull` awaiting review.
 #' @param path Character. The decisions file, as CSV.
@@ -69,7 +72,11 @@ apply_review <- function(pull, path, reason_codes) {
   if (!is.character(reason_codes) || !length(reason_codes) || anyNA(reason_codes)) {
     .abort("review", "apply_review(): `reason_codes` must name the study's codes.")
   }
-  dec <- utils::read.csv(path, colClasses = "character", na.strings = "")
+  # Read once, then hash and parse those bytes: the checksum certifies what was applied.
+  bytes <- .read_file_bytes(path)
+  sha <- digest::digest(bytes, algo = "sha256", serialize = FALSE)
+  dec <- utils::read.csv(text = rawToChar(bytes), colClasses = "character",
+                         na.strings = "")
   if (!all(c("cohort_unit", "criterion_id", "outcome", "reason_code") %in% names(dec))) {
     .abort("review", "apply_review(): the decisions file needs cohort_unit, ",
            "criterion_id, outcome and reason_code.")
@@ -101,7 +108,6 @@ apply_review <- function(pull, path, reason_codes) {
            sum(!is.na(dec$reason_code) & !dec$reason_code %in% reason_codes),
            " decision(s) use a reason code not in `reason_codes`.")
   }
-  sha <- digest::digest(path, algo = "sha256", file = TRUE)
   label <- crit$label[match(dec$criterion_id, crit$criterion_id)]
   dec$reason <- rep(NA_character_, nrow(dec))
   dec$reason[excludes] <- paste0(label[excludes], " at review: ",
@@ -128,6 +134,7 @@ apply_review <- function(pull, path, reason_codes) {
   routed <- dec[dec$criterion_id %in% pull$review$queue$criterion_id &
                   key %in% paste(pull$review$queue$cohort_unit,
                                  pull$review$queue$criterion_id, sep = "\r"), ]
+  record <- .settle_routed_out(record, routed)
   if (nrow(routed)) {
     record <- review_stage(record, "review_undetermined",
                            "Undetermined at a criterion, decided at chart review", routed)
@@ -153,3 +160,28 @@ apply_review <- function(pull, path, reason_codes) {
   }
   pull
 }
+
+# A routed unit that a later stage excluded while its review was pending. If review
+# excludes it, the routing criterion removed it first: its exclusion moves there and its
+# rows at later stages go. If review keeps it, the later exclusion stands.
+.settle_routed_out <- function(record, routed) {
+  hit <- routed[!is.na(routed$reason) & !routed$cohort_unit %in% .active_units(record), ,
+                drop = FALSE]
+  if (!nrow(hit)) return(record)
+  stages <- record$stages
+  hit$order <- stages$order[match(hit$criterion_id, stages$stage_id)]
+  hit <- hit[order(hit$order), , drop = FALSE]
+  hit <- hit[!duplicated(hit$cohort_unit), , drop = FALSE]
+  m <- record$members
+  at <- hit$order[match(m$patient_id, hit$cohort_unit)]
+  stage_order <- stages$order[match(m$stage_id, stages$stage_id)]
+  here <- !is.na(at) & stage_order == at
+  m$included[here] <- FALSE
+  m$reason[here] <- hit$reason[match(m$patient_id[here], hit$cohort_unit)]
+  m <- m[is.na(at) | stage_order <= at, , drop = FALSE]
+  new_cohort_record(m, stages[order(stages$order), , drop = FALSE],
+                    patient_id_col = record$patient_id_col)
+}
+
+# Every byte of a file, as raw. A seam, so a test can change the file mid-read.
+.read_file_bytes <- function(path) readBin(path, "raw", file.size(path))
