@@ -105,3 +105,28 @@ test_that("non-character key or alt_keys values are refused", {
   expect_error(read_master_config(write_cfg(c(base_cfg, "alt_keys:", "  epic: 456"))),
                "not numbers")
 })
+
+test_that("sources and deciders read, and default to empty", {
+  cfg <- read_master_config(write_cfg(base_cfg))
+  expect_identical(cfg$sources, list())
+  expect_null(cfg$deciders)
+
+  extra <- c("sources:",
+             "  stg_echo: {key: [mrn, encounter_date]}",
+             "  stg_patient: {key: [mrn]}",
+             "deciders: [dm_one, dm_two]")
+  cfg <- read_master_config(write_cfg(c(base_cfg, extra)))
+  expect_identical(names(cfg$sources), c("stg_echo", "stg_patient"))
+  expect_identical(cfg$sources$stg_patient$key, "mrn")
+  expect_identical(cfg$deciders, c("dm_one", "dm_two"))
+})
+
+test_that("a source needs a key and a plain name", {
+  expect_error(read_master_config(write_cfg(c(base_cfg, "sources:", "  stg_echo: {}"))),
+               "must declare its key")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "sources:",
+                                              "  \"stg echo\": {key: [mrn]}"))),
+               "plain view name")
+  expect_error(read_master_config(write_cfg(c(base_cfg, "deciders: []"))),
+               "'deciders' must list")
+})

@@ -12,13 +12,17 @@
 #' is non-null, and its columns are carried on every correction, but nothing
 #' matches on them.
 #'
+#' `sources` declares the warehouse source views whose cells may be corrected, each with its
+#' unique key, and `deciders` names who may decide a correction (see [propose_corrections()]).
+#'
 #' @param path Path to the `master.yml` file.
 #'
 #' @return An object of class `master_config`: a list with `name`, `key`,
 #'   `alt_keys` (a named list, possibly empty), `parent` (`NULL` or a list with
 #'   `master` and `libref`), `parent_release` (`NULL` or a string), `snapshots`,
 #'   `current`, `history` (`NULL` or a regular expression), `build_program`,
-#'   and `file`.
+#'   `sources` (a named list of `list(key = )`, possibly empty), `deciders` (`NULL` or a
+#'   character vector), and `file`.
 #'
 #' @seealso [snapshot_master()], [lift_master()], [backfill_corrections()]
 #'
@@ -120,12 +124,37 @@ read_master_config <- function(path) {
     }
   }
 
+  sources <- raw[["sources"]]
+  if (is.null(sources)) sources <- list()
+  if (length(sources) && (is.null(names(sources)) || !all(nzchar(names(sources))))) {
+    stop("'sources' must be a mapping of source view names to their keys.", call. = FALSE)
+  }
+  for (s in names(sources)) {
+    if (!grepl("^[A-Za-z_][A-Za-z0-9_]*$", s)) {
+      stop("Source '", s, "' must be a plain view name (letters, digits, underscores).",
+           call. = FALSE)
+    }
+    k <- sources[[s]][["key"]]
+    if (!is.character(k) || !length(k) || anyNA(k) || !all(nzchar(k))) {
+      stop("Source '", s, "' must declare its key as one or more column names.",
+           call. = FALSE)
+    }
+  }
+  sources <- lapply(sources, function(s) list(key = as.character(s[["key"]])))
+
+  deciders <- raw[["deciders"]]
+  if (!is.null(deciders) &&
+        (!is.character(deciders) || !length(deciders) || anyNA(deciders))) {
+    stop("'deciders' must list who may decide corrections.", call. = FALSE)
+  }
+
   structure(list(
     name = as.character(raw[["name"]]), key = key, alt_keys = alt_keys,
     parent = parent, parent_release = parent_release,
     snapshots = as.character(raw[["snapshots"]]),
     current = as.character(raw[["current"]]), history = history,
-    build_program = as.character(raw[["build_program"]]), file = path
+    build_program = as.character(raw[["build_program"]]),
+    sources = sources, deciders = deciders, file = path
   ), class = "master_config")
 }
 
