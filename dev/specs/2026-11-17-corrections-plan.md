@@ -1278,15 +1278,18 @@ test_that("every verdict is reached, and a bad row refuses the whole file", {
     good_row(variable = "seen_on", expected_prior = "2019-12-01",
              new_value = "not a date"),                              # 10 does_not_cast
     good_row(expected_prior = "31"),                                 # 11 prior_mismatch
-    good_row(variable = "mrn", expected_prior = "SYN201", new_value = "SYN209")
+    good_row(variable = "mrn", expected_prior = "SYN201", new_value = "SYN209"),
                                                                      # 12 no_variable (key)
+    good_row(mrn = "SYN204", encounter_date = "2020-04-01", variable = "mr_grade",
+             expected_prior = "", expected_prior_missing = "1", new_value = "",
+             new_value_missing = "1")                                # 13 appendable: NA to NA
   )
   f <- write_submission(s$cfg, rows)
   out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
   expect_identical(out$verdicts$verdict, c(
     "appendable", "rule_not_fact", "unknown_source", "invalid_field", "invalid_field",
     "no_variable", "derived_variable", "unknown_key", "unknown_key", "does_not_cast",
-    "prior_mismatch", "no_variable"))
+    "prior_mismatch", "no_variable", "appendable"))
   expect_error(propose_corrections(s$cfg, s$con, f, dry_run = FALSE, dialect = "duckdb"),
                class = "hvtiRdatabuild_corrections_refused")
   expect_identical(DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_corrections")$n,
@@ -1629,7 +1632,7 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         texts <- c(vapply(rv, `[[`, character(1), "expected_prior"),
                    vapply(rv, `[[`, character(1), "new_value"))
         rid <- rep(vapply(rv, `[[`, integer(1), ".row"), 2L)
-        keep <- !is.na(texts)
+        keep <- !is.na(texts)  # a missing-to-missing row has nothing to cast
         ok <- .casts_losslessly(con, texts[keep], types[[v]])
         set(unique(rid[keep][!ok]), "does_not_cast")
       }
@@ -1684,6 +1687,7 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
 #' @noRd
 .casts_losslessly <- function(con, texts, type) {
   ok <- rep(FALSE, length(texts))
+  if (!length(texts)) return(ok)  # seq(1, 0, by = 500) would error
   for (start in seq(1L, length(texts), by = 500L)) {
     i <- start:min(start + 499L, length(texts))
     params <- vector("list", 2L * length(i))
