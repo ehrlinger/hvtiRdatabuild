@@ -93,7 +93,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpDDHprW/duckdb
+#> ℹ /tmp/RtmpeZtUmy/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -101,6 +101,6 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> ℹ Run duckdb(shared_home = FALSE) to accept the temporary directory (and silence this message).
 #> ℹ See ?duckdb_storage for details and alternatives.
 #> key id                               unique     rows 2, null key parts 0, duplicates 0
-#> dry run: DDL for master_demo_base_built_demo_cec1958084d9 written to /tmp/RtmpDDHprW/lift1bad8c15f7/built_demo.parquet.ddl.sql
+#> dry run: DDL for master_demo_base_built_demo_cec1958084d9 written to /tmp/RtmpeZtUmy/lift1cd8374e8dbe/built_demo.parquet.ddl.sql
 # }
 ```
