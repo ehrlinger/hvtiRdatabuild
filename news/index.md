@@ -1,5 +1,255 @@
 # Changelog
 
+## hvtiRdatabuild 0.3.5
+
+- New
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  selects a cohort and reads its rows from a master view in one
+  snapshot-isolation transaction, joined through a session temp table,
+  and records the SQL commit, the ids of the corrections applied and the
+  study configuration’s checksum. It refuses a master that has not
+  passed its parity gate at the deployed SQL commit.
+  [`cohort_query()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_query.md)
+  defines a cohort by query, epoch and index (`"first"` or `"all"`),
+  computed in the database, with a qualifying encounter before the epoch
+  recorded as a counted stage.
+  [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+  turns the pull into the `build_result` that
+  [`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md)
+  consumes.
+  [`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md)
+  publishes the pull as a parquet release carrying its provenance in the
+  file, read back with
+  [`read_pull_provenance()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_pull_provenance.md),
+  and refuses a study configuration changed since the pull.
+
+- New
+  [`cohort_unit_id()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_unit_id.md)
+  and
+  [`split_cohort_unit()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/split_cohort_unit.md)
+  key a cohort by MRN and encounter date, so a patient with two
+  operations is two units.
+
+- [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md)
+  accepts `.parquet` drafts.
+
+- [`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md)
+  compares the source SAS file’s sha256 with the one its sidecar
+  records, and snapshots a rebuilt current master again instead of
+  skipping it.
+  [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
+  refuses a snapshot whose current build has changed since it was taken.
+
+- [`lift_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.md)
+  names the base table for the snapshot’s release and the first 12 hex
+  digits of its sha256, and the load log records the parquet’s sha256
+  with each row group. Re-lifting a rebuilt master loads a new base
+  table and moves the view to it, where it used to skip the row groups
+  already logged. A load log written for a different parquet now stops
+  the load.
+
+- [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md)
+  on bytes identical to a withdrawn release is an error that names the
+  withdrawn release and says how to reinstate it. It used to return the
+  withdrawn record as if publication had worked.
+
+- [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+  counts each event code explicitly: `n_censored` (0), `n_events` (1),
+  `n_other_events` (any other code) and `n_event_missing` (`NA`).
+  `n_censored` was `n` minus the events, which counted competing risks
+  and missing codes as censored. `expect:` accepts the two new counts.
+
+- A patient whose value is `NA` on an exclusion rule is still kept, for
+  SAS parity, and is now counted at each rule they reach in a new
+  attrition column, `n_na_kept`.
+
+- [`write_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.md)
+  holds the study’s manifest lock while it writes, and the sidecar
+  records the parquet’s sha256.
+  [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+  stops when the sidecar does not describe the parquet beside it. A
+  sidecar written before this change is not checked until the set is
+  rewritten.
+
+- [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
+  matches numeric ids by value: a double `100000` in a SAS oracle and an
+  integer `100000L` in R no longer show up as row drift.
+
+- [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md)
+  defaults to `trust_certificate = FALSE`, so the warehouse server’s TLS
+  certificate is checked. A failed connection that checked it says how
+  to install the CA chain, and that `trust_certificate = TRUE` is a
+  stop-gap only.
+
+- The analysis-set examples call
+  `hvtiRutilities::register_data(file = , root = )`, and exclusions pass
+  `patient_id_col` to
+  [`hvtiPlotR::hv_consort_start()`](https://ehrlinger.github.io/hvtiPlotR/reference/hv_consort_start.html).
+
+- [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
+  writes numeric ids losslessly, so two distinct doubles never become
+  one id, and it refuses whole-number ids beyond 2^53, which a double
+  cannot hold exactly.
+
+- [`read_analysis_set()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_analysis_set.md)
+  holds the study’s manifest lock, shared, while it verifies the
+  sidecar, the manifest entry and the parquet’s hash and reads the
+  parquet, so a writer cannot replace the parquet between the check and
+  the read.
+
+- Informational messages go through the hvtiR family’s quiet mode:
+  `options(hvti.quiet = TRUE)` silences them. Warnings and errors are
+  never silenced.
+
+- Quiet mode cannot hide unfinished work.
+  [`snapshot_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.md)
+  warns, with class `hvtiRdatabuild_snapshot_failed`, when a historical
+  snapshot fails, naming the files.
+  [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md)
+  warns, with class `hvtiRdatabuild_incomplete_backfill`, when a legacy
+  fact is unresolved or a statement unparsed, giving counts and program
+  line numbers only. Its result gains `unparsed`, `unresolved_lines` and
+  `unparsed_lines`.
+
+- Errors a caller is expected to catch carry an
+  `hvtiRdatabuild_<condition>` class and `hvtiRdatabuild_error`:
+  `withdrawn_release`, `stale_snapshot`, `parity_failed`,
+  `key_not_unique`, `load_log_mismatch`, `parity_gate`,
+  `connection_failed`, `lock_timeout`, `unregistered_parent`,
+  `expect_failed`, `analysis_set_not_written`, `analysis_set_integrity`,
+  `stale_analysis_set` and `both_names`. Their messages start with the
+  function’s name.
+
+- The stale-analysis-set message carries
+  `hvtiRdatabuild_stale_analysis_set` first and
+  `hvtiRutilities_stale_analysis_set` second. The old class goes in the
+  next release.
+
+- [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  returns `$meta`, which leads with the hvtiR provenance record
+  (`package`, `version`, `sha`, `method`, `seed`, `rng_kind`, `time`).
+  `$provenance` is deprecated and goes in the next release. The
+  analysis-set sidecar carries the same record, and its `written` time
+  is ISO 8601 local time with its UTC offset, which
+  [`as.POSIXct()`](https://rdrr.io/r/base/as.POSIXlt.html) reads back.
+
+- Renamed arguments, each deprecated for one release with a
+  once-per-session warning of class `hvtiRdatabuild_deprecated`. Giving
+  both the old and the new name is an error that names both.
+
+  - `compare_built(id)` is `id_col`, with no default (`"ccfidu"` was one
+    study’s column).
+  - `parse_legacy_facts(key_var)` is `key_col`, with no default.
+  - `pull_master(columns, study_config)` are `var_cols` and `path`.
+  - `propose_correction(variable)` is `var_col`.
+  - `snapshot_master(out_dir)` is `dir`, and so is `datasets_dir` in
+    [`publish_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/publish_dataset.md),
+    [`withdraw_dataset_release()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/withdraw_dataset_release.md)
+    and
+    [`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md).
+  - `freeze_study_pull(study_config)` is `path`.
+  - `snapshot_oracle(sas_path, out_path)` are `path` and `file`.
+  - `dw_pull(conn)` is `con`.
+
+- A failed
+  [`dw_connect()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.md)
+  now says what failed, in its message and in the error’s `kind` field:
+  the driver or DSN would not load, the server could not be reached (DNS
+  or route), the TLS handshake failed, or the login was refused. The
+  certificate advice appears only where a certificate can be the cause.
+  The driver’s own message is still never shown.
+
+- [`cohort_query()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_query.md)
+  takes `criteria`: inclusion and exclusion criteria evaluated in the
+  warehouse inside
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)’s
+  transaction, each a counted cohort stage. A criterion
+  ([`criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.md))
+  wraps a test:
+  [`master_row()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/master_row.md),
+  [`view_rows()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/view_rows.md)
+  (rows of another view in a day window, judged by `pick = "any"`,
+  `"all"` or `"nearest"`), or
+  [`any_of()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/any_of.md)
+  /
+  [`all_of()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/any_of.md).
+  Only keys and flags leave the database.
+
+- No clinical defaults: `role`, `undetermined`, `window`, `pick`,
+  `date_col` and, with `index = "first"`, `index_on` are required.
+  `index_on = "eligible"` lets a patient’s later encounter be the index
+  when an earlier one is excluded.
+
+- A unit a criterion cannot decide follows its `undetermined` route:
+  exclude, keep, or chart review.
+  [`review_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_criterion.md),
+  [`review_list()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_list.md)
+  and
+  [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md)
+  record review decisions from a checksummed file with declared reason
+  codes, as `review` stages.
+  [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+  and
+  [`freeze_study_pull()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/freeze_study_pull.md)
+  refuse a pull awaiting review.
+
+- [`local_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/local_criterion.md)
+  decides a criterion in R from a file outside the warehouse, after the
+  snapshot, and records the file’s SHA-256.
+
+- `review` is a fourth cohort stage source.
+
+- [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  checks that every candidate unit matches one master row before any
+  criterion runs, so a criterion can no longer filter a duplicate key
+  out of sight.
+
+- After chart review moves a unit back to the criterion that routed it,
+  [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md)
+  rebuilds each later criterion’s met, not met and undetermined tally
+  from the units that reached it, so a stage’s provenance agrees with
+  its counts. The figures evaluated at the pull are kept beside the
+  tally, labelled, where they differ.
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  keeps each unit’s outcome at every warehouse and local criterion in
+  `review$outcomes`.
+
+- A pull saved while awaiting review before `review$outcomes` existed
+  cannot have its stages recounted.
+  [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md)
+  refuses decisions that would change a counted stage on such a pull
+  (`hvtiRdatabuild_review_outcomes_missing`); pull again with
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  and apply the decisions to the new pull. Decisions that change no
+  counted stage are applied as before.
+
+- Documentation sweep before 0.3.5.
+  [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md)
+  and
+  [`review_list()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_list.md)
+  gain a runnable example on synthetic data. The README’s status section
+  lists the stages that ship,
+  [`build_dataset()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.md)
+  and
+  [`derive_vars()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.md)
+  among them, which it still called future work; it links
+  [`vignette("master-datasets")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/master-datasets.md),
+  and says a stale analysis set is read with a note in a draft and
+  refused in a final render.
+  [`vignette("master-datasets")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/master-datasets.md)
+  calls `propose_correction(var_col =)`, so it no longer prints a
+  deprecation warning, and points to
+  [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+  and
+  [`build_from_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.md)
+  for reading a master into a study.
+  [`vignette("coming-from-sas")`](https://ehrlinger.github.io/hvtiRdatabuild/articles/coming-from-sas.md)
+  says
+  [`compare_built()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.md)
+  matches ids exactly, without trimming, and that a row whose `exclude`
+  rule is `NA` is kept and counted in `n_na_kept`, with the rule to
+  write when the SAS step deleted it.
+
 ## hvtiRdatabuild 0.3.4
 
 - [`backfill_corrections()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.md),
