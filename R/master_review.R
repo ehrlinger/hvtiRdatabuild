@@ -135,7 +135,7 @@ apply_review <- function(pull, path, reason_codes) {
   routed <- dec[dec$criterion_id %in% pull$review$queue$criterion_id &
                   key %in% paste(pull$review$queue$cohort_unit,
                                  pull$review$queue$criterion_id, sep = "\r"), ]
-  record <- .settle_routed(record, routed, sha)
+  record <- .settle_routed(record, routed, sha, pull$review$outcomes)
   for (i in which(crit$kind == "review")) {
     rows <- dec[dec$criterion_id == crit$criterion_id[[i]], , drop = FALSE]
     record <- review_stage(record, crit$criterion_id[[i]], crit$label[[i]], rows)
@@ -161,7 +161,7 @@ apply_review <- function(pull, path, reason_codes) {
 # Settle each unit routed to review at the criterion that routed it. If review excludes
 # it, that criterion removed it first: the exclusion is recorded there and its rows at
 # later stages go. If review keeps it, every later outcome stands.
-.settle_routed <- function(record, routed, sha) {
+.settle_routed <- function(record, routed, sha, outcomes) {
   hit <- routed[!is.na(routed$reason), , drop = FALSE]
   if (!nrow(hit)) return(record)
   stages <- record$stages
@@ -175,12 +175,35 @@ apply_review <- function(pull, path, reason_codes) {
   m$included[here] <- FALSE
   m$reason[here] <- hit$reason[match(m$patient_id[here], hit$cohort_unit)]
   m <- m[is.na(at) | stage_order <= at, , drop = FALSE]
+  stages <- .recount_stages(stages, m, outcomes)
   n <- table(hit$criterion_id)
   i <- match(names(n), stages$stage_id)
   stages$provenance[i] <- sprintf("%s; %d excluded at chart review, decisions file sha256 %s",
                                   stages$provenance[i], as.integer(n), sha)
   new_cohort_record(m, stages[order(stages$order), , drop = FALSE],
                     patient_id_col = record$patient_id_col)
+}
+
+# Rebuild a criterion's tally from the units that reached it once review has settled
+# them. Where that differs from what was evaluated at the pull (in the warehouse, or in
+# R for a local criterion), those figures are kept beside it, labelled.
+.recount_stages <- function(stages, members, outcomes) {
+  if (is.null(outcomes) || !nrow(outcomes)) return(stages)
+  pattern <- "^(.*)met [0-9]+, not met [0-9]+, undetermined [0-9]+"
+  for (i in which(stages$stage_id %in% outcomes$criterion_id)) {
+    id <- stages$stage_id[[i]]
+    rows <- outcomes[outcomes$criterion_id == id, , drop = FALSE]
+    entrants <- members$patient_id[members$stage_id == id]
+    now <- .count_text(rows$outcome[rows$cohort_unit %in% entrants])
+    before <- .count_text(rows$outcome)
+    if (identical(now, before) || !grepl(pattern, stages$provenance[[i]])) next
+    where <- if (identical(stages$source[[i]], "build")) "in R" else "in the warehouse"
+    stages$provenance[[i]] <- paste0(
+      sub(pattern, paste0("\\1", now), stages$provenance[[i]]),
+      "; as evaluated ", where, " before review: ", before
+    )
+  }
+  stages
 }
 
 # Every byte of a file, as raw. A seam, so a test can change the file mid-read.

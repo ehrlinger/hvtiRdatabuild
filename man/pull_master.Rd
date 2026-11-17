@@ -55,8 +55,10 @@ ending with the \code{in_master} stage) and \code{meta}: the family's provenance
 \code{study_config_sha256}, \code{n_cohort}, \code{n_matched}, \code{n_unmatched}, \code{status}
 (\code{"complete"}, or \code{"awaiting review"} while chart review is pending; see
 \code{\link[=apply_review]{apply_review()}}) and \code{review_decisions_sha256} (\code{NA} until review is applied).
-\code{review} holds the review \code{queue} (\code{cohort_unit}, \code{criterion_id}) and the declared
-\code{criteria} (\code{criterion_id}, \code{label}, \code{role}, \code{kind}). The same pull
+\code{review} holds the review \code{queue} (\code{cohort_unit}, \code{criterion_id}), each unit's
+\code{outcomes} at the warehouse and local criteria (\code{cohort_unit}, \code{criterion_id},
+\code{outcome}: 1 met, 0 not met, \code{NA} undetermined) and the declared \code{criteria}
+(\code{criterion_id}, \code{label}, \code{role}, \code{kind}). The same pull
 fields without the provenance record are also in \code{provenance}, which is deprecated
 and goes in the next release; read \code{meta}.
 \code{corrections_in_effect} holds every correction id applied anywhere in the master in
