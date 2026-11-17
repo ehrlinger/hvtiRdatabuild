@@ -30,6 +30,14 @@ review keeps it, every later outcome stands. The criterion's provenance records 
 many were excluded at review and the decisions file's checksum. Each review criterion
 is then its own stage, with source \code{review}. The file's SHA-256 is recorded in the
 pull's metadata, and the pull is then complete.
+
+Each later criterion's tally of met, not met and undetermined units is rebuilt from
+the units that reached it, using the outcomes \code{\link[=pull_master]{pull_master()}} keeps in
+\code{review$outcomes}. A pull saved before that field existed has none, so decisions that
+would change a counted stage are refused with an error of class
+\code{hvtiRdatabuild_review_outcomes_missing}: pull again with \code{\link[=pull_master]{pull_master()}} and apply
+the decisions to the new pull. Decisions that change no counted stage are applied as
+usual.
 }
 \seealso{
 \code{\link[=review_list]{review_list()}}, \code{\link[=review_criterion]{review_criterion()}}
