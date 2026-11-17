@@ -160,6 +160,47 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
                         c("correction_id", "variable", "reason")))
 }
 
+#' Exact join condition on the key columns, and on `variable` when asked
+#'
+#' Character keys compare exactly on SQL Server (see `.string_eq_sql()`); other types
+#' compare plainly.
+#'
+#' @param l,r Character. The two table aliases.
+#' @param key Character. The key columns.
+#' @param types A named character vector of SQL types covering `key`.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#' @param variable Logical. Also join on the `variable` column.
+#'
+#' @return A length-one character: a SQL condition.
+#'
+#' @keywords internal
+#' @noRd
+.key_join_sql <- function(l, r, key, types, dialect, variable = FALSE) {
+  q <- quoter(dialect)
+  conds <- vapply(key, function(k) {
+    .string_eq_sql(paste0(l, ".", q(k)), paste0(r, ".", q(k)), types[[k]], dialect)
+  }, character(1))
+  if (variable) {
+    conds <- c(conds, .string_eq_sql(paste0(l, ".variable"), paste0(r, ".variable"),
+                                     "nvarchar(128)", dialect))
+  }
+  paste(conds, collapse = " AND ")
+}
+
+#' A variable name as a SQL literal that matches the `variable` column exactly
+#'
+#' @param v Character. A column name.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A length-one character. On SQL Server the literal is `nvarchar`, so that
+#'   `DATALENGTH` agrees with the `nvarchar` column.
+#'
+#' @keywords internal
+#' @noRd
+.variable_literal <- function(v, dialect) {
+  paste0(if (identical(dialect, "mssql")) "N" else "", sql_string(v))
+}
+
 #' The `checked` CTE: every accepted correction with its status
 #'
 #' Shared by the four views, so they cannot disagree. The per-variable checks are one
@@ -180,8 +221,9 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
   tabs <- .source_tables(source)
   valid <- setdiff(names(types), key)
   # SQL Server's default collation would count "Yes" and "yes" as one value.
+  # BIN2 still ignores trailing spaces, so the byte length joins the value counted.
   distinct_value <- if (identical(dialect, "mssql")) {
-    "new_value COLLATE Latin1_General_BIN2"
+    "CONCAT(DATALENGTH(new_value), '|', new_value COLLATE Latin1_General_BIN2)"
   } else {
     "new_value"
   }
@@ -190,7 +232,8 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
     prior <- sprintf("TRY_CAST(a.expected_prior AS %s)", types[[v]])
     new <- sprintf("TRY_CAST(a.new_value AS %s)", types[[v]])
     paste0(
-      "WHEN ", sql_string(v), " THEN CASE",
+      "WHEN ", .string_eq_sql("a.variable", .variable_literal(v, dialect), "nvarchar(128)",
+                              dialect), " THEN CASE",
       " WHEN (a.expected_prior_missing = 0 AND ", prior, " IS NULL)",
       " OR (a.new_value_missing = 0 AND ", new, " IS NULL) THEN 'does_not_cast'",
       " WHEN a.expected_prior_missing = 1 AND ", b, " IS NOT NULL THEN CASE",
@@ -201,10 +244,13 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
       " ELSE 'apply' END"
     )
   }, character(1))
-  on_b <- paste(sprintf("b.%s = a.%s", q(key), q(key)), collapse = " AND ")
-  on_bc <- paste(sprintf("bc.%s = a.%s", q(key), q(key)), collapse = " AND ")
-  on_k <- paste(c(sprintf("k.%s = a.%s", q(key), q(key)), "k.variable = a.variable"),
-                collapse = " AND ")
+  on_b <- .key_join_sql("b", "a", key, types, dialect)
+  on_bc <- .key_join_sql("bc", "a", key, types, dialect)
+  on_k <- .key_join_sql("k", "a", key, types, dialect, variable = TRUE)
+  not_valid <- paste(vapply(valid, function(v) {
+    paste0("NOT (", .string_eq_sql("a.variable", .variable_literal(v, dialect),
+                                   "nvarchar(128)", dialect), ")")
+  }, character(1)), collapse = " AND ")
   keys <- paste(q(key), collapse = ", ")
   paste0(
     "WITH latest AS (\n",
@@ -227,13 +273,12 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
     "  SELECT ", keys, ", COUNT(*) AS n_rows FROM ", q(source), " GROUP BY ", keys, "\n",
     "), checked AS (\n",
     "  SELECT a.*, CASE\n",
-    "    WHEN a.variable NOT IN (", paste(sql_string(valid), collapse = ", "),
-    ") THEN 'no_variable'\n",
+    "    WHEN ", not_valid, " THEN 'no_variable'\n",
     "    WHEN bc.n_rows IS NULL THEN 'no_record'\n",
     "    WHEN bc.n_rows > 1 THEN 'ambiguous_record'\n",
     "    WHEN k.n_values > 1 THEN 'accepted_disagree'\n",
     "    WHEN a.expected_prior_missing IS NULL THEN 'prior_unknown'\n",
-    "    ELSE CASE a.variable\n      ", paste(per_var, collapse = "\n      "),
+    "    ELSE CASE\n      ", paste(per_var, collapse = "\n      "),
     "\n    END END AS status\n",
     "  FROM accepted a\n",
     "  LEFT JOIN bc ON ", on_bc, "\n",
@@ -252,6 +297,12 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
 #' applied, which plan 3 rolls up to the master. `_corrections_stale` and
 #' `_corrections_conflicts` are for data management and are never read by a study build.
 #'
+#' The views cast stored text with `TRY_CAST` at each column's declared type, and they
+#' assume values stored by intake, which refuses any value that does not cast back
+#' unchanged. If a column's type changes after a correction is accepted, the SQL may round
+#' where `resolve_source_corrections()` does not, so the reference and the views agree
+#' only on intake-canonical values.
+#'
 #' @param source Character. The source view's name.
 #' @param key Character. Its key columns.
 #' @param types A named character vector of all its columns' SQL types, from
@@ -266,11 +317,19 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
   q <- quoter(dialect)
   tabs <- .source_tables(source)
   valid <- setdiff(names(types), key)
-  stopifnot(all(key %in% names(types)), length(valid) > 0L)
+  if (!all(key %in% names(types))) {
+    .abort("source_views_key", "source_views_sql(): every key column must be among the ",
+           "source's columns.")
+  }
+  if (length(valid) == 0L) {
+    .abort("source_views_no_columns", "source_views_sql(): the source has no non-key ",
+           "column to correct.")
+  }
   cte <- .checked_cte(source, key, types, dialect)
   keys <- paste(q(key), collapse = ", ")
   pivot <- unlist(lapply(seq_along(valid), function(i) {
-    w <- sprintf("WHEN variable = %s THEN", sql_string(valid[[i]]))
+    w <- paste0("WHEN ", .string_eq_sql("variable", .variable_literal(valid[[i]], dialect),
+                                        "nvarchar(128)", dialect), " THEN")
     c(sprintf("MAX(CASE %s 1 END) AS h%d", w, i),
       sprintf("MAX(CASE %s new_value_missing END) AS m%d", w, i),
       sprintf("MAX(CASE %s new_value END) AS v%d", w, i))
@@ -283,7 +342,7 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
                   "ELSE TRY_CAST(p.v%1$d AS %2$s) END ELSE b.%3$s END AS %3$s"),
             i, types[[v]], q(v))
   }, character(1))
-  on_p <- paste(sprintf("p.%s = b.%s", q(key), q(key)), collapse = " AND ")
+  on_p <- .key_join_sql("p", "b", key, types, dialect)
   corrected <- paste0(
     view_header(dialect), " ", q(tabs$corrected), " AS\n", cte,
     ", p AS (\n  SELECT ", keys, ",\n    ", paste(pivot, collapse = ",\n    "),

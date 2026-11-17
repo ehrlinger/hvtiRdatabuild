@@ -123,3 +123,30 @@ test_that("a key duplicated after acceptance changes no row, in SQL and in R", {
                   c("c01", "c05", "c06"))
   expect_false(any(c("c01", "c05", "c06") %in% ref$applied$correction_id))
 })
+
+test_that("the mssql views compare names, character keys and counted values exactly", {
+  types <- c(mrn = "varchar(20)", visit_no = "int", lvef = "float", grade = "varchar(5)")
+  v <- source_views_sql("stg_x", c("mrn", "visit_no"), types, "mssql")
+  bin2 <- "COLLATE Latin1_General_BIN2"
+  for (view in v) {
+    expect_match(view, paste0("a.variable ", bin2, " = N'lvef' ", bin2), fixed = TRUE)
+    expect_match(view, "DATALENGTH(a.variable) = DATALENGTH(N'lvef')", fixed = TRUE)
+    expect_match(view, paste0("b.[mrn] ", bin2, " = a.[mrn] ", bin2), fixed = TRUE)
+    expect_match(view, paste0("k.variable ", bin2, " = a.variable ", bin2), fixed = TRUE)
+    expect_match(view, "CONCAT(DATALENGTH(new_value), '|', new_value COLLATE", fixed = TRUE)
+    expect_no_match(view, "NOT IN", fixed = TRUE)
+    # The numeric key is joined plainly, never collated.
+    expect_match(view, "b.[visit_no] = a.[visit_no]", fixed = TRUE)
+    expect_no_match(view, "[visit_no] COLLATE", fixed = TRUE)
+  }
+  expect_match(v[["corrected"]], paste0("variable ", bin2, " = N'grade' ", bin2), fixed = TRUE)
+  expect_match(v[["corrected"]], paste0("p.[mrn] ", bin2, " = b.[mrn] ", bin2), fixed = TRUE)
+  expect_match(v[["corrected"]], "p.[visit_no] = b.[visit_no]", fixed = TRUE)
+})
+
+test_that("source_views_sql() refuses a key outside the columns and a keys-only source", {
+  expect_error(source_views_sql("s", "nope", c(a = "int", b = "int"), "duckdb"),
+               class = "hvtiRdatabuild_source_views_key")
+  expect_error(source_views_sql("s", "a", c(a = "int"), "duckdb"),
+               class = "hvtiRdatabuild_source_views_no_columns")
+})
