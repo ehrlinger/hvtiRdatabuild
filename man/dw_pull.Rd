@@ -35,8 +35,27 @@ which is the failure this package exists to prevent.
 }
 \examples{
 \donttest{
-# Requires a warehouse connection; see ?dw_connect
-# for a runnable version against a mocked connection.
+if (requireNamespace("duckdb", quietly = TRUE)) {
+  # Synthetic data; no PHI. DuckDB stands in for the warehouse: its in-memory catalog
+  # is `memory` and its default schema `main`, so the module SQL's three-part names
+  # resolve without SQL Server.
+  con <- DBI::dbConnect(duckdb::duckdb())
+  DBI::dbWriteTable(con, "st1234_cohort", data.frame(masterid = 1:2))
+  DBI::dbWriteTable(con, "vw_CardSurg_Base", data.frame(masterid = 1:2, age = c(61, 70)))
+  DBI::dbWriteTable(con, "vw_CardSurg_Valve", data.frame(masterid = 1:2, avr = c(1, 0)))
+  DBI::dbWriteTable(con, "vw_CardSurg_Cabg", data.frame(masterid = 1:2, cabg = c(0, 1)))
+  path <- tempfile(fileext = ".yaml")
+  yaml::write_yaml(list(
+    study = "st1234", cohort_table = "st1234_cohort",
+    warehouse = "memory", view_schema = "main",
+    pull_date = "2026-08-04", modules = list("base"),
+    varsets = list("core"), derive = list(missing = TRUE)
+  ), path)
+  res <- dw_pull(read_study_config(path), con)
+  res$manifest
+  DBI::dbDisconnect(con, shutdown = TRUE)
+  unlink(path)
+}
 }
 
 }
