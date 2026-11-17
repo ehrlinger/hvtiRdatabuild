@@ -36,8 +36,9 @@ test_that("decisions are applied as review stages, with the file checksum", {
   expect_identical(out$meta$review_decisions_sha256,
                    digest::digest(f, algo = "sha256", file = TRUE))
   s <- out$cohort$stages
-  expect_identical(utils::tail(s$stage_id, 2L), c("review_undetermined", "strategy"))
-  expect_true(all(utils::tail(s$source, 2L) == "review"))
+  expect_identical(utils::tail(s$stage_id, 1L), "strategy")
+  expect_identical(utils::tail(s$source, 1L), "review")
+  expect_false("review_undetermined" %in% s$stage_id)
   expect_setequal(out$data$cohort_unit, c("SYN101|2010-03-01", "SYN103|2015-06-30"))
   expect_s3_class(build_from_master(out), "build_result")
 })
@@ -131,7 +132,6 @@ test_that("a routed unit excluded at review is attributed to the routing criteri
   n <- stage_excluded(out$cohort)
   expect_identical(n[["lvef"]], 1L)
   expect_identical(n[["age"]], 0L)
-  expect_identical(n[["review_undetermined"]], 0L)
   reasons <- cohort_summary(out$cohort)$reasons
   expect_identical(reasons$reason[reasons$stage_id == "lvef"],
                    "LVEF 25% or less at review: NO_ECHO")
@@ -168,4 +168,25 @@ test_that("the recorded checksum is of the decisions that were applied", {
   out <- apply_review(pull, f, reason_codes = c("NO_ECHO", "PLANNED"))
   expect_identical(out$meta$review_decisions_sha256, original)
   expect_identical(nrow(out$data), 3L)
+})
+
+test_that("a routed unit that passes later criteria is excluded at the routing criterion", {
+  con <- criteria_db()
+  routed <- criterion("lvef", "LVEF 25% or less", "include",
+                      view_rows("echo_demo", "measured_on", c(-30, 0), "nearest",
+                                "lvef <= 25"),
+                      undetermined = "review")
+  # Every candidate passes this one, so the routed units reach the end active.
+  adult <- criterion("adult", "Age 50 or over", "include", master_row("age >= 50"), "exclude")
+  pull <- pull_demo(con, demo_query(criteria = list(routed, adult), index_on = "qualifying"))
+  out <- apply_review(pull, write_decisions(decide_all(pull, code = "NO_ECHO")),
+                      reason_codes = "NO_ECHO")
+  s <- cohort_summary(out$cohort)$stages
+  expect_identical(s$n_excluded[s$stage_id == "lvef"], 2L)
+  expect_identical(s$n_in[s$stage_id == "adult"], 1L)
+  expect_identical(s$n_excluded[s$stage_id == "adult"], 0L)
+  expect_false("review_undetermined" %in% s$stage_id)
+  prov <- out$cohort$stages$provenance[out$cohort$stages$stage_id == "lvef"]
+  expect_match(prov, "2 excluded at chart review", fixed = TRUE)
+  expect_identical(out$data$cohort_unit, "SYN101|2010-03-01")
 })

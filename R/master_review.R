@@ -43,12 +43,13 @@ review_list <- function(pull) {
 #' excludes the unit (not met on an include criterion, or met on an exclude criterion)
 #' needs a code from `reason_codes`. Codes, never free text: chart notes are PHI.
 #'
-#' Routed units are decided in one `review_undetermined` stage, then each review criterion
-#' is its own stage, all with source `review`. A routed unit that a later criterion
-#' excluded while its review was pending is still listed: if review excludes it, the
-#' exclusion is recorded at the criterion that routed it, which came first, and the later
-#' stages no longer count it; if review keeps it, the later exclusion stands. The file's
-#' SHA-256 is recorded in the pull's metadata, and the pull is then complete.
+#' A routed unit is settled at the criterion that routed it, so the stage counts stay
+#' sequential: if review excludes it, the exclusion is recorded at that criterion and no
+#' later stage counts the unit, whether or not a later criterion also excluded it; if
+#' review keeps it, every later outcome stands. The criterion's provenance records how
+#' many were excluded at review and the decisions file's checksum. Each review criterion
+#' is then its own stage, with source `review`. The file's SHA-256 is recorded in the
+#' pull's metadata, and the pull is then complete.
 #'
 #' @param pull A `master_pull` awaiting review.
 #' @param path Character. The decisions file, as CSV.
@@ -134,11 +135,7 @@ apply_review <- function(pull, path, reason_codes) {
   routed <- dec[dec$criterion_id %in% pull$review$queue$criterion_id &
                   key %in% paste(pull$review$queue$cohort_unit,
                                  pull$review$queue$criterion_id, sep = "\r"), ]
-  record <- .settle_routed_out(record, routed)
-  if (nrow(routed)) {
-    record <- review_stage(record, "review_undetermined",
-                           "Undetermined at a criterion, decided at chart review", routed)
-  }
+  record <- .settle_routed(record, routed, sha)
   for (i in which(crit$kind == "review")) {
     rows <- dec[dec$criterion_id == crit$criterion_id[[i]], , drop = FALSE]
     record <- review_stage(record, crit$criterion_id[[i]], crit$label[[i]], rows)
@@ -161,12 +158,11 @@ apply_review <- function(pull, path, reason_codes) {
   pull
 }
 
-# A routed unit that a later stage excluded while its review was pending. If review
-# excludes it, the routing criterion removed it first: its exclusion moves there and its
-# rows at later stages go. If review keeps it, the later exclusion stands.
-.settle_routed_out <- function(record, routed) {
-  hit <- routed[!is.na(routed$reason) & !routed$cohort_unit %in% .active_units(record), ,
-                drop = FALSE]
+# Settle each unit routed to review at the criterion that routed it. If review excludes
+# it, that criterion removed it first: the exclusion is recorded there and its rows at
+# later stages go. If review keeps it, every later outcome stands.
+.settle_routed <- function(record, routed, sha) {
+  hit <- routed[!is.na(routed$reason), , drop = FALSE]
   if (!nrow(hit)) return(record)
   stages <- record$stages
   hit$order <- stages$order[match(hit$criterion_id, stages$stage_id)]
@@ -179,6 +175,10 @@ apply_review <- function(pull, path, reason_codes) {
   m$included[here] <- FALSE
   m$reason[here] <- hit$reason[match(m$patient_id[here], hit$cohort_unit)]
   m <- m[is.na(at) | stage_order <= at, , drop = FALSE]
+  n <- table(hit$criterion_id)
+  i <- match(names(n), stages$stage_id)
+  stages$provenance[i] <- sprintf("%s; %d excluded at chart review, decisions file sha256 %s",
+                                  stages$provenance[i], as.integer(n), sha)
   new_cohort_record(m, stages[order(stages$order), , drop = FALSE],
                     patient_id_col = record$patient_id_col)
 }

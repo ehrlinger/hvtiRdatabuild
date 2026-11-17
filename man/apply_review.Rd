@@ -23,12 +23,13 @@ excludes the unit (not met on an include criterion, or met on an exclude criteri
 needs a code from \code{reason_codes}. Codes, never free text: chart notes are PHI.
 }
 \details{
-Routed units are decided in one \code{review_undetermined} stage, then each review criterion
-is its own stage, all with source \code{review}. A routed unit that a later criterion
-excluded while its review was pending is still listed: if review excludes it, the
-exclusion is recorded at the criterion that routed it, which came first, and the later
-stages no longer count it; if review keeps it, the later exclusion stands. The file's
-SHA-256 is recorded in the pull's metadata, and the pull is then complete.
+A routed unit is settled at the criterion that routed it, so the stage counts stay
+sequential: if review excludes it, the exclusion is recorded at that criterion and no
+later stage counts the unit, whether or not a later criterion also excluded it; if
+review keeps it, every later outcome stands. The criterion's provenance records how
+many were excluded at review and the decisions file's checksum. Each review criterion
+is then its own stage, with source \code{review}. The file's SHA-256 is recorded in the
+pull's metadata, and the pull is then complete.
 }
 \seealso{
 \code{\link[=review_list]{review_list()}}, \code{\link[=review_criterion]{review_criterion()}}
