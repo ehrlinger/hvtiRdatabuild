@@ -84,17 +84,24 @@ Task 8 records each of these as an amendment to the spec.
    - `no_variable`: the source has no such column (§3.3), or it is a key column.
    - `prior_mismatch`: the spec names it in §3.5.
 
+   `decide_corrections()` adds `repeated_correction`: one correction decided twice in one
+   batch is refused, because the rows share a `decided_on` and their order would be
+   arbitrary.
+
    **`rule_not_fact`** is a key or variable cell holding a pattern or comparison
    (`* % ? < > = , ;`) or the word `all` or `any`. It is a predicate, so it is a rule.
 5. **Statuses, checked in this order:**
    1. `no_variable`
    2. `no_record`
-   3. `accepted_disagree` (G1)
-   4. `prior_unknown`
-   5. `does_not_cast`
-   6. `filled_upstream_agrees` or `filled_upstream_disagrees` (G7)
-   7. `prior_mismatch`
-   8. `apply`
+   3. `ambiguous_record`: the key now matches several source rows, so none is changed.
+      Intake refuses such a key (`ambiguous_key`), but a refresh can break uniqueness
+      after a correction is accepted.
+   4. `accepted_disagree` (G1)
+   5. `prior_unknown`
+   6. `does_not_cast`
+   7. `filled_upstream_agrees` or `filled_upstream_disagrees` (G7)
+   8. `prior_mismatch`
+   9. `apply`
 
    The stale view lists `no_variable` through `prior_mismatch` plus `filled_upstream_agrees`.
    The conflicts view lists `accepted_disagree` and `filled_upstream_disagrees`.
@@ -499,8 +506,8 @@ Expected: FAIL with `could not find function "source_corrections_ddl"`.
 }
 
 # Statuses an accepted correction can take, besides "apply" (spec §3.3, G1, G7).
-SOURCE_STALE <- c("no_variable", "no_record", "prior_unknown", "does_not_cast", # nolint
-                  "prior_mismatch", "filled_upstream_agrees")
+SOURCE_STALE <- c("no_variable", "no_record", "ambiguous_record", "prior_unknown", # nolint
+                  "does_not_cast", "prior_mismatch", "filled_upstream_agrees")
 SOURCE_CONFLICT <- c("accepted_disagree", "filled_upstream_disagrees") # nolint
 
 #' DDL for one source's corrections and decisions tables
@@ -547,13 +554,14 @@ source_corrections_ddl <- function(source, key_types, dialect = "mssql") {
 #'
 #' 1. `no_variable`: its variable is not a non-key column.
 #' 2. `no_record`: its key matches no row.
-#' 3. `accepted_disagree`: accepted corrections to its cell disagree on the new value (G1).
-#' 4. `prior_unknown`.
-#' 5. `does_not_cast`.
-#' 6. `filled_upstream_agrees` or `filled_upstream_disagrees`: it filled a missing value,
+#' 3. `ambiguous_record`: its key matches several rows, so it changes none.
+#' 4. `accepted_disagree`: accepted corrections to its cell disagree on the new value (G1).
+#' 5. `prior_unknown`.
+#' 6. `does_not_cast`.
+#' 7. `filled_upstream_agrees` or `filled_upstream_disagrees`: it filled a missing value,
 #'    and the source now holds one (G7).
-#' 7. `prior_mismatch`.
-#' 8. Otherwise, `apply`.
+#' 8. `prior_mismatch`.
+#' 9. Otherwise, `apply`.
 #'
 #' @param base A data frame of the source's rows.
 #' @param corrections A data frame of the corrections table's rows.
@@ -575,7 +583,10 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
   marker <- ifelse(acc$new_value_missing == 1L, "\001missing", acc$new_value)
   n_values <- tapply(marker, acc_cell, function(v) length(unique(v)))
   valid <- setdiff(names(base), key)
-  row_of <- match(cell_of(acc, key), cell_of(base, key))
+  base_id <- cell_of(base, key)
+  row_of <- match(cell_of(acc, key), base_id)
+  # A key that now matches several rows changes none of them (the source lost uniqueness).
+  n_rows <- as.integer(table(base_id)[cell_of(acc, key)])
   status <- character(nrow(acc))
   for (i in seq_len(nrow(acc))) {
     a <- acc[i, ]
@@ -584,6 +595,8 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
       "no_variable"
     } else if (is.na(row_of[[i]])) {
       "no_record"
+    } else if (n_rows[[i]] > 1L) {
+      "ambiguous_record"
     } else if (n_values[[acc_cell[[i]]]] > 1L) {
       "accepted_disagree"
     } else if (is.na(a$expected_prior_missing)) {
@@ -718,6 +731,27 @@ test_that("a supersede decision settles a G1 conflict", {
   conflicts <- DBI::dbGetQuery(con, "SELECT correction_id FROM stg_echo_corrections_conflicts")
   expect_false(any(c("c03", "c04") %in% conflicts$correction_id))
 })
+
+test_that("a key duplicated after acceptance changes no row, in SQL and in R", {
+  con <- local_sources_db()
+  deploy_echo(con)
+  DBI::dbExecute(con, paste("INSERT INTO stg_echo VALUES",
+                            "('SYN201', DATE '2020-01-01', 30, '2', NULL)"))
+  got <- DBI::dbGetQuery(con, "SELECT lvef, mr_grade FROM stg_echo_corrected
+                               WHERE mrn = 'SYN201'")
+  expect_identical(got$lvef, c(30, 30))           # c01 no longer applies to either row
+  expect_identical(got$mr_grade, c("2", "2"))     # nor do c05 and c06
+  expect_identical(nrow(DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrected")), 6L)
+  stale <- DBI::dbGetQuery(con, "SELECT * FROM stg_echo_corrections_stale")
+  expect_setequal(stale$correction_id[stale$reason == "ambiguous_record"],
+                  c("c01", "c05", "c06"))
+  ref <- resolve_source_corrections(DBI::dbGetQuery(con, "SELECT * FROM stg_echo"),
+                                    case_corrections(), case_decisions(),
+                                    c("mrn", "encounter_date"))
+  expect_setequal(ref$stale$correction_id[ref$stale$reason == "ambiguous_record"],
+                  c("c01", "c05", "c06"))
+  expect_false(any(c("c01", "c05", "c06") %in% ref$applied$correction_id))
+})
 ```
 
 - [ ] **Step 2: Run them and confirm they fail**
@@ -770,6 +804,7 @@ Expected: FAIL with `could not find function "source_views_sql"`.
     )
   }, character(1))
   on_b <- paste(sprintf("b.%s = a.%s", q(key), q(key)), collapse = " AND ")
+  on_bc <- paste(sprintf("bc.%s = a.%s", q(key), q(key)), collapse = " AND ")
   on_k <- paste(c(sprintf("k.%s = a.%s", q(key), q(key)), "k.variable = a.variable"),
                 collapse = " AND ")
   keys <- paste(q(key), collapse = ", ")
@@ -789,17 +824,23 @@ Expected: FAIL with `could not find function "source_views_sql"`.
     distinct_value, " END)\n",
     "         + MAX(new_value_missing) AS n_values\n",
     "  FROM accepted GROUP BY ", keys, ", variable\n",
+    # Source rows per key now: a refresh can break uniqueness after a correction is accepted.
+    "), bc AS (\n",
+    "  SELECT ", keys, ", COUNT(*) AS n_rows FROM ", q(source), " GROUP BY ", keys, "\n",
     "), checked AS (\n",
     "  SELECT a.*, CASE\n",
     "    WHEN a.variable NOT IN (", paste(sql_string(valid), collapse = ", "),
     ") THEN 'no_variable'\n",
-    "    WHEN b.", q(key[[1]]), " IS NULL THEN 'no_record'\n",
+    "    WHEN bc.n_rows IS NULL THEN 'no_record'\n",
+    "    WHEN bc.n_rows > 1 THEN 'ambiguous_record'\n",
     "    WHEN k.n_values > 1 THEN 'accepted_disagree'\n",
     "    WHEN a.expected_prior_missing IS NULL THEN 'prior_unknown'\n",
     "    ELSE CASE a.variable\n      ", paste(per_var, collapse = "\n      "),
     "\n    END END AS status\n",
     "  FROM accepted a\n",
-    "  LEFT JOIN ", q(source), " b ON ", on_b, "\n",
+    "  LEFT JOIN bc ON ", on_bc, "\n",
+    # Joined only on a unique key, so a duplicated key never fans a correction out.
+    "  LEFT JOIN ", q(source), " b ON ", on_b, " AND bc.n_rows = 1\n",
     "  JOIN cell k ON ", on_k, "\n",
     ")\n"
   )
@@ -873,7 +914,7 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::test(filter = "source-corrections-sql")'`
-Expected: PASS, 8 tests.
+Expected: PASS, 9 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1308,6 +1349,26 @@ test_that("keys and values are kept verbatim; only structural fields are trimmed
   expect_identical(out$verdicts$verdict, c("appendable", "prior_mismatch"))
 })
 
+test_that("an empty string and significant spaces survive intake into the view", {
+  s <- propose_setup()
+  f <- write_submission(s$cfg, list(
+    good_row(variable = "mr_grade", expected_prior = "2", new_value = ""),
+    good_row(mrn = "SYN203", encounter_date = "2020-03-01", variable = "mr_grade",
+             expected_prior = "1", new_value = "  3 ")))
+  out <- propose_corrections(s$cfg, s$con, f, dry_run = FALSE, dialect = "duckdb")
+  expect_identical(out$appended, 2L)
+  stored <- DBI::dbGetQuery(s$con, paste("SELECT new_value, new_value_missing FROM",
+                                         "stg_echo_corrections ORDER BY mrn"))
+  expect_identical(stored$new_value, c("", "  3 "))
+  expect_identical(stored$new_value_missing, c(0L, 0L))
+  DBI::dbAppendTable(s$con, "stg_echo_correction_decisions",
+                     rbind(dec_row("d1", out$correction_ids[[1]]),
+                           dec_row("d2", out$correction_ids[[2]])))
+  got <- DBI::dbGetQuery(s$con, paste("SELECT mr_grade FROM stg_echo_corrected",
+                                      "WHERE mrn IN ('SYN201', 'SYN203') ORDER BY mrn"))
+  expect_identical(got$mr_grade, c("", "  3 "))
+})
+
 test_that("a template with the wrong columns is refused before any row is read", {
   s <- propose_setup()
   f <- withr::local_tempfile(fileext = ".csv")
@@ -1338,19 +1399,24 @@ Expected: FAIL with `could not find function "propose_corrections"`.
   if (!file.exists(file)) .abort("no_file", "propose_corrections(): `file` does not exist.")
   bytes <- readBin(file, "raw", file.size(file))
   sha <- digest::digest(bytes, algo = "sha256", serialize = FALSE)
+  # Nothing becomes NA on reading: the two value columns are kept exactly as written, and
+  # their flags, not an empty cell, say whether a value is missing.
   rows <- utils::read.csv(text = rawToChar(bytes), colClasses = "character",
-                          na.strings = "", check.names = FALSE)
+                          na.strings = character(), check.names = FALSE)
   if (!identical(names(rows), .template_columns(config))) {
     .abort("template_columns", "propose_corrections(): the file's columns are not the ",
            "template's. Start from write_corrections_template().")
   }
   # Trim only the structural fields. Keys and values stay verbatim: a prior of " A" is not
-  # "A", and parse_value()/value_text() preserve character text. An empty cell is missing.
+  # "A", and parse_value()/value_text() preserve character text. Outside the two value
+  # columns an empty cell is missing; inside them an empty cell is an empty string unless
+  # its flag says missing, so "" and "   " are both representable.
   structural <- c("source", "variable", "expected_prior_missing", "new_value_missing",
                   "evidence_type", "asserted_by")
   rows[structural] <- lapply(rows[structural], trimws)
-  rows[] <- lapply(rows, function(x) {
-    x[!is.na(x) & !nzchar(x)] <- NA_character_
+  other <- setdiff(names(rows), c("expected_prior", "new_value"))
+  rows[other] <- lapply(rows[other], function(x) {
+    x[!nzchar(x)] <- NA_character_
     x
   })
   list(rows = rows, sha256 = sha)
@@ -1447,14 +1513,18 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
   }))
   set(ruled, "rule_not_fact")
   set(!rows$source %in% names(config$sources), "unknown_source")
+  # A flag is 0 or 1, and a missing value (flag 1) leaves its cell empty. With flag 0 any
+  # text is the value, the empty string included.
   flag_ok <- function(f, value) {
-    f %in% c("0", "1") & ((f == "1") == is.na(value))
+    f %in% c("0", "1") & (f %in% "0" | !nzchar(value))
   }
   bad <- is.na(rows$variable) | is.na(rows$evidence_ref) | is.na(rows$asserted_by) |
     !rows$evidence_type %in% setdiff(EVIDENCE_TYPES, "legacy_sas_inline") |
     !flag_ok(rows$expected_prior_missing, rows$expected_prior) |
     !flag_ok(rows$new_value_missing, rows$new_value)
   set(bad, "invalid_field")
+  rows$expected_prior[rows$expected_prior_missing %in% "1"] <- NA_character_
+  rows$new_value[rows$new_value_missing %in% "1"] <- NA_character_
 
   master_cols <- names(run_step("read master columns", table_types(con, config$name)))
   out_rows <- list()
@@ -1663,7 +1733,7 @@ parse_value_vec <- function(x, r_class) {
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::document(); devtools::test(filter = "propose-corrections")'`
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -1747,6 +1817,15 @@ test_that("each refusal has its verdict, and one refuses the whole batch", {
     DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_correction_decisions")$n, 0)
 })
 
+test_that("a batch deciding one correction twice is refused, whatever the decisions", {
+  s <- decide_setup()
+  d <- rbind(decisions_df(), decisions_df(decision = "reject"))
+  out <- decide_corrections(s$cfg, s$con, d, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict, c("repeated_correction", "repeated_correction"))
+  expect_error(decide_corrections(s$cfg, s$con, d, dry_run = FALSE, dialect = "duckdb"),
+               class = "hvtiRdatabuild_decisions_refused")
+})
+
 test_that("a master.yml with no deciders cannot decide", {
   s <- decide_setup()
   s$cfg$deciders <- NULL
@@ -1793,6 +1872,9 @@ Expected: FAIL with `could not find function "decide_corrections"`.
 #'
 #' - `recordable`: the row passed every check below.
 #' - `unknown_source`: the source is not declared in `master.yml`.
+#' - `repeated_correction`: the batch decides the same correction more than once. Every row
+#'   of a batch shares one `decided_on`, so their order would be arbitrary; decide it again
+#'   in a later batch instead.
 #' - `unknown_correction`: the source has no correction with that id.
 #' - `invalid_decision`: the decision is not one of the four.
 #' - `not_decider`: the decider is not listed in `master.yml`'s `deciders`.
@@ -1838,6 +1920,10 @@ decide_corrections <- function(config, con, decisions, dry_run = TRUE, dialect =
     verdict[i & is.na(verdict)] <<- v
   }
   set(!decisions$source %in% names(config$sources), "unknown_source")
+  # One correction, one decision per batch: rows sharing a decided_on would be ordered by
+  # their hash-derived decision_id, not by intent.
+  dup <- paste(decisions$source, decisions$correction_id, sep = "\r")
+  set(dup %in% dup[duplicated(dup)], "repeated_correction")
   q <- quoter(dialect)
   now <- Sys.time()
   record <- function() {
@@ -1947,7 +2033,7 @@ retire_filled_corrections <- function(config, con, source, dry_run = TRUE,
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::document(); devtools::test(filter = "decide-corrections")'`
-Expected: PASS, 4 tests.
+Expected: PASS, 5 tests.
 
 - [ ] **Step 5: Commit**
 
