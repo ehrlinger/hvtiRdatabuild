@@ -88,11 +88,17 @@ family's provenance record (`package`, `version`, `sha`, `method`,
 `seed`, `rng_kind`, `time`), then `master`, `sql_commit`,
 `applied_correction_ids`, `corrections_in_effect`, `parity_verified_at`,
 `read_at`, `columns`, `cohort_definition`, `study_config_sha256`,
-`n_cohort`, `n_matched` and `n_unmatched`. The same pull fields without
-the provenance record are also in `provenance`, which is deprecated and
-goes in the next release; read `meta`. `corrections_in_effect` holds
-every correction id applied anywhere in the master in the same snapshot,
-including any that changed who qualified.
+`n_cohort`, `n_matched`, `n_unmatched`, `status` (`"complete"`, or
+`"awaiting review"` while chart review is pending; see
+[`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md))
+and `review_decisions_sha256` (`NA` until review is applied). `review`
+holds the review `queue` (`cohort_unit`, `criterion_id`) and the
+declared `criteria` (`criterion_id`, `label`, `role`, `kind`). The same
+pull fields without the provenance record are also in `provenance`,
+which is deprecated and goes in the next release; read `meta`.
+`corrections_in_effect` holds every correction id applied anywhere in
+the master in the same snapshot, including any that changed who
+qualified.
 
 ## Details
 
@@ -120,8 +126,14 @@ can refuse a configuration that changed afterwards.
 The returned cohort ends with an `in_master` stage that excludes units
 with no master row, so the data match the active cohort exactly. A unit
 matching more than one master row stops the pull, because the key is
-meant to be unique. Nothing in an error or in printed output names a
-patient.
+meant to be unique; this is checked before any criterion runs, so a
+criterion cannot filter a duplicate out of sight. Nothing in an error or
+in printed output names a patient.
+
+A query's criteria are evaluated in the warehouse, inside the same
+transaction: each sets a flag on the session cohort table, and only the
+keys and flags are read back. The pull refuses itself if the stages R
+rebuilds from the flags disagree with the warehouse.
 
 ## See also
 
@@ -156,7 +168,7 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmp6qemSm/duckdb
+#> ℹ /tmp/RtmpVuyOuJ/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

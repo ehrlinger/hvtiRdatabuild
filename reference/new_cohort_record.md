@@ -21,7 +21,10 @@ new_cohort_record(members, stages, patient_id_col)
 - stages:
 
   A data frame with `stage_id`, `order`, `label`, `source`, and
-  `provenance` columns, ordered by `order`.
+  `provenance` columns, ordered by `order`. `source` is `"upstream"`,
+  `"build"`, `"derive"` or `"review"`. `review` is a decision made at
+  chart review, recorded by
+  [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md).
 
 - patient_id_col:
 

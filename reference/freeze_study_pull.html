@@ -110,7 +110,8 @@ release can never exist without it. Read it back with <code><a href="read_pull_p
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>The configuration must be unchanged since the pull: if its checksum no longer matches
-the one <code><a href="pull_master.html">pull_master()</a></code> recorded, nothing is published.</p>
+the one <code><a href="pull_master.html">pull_master()</a></code> recorded, nothing is published. A pull awaiting chart review is
+refused.</p>
 <p>Retrying the same pull returns the same release. A distinct pull with identical data
 carries different provenance, so it becomes its own release.</p>
 <p>The retained pull holds patient values. It belongs in the study's data folder under
@@ -151,7 +152,7 @@ the same rules as the built dataset, never in a repository.</p>
 <span class="r-in"><span>  <span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">config</span>, <span class="va">published</span><span class="op">)</span>, recursive <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmp6qemSm/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpVuyOuJ/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>

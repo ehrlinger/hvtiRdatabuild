@@ -62,7 +62,7 @@ Invisibly, the release, as returned by
 The configuration must be unchanged since the pull: if its checksum no
 longer matches the one
 [`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
-recorded, nothing is published.
+recorded, nothing is published. A pull awaiting chart review is refused.
 
 Retrying the same pull returns the same release. A distinct pull with
 identical data carries different provenance, so it becomes its own
@@ -108,7 +108,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   unlink(c(config, published), recursive = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmp6qemSm/duckdb
+#> ℹ /tmp/RtmpVuyOuJ/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

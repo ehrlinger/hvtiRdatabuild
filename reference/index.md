@@ -70,6 +70,30 @@ provenance.
 - [`read_pull_provenance()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/read_pull_provenance.md)
   : Read the provenance a frozen pull carries
 
+## Pull: Cohort criteria
+
+Declare inclusion and exclusion criteria for a cohort query. Each is
+evaluated in the warehouse inside the pull, counted as its own stage,
+and states every clinical choice itself.
+
+- [`criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.md)
+  : Declare an inclusion or exclusion criterion
+- [`master_row()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/master_row.md)
+  : Test a condition on the master row
+- [`view_rows()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/view_rows.md)
+  : Test rows of another view in a window around the encounter
+- [`any_of()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/any_of.md)
+  [`all_of()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/any_of.md)
+  : Combine tests
+- [`local_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/local_criterion.md)
+  : Declare a criterion evaluated in R on a file the study holds
+- [`review_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_criterion.md)
+  : Declare a criterion decided at chart review
+- [`review_list()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_list.md)
+  : List what a pull needs decided at chart review
+- [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md)
+  : Record chart-review decisions on a pull
+
 ## Build: Assemble and Derive
 
 Join the pulled modules into a study’s built dataset, run its

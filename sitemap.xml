@@ -10,7 +10,9 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/copilot-instructions.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/index.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/news/index.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/any_of.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/append_cohort_stage.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/backfill_corrections.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/build_dataset.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/build_from_master.html</loc></url>
@@ -18,6 +20,7 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_summary.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/cohort_unit_id.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/compare_built.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/decide_correction.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/derive_vars.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/dw_connect.html</loc></url>
@@ -27,6 +30,8 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/hvtiRdatabuild-package.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/index.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/lift_master.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/local_criterion.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/master_row.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/new_cohort_record.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/print.build_result.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/print.built_comparison.html</loc></url>
@@ -41,6 +46,8 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/read_master_config.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/read_pull_provenance.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/read_study_config.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/review_criterion.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/review_list.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_master.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/snapshot_oracle.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/split_cohort_unit.html</loc></url>
@@ -48,6 +55,7 @@
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/str.built_comparison.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/str.cohort_record.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/str.derive_result.html</loc></url>
+<url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/view_rows.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/withdraw_dataset_release.html</loc></url>
 <url><loc>https://ehrlinger.github.io/hvtiRdatabuild/reference/write_analysis_set.html</loc></url>
 </urlset>

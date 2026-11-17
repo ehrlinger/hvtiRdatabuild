@@ -66,7 +66,9 @@ derived from these outcomes, so stage counts cannot drift from membership.</p>
 
 <dt id="arg-stages">stages<a class="anchor" aria-label="anchor" href="#arg-stages"></a></dt>
 <dd><p>A data frame with <code>stage_id</code>, <code>order</code>, <code>label</code>, <code>source</code>, and
-<code>provenance</code> columns, ordered by <code>order</code>.</p></dd>
+<code>provenance</code> columns, ordered by <code>order</code>. <code>source</code> is <code>"upstream"</code>, <code>"build"</code>,
+<code>"derive"</code> or <code>"review"</code>. <code>review</code> is a decision made at chart review, recorded by
+<code><a href="apply_review.html">apply_review()</a></code>.</p></dd>
 
 
 <dt id="arg-patient-id-col">patient_id_col<a class="anchor" aria-label="anchor" href="#arg-patient-id-col"></a></dt>

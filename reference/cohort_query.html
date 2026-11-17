@@ -56,7 +56,9 @@ warehouse.</p>
 <span>  <span class="va">qualifying</span>,</span>
 <span>  <span class="va">epoch</span>,</span>
 <span>  index <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"first"</span>, <span class="st">"all"</span><span class="op">)</span>,</span>
-<span>  prior <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"keep"</span>, <span class="st">"exclude"</span><span class="op">)</span></span>
+<span>  prior <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"keep"</span>, <span class="st">"exclude"</span><span class="op">)</span>,</span>
+<span>  criteria <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="op">)</span>,</span>
+<span>  index_on <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -81,6 +83,20 @@ example <code>"proc = 'CABG'"</code>.</p></dd>
 <dd><p><code>"keep"</code> or <code>"exclude"</code>, for units with a qualifying encounter before
 the epoch.</p></dd>
 
+
+<dt id="arg-criteria">criteria<a class="anchor" aria-label="anchor" href="#arg-criteria"></a></dt>
+<dd><p>A list of criteria from <code><a href="criterion.html">criterion()</a></code>, <code><a href="local_criterion.html">local_criterion()</a></code> and
+<code><a href="review_criterion.html">review_criterion()</a></code>, in the order they run: warehouse criteria, then local, then
+review. Each becomes a counted cohort stage; see <code><a href="criterion.html">criterion()</a></code>.</p></dd>
+
+
+<dt id="arg-index-on">index_on<a class="anchor" aria-label="anchor" href="#arg-index-on"></a></dt>
+<dd><p>With <code>index = "first"</code> and criteria, which encounter is the index:
+<code>"qualifying"</code> takes each patient's first qualifying encounter and then applies the
+criteria, so a patient excluded there is out; <code>"eligible"</code> applies the criteria to
+every qualifying encounter and takes each patient's first that survives. The two give
+different cohorts, so there is no default. Leave <code>NULL</code> otherwise.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -99,6 +115,7 @@ reason. Nothing is dropped silently. The earlier encounter is detected in the da
 its date never leaves it.</p>
 <p><code>qualifying</code> is SQL written by the study programmer and run as a <code>WHERE</code> condition on
 the master. It must never be built from data.</p>
+<p>Criteria are evaluated in the warehouse, in the pull's transaction; see <code><a href="criterion.html">criterion()</a></code>.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

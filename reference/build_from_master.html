@@ -3,11 +3,11 @@
 encounter, so there are no modules to join: the pulled rows are the built dataset.
 build_from_master() checks they match the cohort's active units exactly and records
 the build as a cohort stage, returning the same build_result shape that
-derive_vars() consumes."><meta property="og:description" content="The master-view counterpart of build_dataset(). A master is already one wide row per
+derive_vars() consumes. A pull awaiting chart review is refused."><meta property="og:description" content="The master-view counterpart of build_dataset(). A master is already one wide row per
 encounter, so there are no modules to join: the pulled rows are the built dataset.
 build_from_master() checks they match the cohort's active units exactly and records
 the build as a cohort stage, returning the same build_result shape that
-derive_vars() consumes."></head><body>
+derive_vars() consumes. A pull awaiting chart review is refused."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -53,7 +53,7 @@ derive_vars() consumes."></head><body>
 encounter, so there are no modules to join: the pulled rows are the built dataset.
 <code>build_from_master()</code> checks they match the cohort's active units exactly and records
 the build as a cohort stage, returning the same <code>build_result</code> shape that
-<code><a href="derive_vars.html">derive_vars()</a></code> consumes.</p>
+<code><a href="derive_vars.html">derive_vars()</a></code> consumes. A pull awaiting chart review is refused.</p>
     </div>
 
     <div class="section level2">
@@ -104,7 +104,7 @@ and <code>tables</code> (empty).</p>
 <span class="r-in"><span>  <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="op">}</span></span></span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> duckdb keeps downloaded extensions and secrets in a temporary directory:</span>
-<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/Rtmp6qemSm/duckdb</span>
+<span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #0000BB;">ℹ</span> /tmp/RtmpVuyOuJ/duckdb</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> This is removed when the R session ends.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span>
 <span class="r-msg co"><span class="r-pr">#&gt;</span> <span style="color: #00BBBB;">•</span> Secrets are lost.</span>

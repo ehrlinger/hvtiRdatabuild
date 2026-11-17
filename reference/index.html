@@ -208,6 +208,71 @@
         </dt>
         <dd>Read the provenance a frozen pull carries</dd>
       </dl></div><div class="section level2">
+      <h2 id="pull-cohort-criteria">Pull: Cohort criteria<a class="anchor" aria-label="anchor" href="#pull-cohort-criteria"></a></h2>
+
+      <div class="section-desc"><p>Declare inclusion and exclusion criteria for a cohort query. Each is evaluated in the warehouse inside the pull, counted as its own stage, and states every clinical choice itself.</p></div>
+
+      <dl></dl></div><div class="section level2">
+
+
+
+
+      <dl><dt>
+
+          <code><a href="criterion.html">criterion()</a></code>
+
+        </dt>
+        <dd>Declare an inclusion or exclusion criterion</dd>
+
+        <dt>
+
+          <code><a href="master_row.html">master_row()</a></code>
+
+        </dt>
+        <dd>Test a condition on the master row</dd>
+
+        <dt>
+
+          <code><a href="view_rows.html">view_rows()</a></code>
+
+        </dt>
+        <dd>Test rows of another view in a window around the encounter</dd>
+
+        <dt>
+
+          <code><a href="any_of.html">any_of()</a></code> <code><a href="any_of.html">all_of()</a></code>
+
+        </dt>
+        <dd>Combine tests</dd>
+
+        <dt>
+
+          <code><a href="local_criterion.html">local_criterion()</a></code>
+
+        </dt>
+        <dd>Declare a criterion evaluated in R on a file the study holds</dd>
+
+        <dt>
+
+          <code><a href="review_criterion.html">review_criterion()</a></code>
+
+        </dt>
+        <dd>Declare a criterion decided at chart review</dd>
+
+        <dt>
+
+          <code><a href="review_list.html">review_list()</a></code>
+
+        </dt>
+        <dd>List what a pull needs decided at chart review</dd>
+
+        <dt>
+
+          <code><a href="apply_review.html">apply_review()</a></code>
+
+        </dt>
+        <dd>Record chart-review decisions on a pull</dd>
+      </dl></div><div class="section level2">
       <h2 id="build-assemble-and-derive">Build: Assemble and Derive<a class="anchor" aria-label="anchor" href="#build-assemble-and-derive"></a></h2>
 
       <div class="section-desc"><p>Join the pulled modules into a study’s built dataset, run its study-specific derivation code, and carry the cohort’s inclusion and exclusion history through both in order.</p></div>

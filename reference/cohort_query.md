@@ -12,7 +12,9 @@ cohort_query(
   qualifying,
   epoch,
   index = c("first", "all"),
-  prior = c("keep", "exclude")
+  prior = c("keep", "exclude"),
+  criteria = list(),
+  index_on = NULL
 )
 ```
 
@@ -37,6 +39,26 @@ cohort_query(
   `"keep"` or `"exclude"`, for units with a qualifying encounter before
   the epoch.
 
+- criteria:
+
+  A list of criteria from
+  [`criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.md),
+  [`local_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/local_criterion.md)
+  and
+  [`review_criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_criterion.md),
+  in the order they run: warehouse criteria, then local, then review.
+  Each becomes a counted cohort stage; see
+  [`criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.md).
+
+- index_on:
+
+  With `index = "first"` and criteria, which encounter is the index:
+  `"qualifying"` takes each patient's first qualifying encounter and
+  then applies the criteria, so a patient excluded there is out;
+  `"eligible"` applies the criteria to every qualifying encounter and
+  takes each patient's first that survives. The two give different
+  cohorts, so there is no default. Leave `NULL` otherwise.
+
 ## Value
 
 An object of class `cohort_query`.
@@ -58,6 +80,9 @@ never leaves it.
 
 `qualifying` is SQL written by the study programmer and run as a `WHERE`
 condition on the master. It must never be built from data.
+
+Criteria are evaluated in the warehouse, in the pull's transaction; see
+[`criterion()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/criterion.md).
 
 ## See also
 

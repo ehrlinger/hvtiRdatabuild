@@ -116,7 +116,7 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmp6qemSm/duckdb
+#> ℹ /tmp/RtmpVuyOuJ/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -132,8 +132,8 @@ if (requireNamespace("duckdb", quietly = TRUE) &&
 #> legacy: 0 facts parsed; 0 resolved; 0 unresolved
 #> recorded 0; 0 stale corrections
 #> Warning: 'propose_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
-#> Correction c3524232fcee8a2d4 appended. First correction to this variable: regenerate the view.
+#> Correction ca8ea7ed5a81f91a4 appended. First correction to this variable: regenerate the view.
 #> Warning: 'decide_correction()' is deprecated. Corrections to master datasets move to the HVTR registry, and hvtiRdatabuild will read corrected data from it. See https://github.com/ehrlinger/hvtiRdatabuild/issues/101.
-#> Decision d4b13da7ccfe49f37 (accept) recorded on c3524232fcee8a2d4.
+#> Decision d31b5eeeee107ce88 (accept) recorded on ca8ea7ed5a81f91a4.
 # }
 ```
