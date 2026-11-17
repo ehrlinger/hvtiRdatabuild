@@ -183,3 +183,26 @@ test_that("a template with the wrong columns is refused before any row is read",
   expect_error(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"),
                class = "hvtiRdatabuild_template_columns")
 })
+
+test_that("the intake join is exact on mssql for character keys only", {
+  types <- c(mrn = "nvarchar(128)", encounter_date = "date", lvef = "float")
+  sql <- .intake_lookup_sql("#correction_intake", "stg_echo", c("mrn", "encounter_date"),
+                            types, "lvef", "mssql")
+  expect_match(sql, "b.[mrn] COLLATE Latin1_General_BIN2", fixed = TRUE)
+  expect_match(sql, "DATALENGTH(b.[mrn]) = DATALENGTH(t.[mrn])", fixed = TRUE)
+  expect_match(sql, "b.[encounter_date] = t.[encounter_date]", fixed = TRUE)
+  expect_equal(lengths(regmatches(sql, gregexpr("COLLATE", sql))), 2L)
+  expect_match(sql, "t.row_id AS intake_row_", fixed = TRUE)
+  duck <- .intake_lookup_sql("correction_intake", "stg_echo", c("mrn", "encounter_date"),
+                             types, "lvef", "duckdb")
+  expect_false(grepl("COLLATE|DATALENGTH", duck))
+})
+
+test_that("a key matching more than one source row is ambiguous", {
+  s <- propose_setup()
+  DBI::dbExecute(s$con, paste("INSERT INTO stg_echo VALUES ('SYN201', DATE '2020-01-01',",
+                              "31, '2', DATE '2019-12-01')"))
+  f <- write_submission(s$cfg, list(good_row()))
+  out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict, "ambiguous_key")
+})

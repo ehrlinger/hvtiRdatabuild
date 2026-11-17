@@ -206,6 +206,30 @@ write_corrections_template <- function(config, path) {
                                        " NOT NULL", cols, ")")))
 }
 
+#' The intake lookup: the source rows whose keys match the intake table
+#'
+#' Character keys join exactly on SQL Server, as the generated views do (see
+#' `.key_join_sql()`), so a row judged appendable here is a row the views will apply to.
+#' The intake row id is aliased `intake_row_` so it cannot collide with a source column.
+#'
+#' @param intake Character. The intake temp table's name.
+#' @param source Character. The source's name.
+#' @param key Character. The source's key columns.
+#' @param types A named character vector of the source's SQL types.
+#' @param wanted Character. The variables to read.
+#' @param dialect Character. `"mssql"` or `"duckdb"`.
+#'
+#' @return A length-one character: the `SELECT`.
+#'
+#' @keywords internal
+#' @noRd
+.intake_lookup_sql <- function(intake, source, key, types, wanted, dialect) {
+  q <- quoter(dialect)
+  sprintf("SELECT t.row_id AS intake_row_, %s FROM %s t JOIN %s b ON %s",
+          paste0("b.", q(wanted), collapse = ", "), intake, q(source),
+          .key_join_sql("b", "t", key, types, dialect))
+}
+
 #' Propose a batch of corrections from a filled template
 #'
 #' Validates every row of a submission made from [write_corrections_template()] and returns
@@ -331,20 +355,18 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
       ))
       q <- quoter(dialect)
       wanted <- unique(rows$variable[live])
-      found <- run_step("look up source rows", DBI::dbGetQuery(con, sprintf(
-        "SELECT t.row_id, %s FROM %s t JOIN %s b ON %s",
-        paste0("b.", q(wanted), collapse = ", "), tmp$name, q(s),
-        paste(sprintf("b.%s = t.%s", q(key), q(key)), collapse = " AND ")
-      )))
+      found <- run_step("look up source rows", DBI::dbGetQuery(
+        con, .intake_lookup_sql(tmp$name, s, key, types, wanted, dialect)
+      ))
       run_step("drop intake table", DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
-      hits <- tabulate(match(found$row_id, live), nbins = length(live))
+      hits <- tabulate(match(found$intake_row_, live), nbins = length(live))
       set(live[hits == 0L], "unknown_key")
       set(live[hits > 1L], "ambiguous_key")
 
       for (i in live[hits == 1L]) {
         v <- rows$variable[[i]]
         cls <- class(proto[[v]])[[1]]
-        cur <- found[[v]][[match(i, found$row_id)]]
+        cur <- found[[v]][[match(i, found$intake_row_)]]
         parsed <- function(x) tryCatch(parse_value(x, cls), error = function(e) NA)
         prior <- if (rows$expected_prior_missing[[i]] == "1") NA else
           parsed(rows$expected_prior[[i]])
