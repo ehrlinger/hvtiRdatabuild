@@ -199,3 +199,17 @@ test_that("a key matching more than one source row is ambiguous", {
   out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
   expect_identical(out$verdicts$verdict, "ambiguous_key")
 })
+
+test_that("a key the column would round names no row, and cannot correct another", {
+  s <- propose_setup()
+  DBI::dbExecute(s$con, "CREATE TABLE stg_num (id INTEGER, lvef DOUBLE)")
+  DBI::dbExecute(s$con, "INSERT INTO stg_num VALUES (1, 30)")
+  s$cfg$sources$stg_num <- list(key = "id")
+  num <- function(id) good_row(source = "stg_num", mrn = "", encounter_date = "", id = id)
+  f <- write_submission(s$cfg, list(num("1.2"), num("1")))
+  out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict, c("unknown_key", "appendable"))
+  expect_error(propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(num("1.2"))),
+                                   dry_run = FALSE, dialect = "duckdb"),
+               class = "hvtiRdatabuild_corrections_refused")
+})

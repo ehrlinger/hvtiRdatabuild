@@ -352,6 +352,12 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         }, character(1), USE.NAMES = FALSE)
       })
       names(typed) <- key
+      # The key must survive the warehouse's cast to the key column unchanged, as values
+      # must: an integer key `1.2` would load as `1` and name another row.
+      for (k in key) {
+        j <- which(!is.na(typed[[k]]))
+        typed[[k]][j[!.casts_losslessly(con, typed[[k]][j], types[[k]])]] <- NA_character_
+      }
       incomplete <- Reduce(`|`, lapply(typed, is.na)) |
         (if (length(other)) Reduce(`|`, lapply(other, function(k) !is.na(rows[[k]][idx])))
          else FALSE)
