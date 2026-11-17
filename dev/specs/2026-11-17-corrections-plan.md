@@ -53,7 +53,8 @@ duckdb only. The SQL Server rehearsal of the generated SQL belongs to plan 3.
 - **Arrow and duckdb are Suggests.** Tests call `skip_if_not_installed()`.
 - **The old master-level corrections code stays as it is:** `R/corrections_sql.R`,
   `R/master_corrections.R` and the three deprecated exports. This plan adds new files beside
-  them and edits neither.
+  them. Its only edits there are two additive fixes in Task 2 Step 0: decimal scale in
+  `table_types()`, and a `logical` branch in `parse_value()`.
 - **Interim write tools.** Every new export's help says it is interim and superseded by the
   HVTR registry's intake (spec §3.4).
 - **No version bump.** The implementation branch writes one news fragment (Task 8). This
@@ -231,12 +232,17 @@ git commit -m "feat: master.yml declares correctable sources and deciders"
 **Files:**
 - Create: `R/source_corrections_sql.R`
 - Create: `tests/testthat/helper-source-corrections.R`
+- Modify: `R/sql_dialect.R` (`table_types()`, line 115), `R/corrections_sql.R`
+  (`parse_value()`, line 41): two additive fixes the generated casts depend on (Step 0)
 - Test: `tests/testthat/test-source-corrections-sql.R`
 
 **Interfaces:**
 - Consumes: `quoter()`, `sql_types()`, `parse_value()` (`R/corrections_sql.R:41`) and
   `table_types()`.
 - Produces:
+  - `table_types()` now carries a SQL Server `decimal`/`numeric` column's precision and
+    scale (`decimal(10,2)`, not `decimal`). duckdb already reports them in `DATA_TYPE`.
+  - `parse_value()` gains a `logical` branch (`1`/`0`, `TRUE`/`FALSE`, `T`/`F`).
   - `.source_tables(source)`: a list with names `corrections`, `decisions`, `corrected`,
     `applied`, `stale` and `conflicts`.
   - `SOURCE_STALE` and `SOURCE_CONFLICT`: character constants of statuses.
@@ -248,6 +254,55 @@ git commit -m "feat: master.yml declares correctable sources and deciders"
     - `applied`: `correction_id` and the key columns.
     - `stale`: `correction_id`, `variable`, `reason`.
     - `conflicts`: `correction_id`, `variable`, `reason`.
+
+- [ ] **Step 0: Keep decimal scale, and read booleans.** Every generated cast uses
+  `table_types()`. Today it drops a `decimal`'s precision and scale on SQL Server, and a
+  bare `decimal` has scale 0, so a cast to it would round a fill-in of `12.5` to `13`.
+  Separately, `parse_value()` has no `logical` branch, so a `BIT`/`BOOLEAN` column could
+  never be corrected. Write the tests first, in `tests/testthat/test-source-corrections-sql.R`:
+
+```r
+test_that("table_types() keeps a decimal's precision and scale", {
+  skip_if_not_installed("duckdb")
+  con <- DBI::dbConnect(duckdb::duckdb())
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
+  DBI::dbExecute(con, "CREATE TABLE t_dec (a DECIMAL(10,2), b INTEGER)")
+  expect_identical(unname(table_types(con, "t_dec")), c("DECIMAL(10,2)", "INTEGER"))
+})
+
+test_that("parse_value() reads logical text", {
+  expect_identical(parse_value("1", "logical"), TRUE)
+  expect_identical(parse_value("FALSE", "logical"), FALSE)
+  expect_identical(parse_value("maybe", "logical"), NA)
+  expect_identical(value_text(TRUE), "TRUE")
+})
+```
+
+  Then implement. In `table_types()`, add `NUMERIC_PRECISION, NUMERIC_SCALE` to the
+  `SELECT` and replace the `type <-` line with:
+
+```r
+  type <- ifelse(is.na(len), cols$DATA_TYPE,
+                 sprintf("%s(%s)", cols$DATA_TYPE, ifelse(len == -1, "max", len)))
+  # SQL Server reports a bare "decimal"; without its scale a cast would round (duckdb
+  # already writes DECIMAL(p,s) into DATA_TYPE, which has a parenthesis and is left alone).
+  dec <- tolower(cols$DATA_TYPE) %in% c("decimal", "numeric") &
+    !grepl("(", cols$DATA_TYPE, fixed = TRUE)
+  type[dec] <- sprintf("%s(%s,%s)", cols$DATA_TYPE[dec], cols$NUMERIC_PRECISION[dec],
+                       cols$NUMERIC_SCALE[dec])
+```
+
+  In `parse_value()`, add a branch to the `switch()` before the `stop()` line:
+
+```r
+         logical = switch(toupper(text), "1" = , "TRUE" = , "T" = TRUE,
+                          "0" = , "FALSE" = , "F" = FALSE, NA),
+```
+
+  and add `logical = NA,` to the missing-value `switch()` at the top. Add `"logical"` to
+  the `@param r_class` list in its roxygen. These are the plan's only edits to existing
+  corrections code. The global constraint's "stays as it is" means no behaviour change,
+  and both edits are additive.
 
 - [ ] **Step 1: Write the helper** `tests/testthat/helper-source-corrections.R`
 
@@ -580,7 +635,7 @@ resolve_source_corrections <- function(base, corrections, decisions, key) {
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::test(filter = "source-corrections-sql")'`
-Expected: PASS, 2 tests.
+Expected: PASS, 4 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -818,7 +873,7 @@ source_views_sql <- function(source, key, types, dialect = "mssql") {
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::test(filter = "source-corrections-sql")'`
-Expected: PASS, 6 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1225,6 +1280,34 @@ test_that("no value or key reaches a message", {
   }
 })
 
+test_that("a value the column would round or overflow does not cast; booleans do", {
+  s <- propose_setup()
+  DBI::dbExecute(s$con, paste("CREATE TABLE stg_lab (mrn VARCHAR, encounter_date DATE,",
+                              "potassium DECIMAL(4,1), on_pump BOOLEAN, n_grafts SMALLINT)"))
+  DBI::dbExecute(s$con, "INSERT INTO stg_lab VALUES ('SYN201', DATE '2020-01-01', 4.1, TRUE, 3)")
+  s$cfg$sources$stg_lab <- list(key = c("mrn", "encounter_date"))
+  lab <- function(...) good_row(source = "stg_lab", ...)
+  f <- write_submission(s$cfg, list(
+    lab(variable = "potassium", expected_prior = "4.1", new_value = "4.25"),  # rounds
+    lab(variable = "potassium", expected_prior = "4.1", new_value = "4.2"),
+    lab(variable = "on_pump", expected_prior = "TRUE", new_value = "0"),
+    lab(variable = "n_grafts", expected_prior = "3", new_value = "70000")    # overflows
+  ))
+  out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict,
+                   c("does_not_cast", "appendable", "appendable", "does_not_cast"))
+})
+
+test_that("keys and values are kept verbatim; only structural fields are trimmed", {
+  s <- propose_setup()
+  DBI::dbExecute(s$con, "UPDATE stg_echo SET mr_grade = ' 2' WHERE mrn = 'SYN201'")
+  f <- write_submission(s$cfg, list(
+    good_row(variable = " mr_grade ", expected_prior = " 2", new_value = "3"),
+    good_row(variable = "mr_grade", expected_prior = "2", new_value = "3")))
+  out <- propose_corrections(s$cfg, s$con, f, dialect = "duckdb")
+  expect_identical(out$verdicts$verdict, c("appendable", "prior_mismatch"))
+})
+
 test_that("a template with the wrong columns is refused before any row is read", {
   s <- propose_setup()
   f <- withr::local_tempfile(fileext = ".csv")
@@ -1261,9 +1344,13 @@ Expected: FAIL with `could not find function "propose_corrections"`.
     .abort("template_columns", "propose_corrections(): the file's columns are not the ",
            "template's. Start from write_corrections_template().")
   }
+  # Trim only the structural fields. Keys and values stay verbatim: a prior of " A" is not
+  # "A", and parse_value()/value_text() preserve character text. An empty cell is missing.
+  structural <- c("source", "variable", "expected_prior_missing", "new_value_missing",
+                  "evidence_type", "asserted_by")
+  rows[structural] <- lapply(rows[structural], trimws)
   rows[] <- lapply(rows, function(x) {
-    x <- trimws(x)
-    x[!nzchar(x)] <- NA_character_
+    x[!is.na(x) & !nzchar(x)] <- NA_character_
     x
   })
   list(rows = rows, sha256 = sha)
@@ -1306,7 +1393,9 @@ Expected: FAIL with `could not find function "propose_corrections"`.
 #' - `unknown_key`: the key is incomplete, carries another source's key column, or matches
 #'   no row.
 #' - `ambiguous_key`: the key matches more than one row.
-#' - `does_not_cast`: a value is not of the column's type.
+#' - `does_not_cast`: a value is not of the column's type, or the warehouse's cast to the
+#'   column's SQL type would round, overflow or truncate it. This last check runs after
+#'   the prior check.
 #' - `prior_mismatch`: the source no longer holds `expected_prior`.
 #'
 #' With `dry_run = FALSE`, an all-`appendable` file is appended in one transaction, and a
@@ -1441,7 +1530,6 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
           set(i, "prior_mismatch")
           next
         }
-        set(i, "appendable")
         r <- data.frame(correction_id = NA_character_, source = s,
                         stringsAsFactors = FALSE)
         for (k in key) r[[k]] <- parse_value(typed[[k]][[match(i, idx)]],
@@ -1458,9 +1546,28 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         r$correction_id <- paste0("c", substr(digest::digest(
           list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")), algo = "sha1"
         ), 1, 20))
+        r$.row <- i
         out_rows[[length(out_rows) + 1L]] <<- r
       }
+
+      # The warehouse's own cast decides, through the column's SQL type, so a value R
+      # accepts but the column would round, overflow or truncate is refused here, not
+      # discovered as a silently different value in the corrected view.
+      mine <- out_rows[vapply(out_rows, `[[`, character(1), "source") == s]
+      for (v in unique(vapply(mine, `[[`, character(1), "variable"))) {
+        rv <- mine[vapply(mine, `[[`, character(1), "variable") == v]
+        texts <- c(vapply(rv, `[[`, character(1), "expected_prior"),
+                   vapply(rv, `[[`, character(1), "new_value"))
+        rid <- rep(vapply(rv, `[[`, integer(1), ".row"), 2L)
+        keep <- !is.na(texts)
+        ok <- .casts_losslessly(con, texts[keep], types[[v]])
+        set(unique(rid[keep][!ok]), "does_not_cast")
+      }
+      set(vapply(mine, `[[`, integer(1), ".row"), "appendable")
     }
+    out_rows <<- out_rows[verdict[vapply(out_rows, `[[`, integer(1), ".row")] ==
+                            "appendable"]
+    out_rows <<- lapply(out_rows, function(r) r[setdiff(names(r), ".row")])
     stopifnot(!anyNA(verdict))
     if (dry_run || any(verdict != "appendable")) return(invisible(NULL))
     for (s in unique(vapply(out_rows, `[[`, character(1), "source"))) {
@@ -1487,6 +1594,41 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
                  appended = if (dry_run) 0L else length(ids),
                  correction_ids = if (dry_run) character() else ids,
                  file_sha256 = tpl$sha256))
+}
+
+#' Which canonical texts the warehouse casts to a SQL type without loss
+#'
+#' Each text goes through `TRY_CAST(... AS type)` in the warehouse, the cast the generated
+#' views use. A text passes when the cast succeeds and the result's canonical text is the
+#' text itself: `1.239` into `decimal(10,2)` comes back `1.24` and fails, as does an
+#' overflow (`NULL`) or a truncation. Batches of 500 keep under SQL Server's 2,100
+#' parameters.
+#'
+#' @param con A DBI connection.
+#' @param texts Character. Canonical texts, none missing.
+#' @param type Character. The column's SQL type, from `table_types()`.
+#'
+#' @return A logical vector the length of `texts`.
+#'
+#' @keywords internal
+#' @noRd
+.casts_losslessly <- function(con, texts, type) {
+  ok <- rep(FALSE, length(texts))
+  for (start in seq(1L, length(texts), by = 500L)) {
+    i <- start:min(start + 499L, length(texts))
+    params <- vector("list", 2L * length(i))
+    params[c(TRUE, FALSE)] <- as.list(i)
+    params[c(FALSE, TRUE)] <- as.list(texts[i])
+    got <- run_step("check casts", DBI::dbGetQuery(con, sprintf(
+      "SELECT i, TRY_CAST(txt AS %s) AS x FROM (VALUES %s) AS t(i, txt)", type,
+      paste(rep("(?, ?)", length(i)), collapse = ", ")
+    ), params = params))
+    x <- got$x[match(i, got$i)]
+    ok[i] <- vapply(seq_along(i), function(j) {
+      !is.na(x[[j]]) && identical(value_text(x[[j]]), texts[i][[j]])
+    }, logical(1))
+  }
+  ok
 }
 
 #' Parse a vector of canonical texts to one class
@@ -1521,7 +1663,7 @@ parse_value_vec <- function(x, r_class) {
 - [ ] **Step 5: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::document(); devtools::test(filter = "propose-corrections")'`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -1882,6 +2024,36 @@ test_that("a pass-through fix becomes a template row; a derived fix is only coun
   expect_true(is.na(rows$asserted_by))
 })
 
+test_that("a patient-level cell is a candidate only if every encounter agrees", {
+  f <- local_freeze_setup()
+  DBI::dbExecute(f$con, second_cabg)  # SYN103 gains a 2018 encounter
+  DBI::dbWriteTable(f$con, "master_demo_lineage", data.frame(
+    master_column = "proc", source = "stg_pat", source_column = "proc_group",
+    stringsAsFactors = FALSE
+  ))
+  pull <- pull_demo(f$con, demo_query(index = "all"), var_cols = c("proc", "age"))
+  release <- freeze_study_pull(pull, f$config, f$dir, "st0000_pull",
+                               extract_date = "2026-11-16")
+  frozen <- file.path(f$dir, release$file)
+  cfg_path <- withr::local_tempfile(fileext = ".yml")
+  writeLines(c("name: master_demo", "key: [mrn, encounter_date]", "snapshots: .",
+               "current: x.sas7bdat", "build_program: x.sas", "sources:",
+               "  stg_pat: {key: [mrn]}"), cfg_path)
+  cfg <- read_master_config(cfg_path)
+  data <- as.data.frame(arrow::read_parquet(frozen))
+  later <- data$mrn == "SYN103" & data$encounter_date == as.Date("2018-02-02")
+  data$proc[later] <- "OPCAB"           # one encounter changed, the other not
+  one <- study_correction_candidates(cfg, f$con, frozen, data,
+                                     withr::local_tempfile(fileext = ".csv"),
+                                     dialect = "duckdb")
+  expect_identical(c(one$candidates, one$inconsistent), c(0L, 1L))
+  data$proc[data$mrn == "SYN103"] <- "OPCAB"   # both agree: one source cell
+  both <- study_correction_candidates(cfg, f$con, frozen, data,
+                                      withr::local_tempfile(fileext = ".csv"),
+                                      dialect = "duckdb")
+  expect_identical(c(both$candidates, both$inconsistent), c(1L, 0L))
+})
+
 test_that("candidates need the lineage the pull was made with", {
   s <- candidates_setup()
   DBI::dbExecute(s$con, "UPDATE master_demo_deployment SET sql_commit = 'def5678'")
@@ -1979,15 +2151,20 @@ study_correction_candidates <- function(config, con, pull, data, path,
            config$name, ".")
   }
   q <- quoter(dialect)
-  commit <- .read_deployment(con, paste0(config$name, "_deployment"), dialect)
-  if (!identical(commit, prov$sql_commit)) {
+  # One snapshot for both reads, so a redeployment between them cannot pair the pull's
+  # commit with a newer lineage.
+  read <- .with_snapshot_txn(con, dialect, list(
+    commit = .read_deployment(con, paste0(config$name, "_deployment"), dialect),
+    lineage = run_step("read lineage", DBI::dbGetQuery(con, paste(
+      "SELECT master_column, source, source_column FROM",
+      q(paste0(config$name, "_lineage"))
+    )))
+  ))
+  if (!identical(read$commit, prov$sql_commit)) {
     .abort("lineage_moved", "study_correction_candidates(): the master was redeployed ",
            "since the pull, so its lineage may differ. Re-pull, then compare.")
   }
-  lineage <- run_step("read lineage", DBI::dbGetQuery(con, paste(
-    "SELECT master_column, source, source_column FROM",
-    q(paste0(config$name, "_lineage"))
-  )))
+  lineage <- read$lineage
   base <- as.data.frame(arrow::read_parquet(pull))
   if (!all(key %in% names(base)) || !all(key %in% names(data))) {
     .abort("key_columns", "study_correction_candidates(): the pull and `data` must both ",
@@ -2009,6 +2186,7 @@ study_correction_candidates <- function(config, con, pull, data, path,
   cols <- setdiff(intersect(names(data), names(base)), key)
   tpl_cols <- .template_columns(config)
   cand <- list()
+  inconsistent <- 0L
   derived <- data.frame(column = character(), n_cells = integer(), stringsAsFactors = FALSE)
   for (col in cols) {
     before <- as_text(base[[col]][m])
@@ -2027,7 +2205,15 @@ study_correction_candidates <- function(config, con, pull, data, path,
       .abort("source_key_missing", "study_correction_candidates(): the pull lacks ",
              "source ", s, "'s key column(s).")
     }
-    i <- which(differ)
+    # A source cell shared by several encounters (a patient-level source) is a candidate
+    # only when every one of those encounters in `data` agrees on it, changed or not.
+    grp <- do.call(paste, c(lapply(s_key, function(k) as_text(base[[k]][m])), sep = "\r"))
+    n_vals <- tapply(ifelse(is.na(after), "\001missing", after), grp,
+                     function(x) length(unique(x)))
+    split <- grp %in% names(n_vals)[n_vals > 1L]
+    inconsistent <- inconsistent + length(unique(grp[differ & split]))
+    i <- which(differ & !split)
+    if (!length(i)) next
     rows <- as.data.frame(stats::setNames(rep(list(rep(NA_character_, length(i))),
                                               length(tpl_cols)), tpl_cols),
                           check.names = FALSE, stringsAsFactors = FALSE)
@@ -2045,16 +2231,16 @@ study_correction_candidates <- function(config, con, pull, data, path,
   cand <- if (length(cand)) do.call(rbind, cand) else
     as.data.frame(stats::setNames(rep(list(character()), length(tpl_cols)), tpl_cols),
                   check.names = FALSE)
-  # One source cell, several encounters: keep it only if they agree.
-  cell <- do.call(paste, c(lapply(cand[setdiff(names(cand), "evidence_ref")],
-                                  function(x) x), sep = "\r"))
+  # Encounters that agree on a shared cell gave identical rows: keep one. Two master
+  # columns read from one source column could still clash: drop and count those.
+  cell <- do.call(paste, c(lapply(cand, function(x) x), sep = "\r"))
   cand <- cand[!duplicated(cell), , drop = FALSE]
   key_cols <- setdiff(tpl_cols, c("expected_prior", "expected_prior_missing", "new_value",
                                   "new_value_missing", "evidence_type", "evidence_ref",
                                   "asserted_by"))
   addr <- do.call(paste, c(lapply(cand[key_cols], function(x) x), sep = "\r"))
   clash <- addr %in% addr[duplicated(addr)]
-  inconsistent <- length(unique(addr[clash]))
+  inconsistent <- inconsistent + length(unique(addr[clash]))
   cand <- cand[!clash, , drop = FALSE]
   utils::write.csv(cand, path, row.names = FALSE, na = "")
   utils::write.csv(derived, derived_path, row.names = FALSE)
@@ -2069,7 +2255,7 @@ study_correction_candidates <- function(config, con, pull, data, path,
 - [ ] **Step 4: Run the tests and confirm they pass**
 
 Run: `Rscript -e 'devtools::document(); devtools::test(filter = "correction-candidates")'`
-Expected: PASS, 3 tests.
+Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Commit**
 
