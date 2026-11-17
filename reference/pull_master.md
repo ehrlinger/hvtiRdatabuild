@@ -92,7 +92,9 @@ family's provenance record (`package`, `version`, `sha`, `method`,
 `"awaiting review"` while chart review is pending; see
 [`apply_review()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/apply_review.md))
 and `review_decisions_sha256` (`NA` until review is applied). `review`
-holds the review `queue` (`cohort_unit`, `criterion_id`) and the
+holds the review `queue` (`cohort_unit`, `criterion_id`), each unit's
+`outcomes` at the warehouse and local criteria (`cohort_unit`,
+`criterion_id`, `outcome`: 1 met, 0 not met, `NA` undetermined) and the
 declared `criteria` (`criterion_id`, `label`, `role`, `kind`). The same
 pull fields without the provenance record are also in `provenance`,
 which is deprecated and goes in the next release; read `meta`.
@@ -168,7 +170,7 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   DBI::dbDisconnect(con, shutdown = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/RtmpVuyOuJ/duckdb
+#> ℹ /tmp/RtmpqIbyiO/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.

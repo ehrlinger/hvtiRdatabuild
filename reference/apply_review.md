@@ -43,6 +43,16 @@ criterion is then its own stage, with source `review`. The file's
 SHA-256 is recorded in the pull's metadata, and the pull is then
 complete.
 
+Each later criterion's tally of met, not met and undetermined units is
+rebuilt from the units that reached it, using the outcomes
+[`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+keeps in `review$outcomes`. A pull saved before that field existed has
+none, so decisions that would change a counted stage are refused with an
+error of class `hvtiRdatabuild_review_outcomes_missing`: pull again with
+[`pull_master()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/pull_master.md)
+and apply the decisions to the new pull. Decisions that change no
+counted stage are applied as usual.
+
 ## See also
 
 [`review_list()`](https://ehrlinger.github.io/hvtiRdatabuild/reference/review_list.md),

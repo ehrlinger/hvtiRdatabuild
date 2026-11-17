@@ -87,6 +87,13 @@ review keeps it, every later outcome stands. The criterion's provenance records 
 many were excluded at review and the decisions file's checksum. Each review criterion
 is then its own stage, with source <code>review</code>. The file's SHA-256 is recorded in the
 pull's metadata, and the pull is then complete.</p>
+<p>Each later criterion's tally of met, not met and undetermined units is rebuilt from
+the units that reached it, using the outcomes <code><a href="pull_master.html">pull_master()</a></code> keeps in
+<code>review$outcomes</code>. A pull saved before that field existed has none, so decisions that
+would change a counted stage are refused with an error of class
+<code>hvtiRdatabuild_review_outcomes_missing</code>: pull again with <code><a href="pull_master.html">pull_master()</a></code> and apply
+the decisions to the new pull. Decisions that change no counted stage are applied as
+usual.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
