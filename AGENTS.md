@@ -1,10 +1,13 @@
 # hvtiRdatabuild
 
 Builds analysis-ready clinical datasets from the HVTI data warehouse and verifies them against
-the legacy SAS datasets they replace. Twenty-one exports as of 0.3.0, in six groups: pull
-(`read_study_config()`, `dw_connect()`, `dw_modules()`, `dw_pull()`), build (`build_dataset()`,
+the legacy SAS datasets they replace. Thirty-seven exports as of 0.3.5, in eight groups: pull
+(`read_study_config()`, `dw_connect()`, `dw_modules()`, `dw_pull()`), pull from master views
+(`pull_master()`, `cohort_query()` and companions), cohort criteria (`criterion()`,
+`review_criterion()`, `apply_review()` and companions), build (`build_dataset()`,
 `derive_vars()` and the cohort record), verify (`snapshot_oracle()`, `compare_built()`),
-analysis sets, dataset publication, and master datasets. `NAMESPACE` is the authority, and
+analysis sets, dataset publication, and master datasets, plus three deprecated correction
+functions. `NAMESPACE` is the authority, and
 `_pkgdown.yml` groups the same exports by stage.
 
 **This is the package that touches PHI and warehouse credentials.** Most of its rules are

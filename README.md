@@ -15,15 +15,17 @@ them against the legacy SAS datasets they replace.
 
 ## Status
 
-Slices S0 (Verify), S1 (Pull), and the analysis-set checkpoint from S4.
-`snapshot_oracle()` and `compare_built()`
-verify an R-built dataset against its SAS oracle. `read_study_config()`,
-`dw_connect()`, `dw_modules()`, `dw_pull()`, and `print.pull_result()` read a
-study's warehouse modules into R. `write_analysis_set()` materializes a
-declared selection from a built dataset, and `read_analysis_set()` reads a
-stale checkpoint only in a draft, with a note, and refuses it in a final
-render. The build and derivation stages (`build_dataset()` and
-`derive_vars()`) remain future work.
+`snapshot_oracle()` and `compare_built()` verify an R-built dataset against its
+SAS oracle. `read_study_config()`, `dw_connect()`, `dw_modules()` and `dw_pull()`
+read a study's warehouse modules into R. `build_dataset()` and `derive_vars()`
+assemble and derive the study dataset, recording each cohort step in a
+`cohort_record`. Master datasets are snapshotted with `snapshot_master()`, lifted
+into the warehouse as views with `lift_master()`, and read into a study with
+`pull_master()`, whose cohort `cohort_query()` and its criteria define;
+`build_from_master()` turns the pull into a build. `freeze_study_pull()` and
+`publish_dataset()` publish a release. `write_analysis_set()` materializes a
+declared selection from a built dataset, and `read_analysis_set()` reads a stale
+checkpoint only in a draft, with a note, and refuses it in a final render.
 
 ## Installation
 
@@ -69,8 +71,9 @@ eda <- read_analysis_set("eda", set_config)
 ```
 
 The sidecar records the parent dataset, declaration hash, row counts, and
-per-rule attrition. If the parent or declaration changes, reading stops and
-names the `write_analysis_set()` call that refreshes it.
+per-rule attrition. If the parent or declaration changes, a draft render reads
+the old cut with a note naming the `write_analysis_set()` call that refreshes it,
+and a final render stops.
 
 ## Pulling warehouse modules for a study
 
@@ -133,6 +136,11 @@ per-identifier comparison errors on them by design.
 Verifying those three needs a composite-key comparison, deferred to a later
 slice.
 
+Printing a `compare_built()` result never shows identifiers unless
+`show_ids = TRUE`, or `options(hvtiRdatabuild.show_ids = TRUE)`, because `ccfidu`
+is a medical record number combined with a date of surgery. Do not enable it in a
+session whose output is logged or shared.
+
 ## Local integration testing
 
 The committed fixtures are synthetic. To exercise the read path against real
@@ -146,13 +154,11 @@ That directory holds PHI. It must live outside this repository, and nothing in
 the test suite copies from it. With the variable unset (the default, and what
 CI sees), these tests skip.
 
-`print()` never emits identifiers unless `show_ids = TRUE`, because `ccfidu` is
-a medical record number combined with a date of surgery. Do not enable it in a
-session whose output is logged or shared.
-
 ## Documentation
 
 - `vignette("coming-from-sas")`: the migration guide for SAS users. Start here.
+- `vignette("master-datasets")`: snapshotting a SAS master, lifting it into the
+  warehouse as a view, and the deprecated corrections tables.
 - `vignette("registered-datasets", package = "hvtiRutilities")`: for analysts running jobs on a study. What
   registering a dataset does, why its versions are named `<name>_YYYYMMDD_rN.parquet`, which version a job reads,
   and how a report says so. Registration lives in hvtiRutilities (`register_data()`, `update_manifest()`), so the

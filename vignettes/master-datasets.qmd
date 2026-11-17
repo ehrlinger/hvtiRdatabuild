@@ -52,7 +52,7 @@ warehouse-wide layer, is
 
 ## `master.yml`
 
-Everything the six exports need to know about one master lives in a `master.yml` kept
+Everything the six exports that take a `master.yml` need to know about one master lives in a `master.yml` kept
 outside the package, next to the study configs, because it names paths on a shared
 volume. `read_master_config()` reads and validates it:
 
@@ -125,7 +125,7 @@ naming where it found the answer, never the answer's underlying data.
 ## Phases 1 and 2: `lift_master()` and `backfill_corrections()`, dry run first
 
 `lift_master()` moves a snapshot into the warehouse. It checks the key is unique, creates
-a base table named for the snapshot's release, loads the parquet a row group at a time,
+a base table named for the snapshot's release and checksum, loads the parquet a row group at a time,
 and only then proves the load equal to the snapshot: a quick check first (counts,
 aggregates, a sample), a full column-by-column comparison second. The master's view is
 created only after both pass. `dry_run = TRUE`, the default, stops after writing the DDL
@@ -204,7 +204,8 @@ backfill_corrections(cfg2, con, dialect = "duckdb")
 The dry run above reports one fix resolved (the `age` fix) and writes nothing. The
 `ccfid` remap is a key change, not a cell correction, so it is not counted among the
 resolved facts; identity corrections of that kind are designed separately (see the last
-section). Run it for real and the correction and its `bake` decision land in the tables,
+section). It also warns, with class `hvtiRdatabuild_incomplete_backfill`, giving the program
+line of the unresolved remap. Run it for real and the correction and its `bake` decision land in the tables,
 and the master's view is regenerated:
 
 ```{r}
@@ -222,7 +223,7 @@ all. They come from an investigator's chart review, one cell at a time, and
 ```{r}
 #| eval: !expr .master_deps
 prop <- propose_correction(cfg2, con,
-                           key_values = list(emrn = "E3"), alt_key = "epic", variable = "age",
+                           key_values = list(emrn = "E3"), alt_key = "epic", var_col = "age",
                            expected_prior = 70, new_value = 71, evidence_type = "chart_review",
                            evidence_ref = "invented", asserted_by = "tester", dialect = "duckdb")
 prop$verdict
@@ -260,10 +261,12 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 
 ## What is not done yet
 
-Three things this vignette does not show, because the package does not do them yet:
+Three things this vignette does not show:
 
-- **The port.** Nothing here writes a study's `bd.R`/`vars.R` against a master view; that
-  is the next spec in the replacement path, once a master read function exists.
+- **The port.** A study reads a master view with `pull_master()`, and `build_from_master()`
+  hands `derive_vars()` the same `build_result` that `build_dataset()` does;
+  `freeze_study_pull()` publishes the pull. Porting an individual study's `bd.R`/`vars.R`
+  onto that path is not shown here.
 - **Identity corrections.** `backfill_corrections()` finds `ccfid`-remap statements and
   reports them unresolved rather than recording them, because a remapped key changes which
   row every other correction points at. Applying them before cell corrections is designed

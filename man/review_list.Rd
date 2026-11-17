@@ -17,6 +17,44 @@ Every unit a criterion routed to review (\code{undetermined = "review"}), and ev
 still in the cohort for each \code{\link[=review_criterion]{review_criterion()}}. The list holds unit identifiers. Keep
 it with the study's other restricted files, and never print it to a shared log.
 }
+\examples{
+\donttest{
+if (requireNamespace("duckdb", quietly = TRUE)) {
+  # Synthetic data; no PHI.
+  con <- DBI::dbConnect(duckdb::duckdb())
+  DBI::dbWriteTable(con, "master_demo", data.frame(
+    mrn = c("SYN101", "SYN102"),
+    encounter_date = as.Date(c("2010-03-01", "2012-07-15")),
+    proc = c("CABG", "CABG"), age = c(62, 70)
+  ))
+  DBI::dbWriteTable(con, "master_demo_corrections_applied", data.frame(
+    correction_id = character(), mrn = character(), encounter_date = as.Date(character())
+  ))
+  DBI::dbWriteTable(con, "master_demo_deployment", data.frame(sql_commit = "abc1234"))
+  DBI::dbWriteTable(con, "master_demo_parity", data.frame(
+    sql_commit = "abc1234", verdict = "pass", verified_at = Sys.time()
+  ))
+  config <- tempfile(fileext = ".yaml")
+  writeLines("study: st0000", config)
+  strategy <- review_criterion("strategy", "Planned alternative support", role = "exclude")
+  q <- cohort_query("proc = 'CABG'", as.Date(c("2000-01-01", "2024-07-31")),
+                    criteria = list(strategy), index_on = "qualifying")
+  pull <- pull_master(con, "master_demo", q, var_cols = "age", path = config,
+                      dialect = "duckdb")
+  DBI::dbDisconnect(con, shutdown = TRUE)
+
+  # One decision per row of the review list, with a declared code for each exclusion.
+  decisions <- review_list(pull)
+  decisions$outcome <- c("not_met", "met")
+  decisions$reason_code <- c(NA, "PLANNED")
+  f <- tempfile(fileext = ".csv")
+  utils::write.csv(decisions, f, row.names = FALSE, na = "")
+  reviewed <- apply_review(pull, f, reason_codes = "PLANNED")
+  reviewed$meta$status
+}
+}
+
+}
 \seealso{
 \code{\link[=apply_review]{apply_review()}}
 }
