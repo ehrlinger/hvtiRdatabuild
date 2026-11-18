@@ -42,6 +42,12 @@ no row.
 column's SQL type would round, overflow or truncate it. This last check runs after
 the prior check.
 \item \code{prior_mismatch}: the source no longer holds \code{expected_prior}.
+\item \code{duplicate_pending} or \code{duplicate_accepted}: a correction already makes the same
+assertion (same source, key, variable, prior and new value) and is undecided, or its
+latest decision is to accept it. A proposed correction leaves the source unchanged
+until it is accepted, so without this check the same file submitted twice would be
+appended twice. An assertion whose correction was rejected or superseded may be
+proposed again.
 }
 
 With \code{dry_run = FALSE}, an all-\code{appendable} file is appended in one transaction, and a

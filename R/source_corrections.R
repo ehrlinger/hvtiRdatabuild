@@ -243,6 +243,74 @@ write_corrections_template <- function(config, path) {
           .key_join_sql("b", "t", key, types, dialect))
 }
 
+#' One text per correction: its source key, variable, prior and new value
+#'
+#' Two corrections with the same signature make the same assertion about the same cell.
+#' Keys and values are compared in their canonical text form, so `"30.0"` and `"30"` agree.
+#'
+#' @param d A data frame of corrections, with the key columns, `variable`,
+#'   `expected_prior`, `expected_prior_missing`, `new_value` and `new_value_missing`.
+#' @param key Character. The source's key columns.
+#'
+#' @return A character vector, one element per row of `d`.
+#'
+#' @keywords internal
+#' @noRd
+.correction_signature <- function(d, key) {
+  texts <- lapply(key, function(k) {
+    vapply(seq_len(nrow(d)), function(j) value_text(d[[k]][j]), character(1))
+  })
+  .composite_key(c(texts, list(
+    as.character(d$variable), as.character(d$expected_prior),
+    as.character(d$expected_prior_missing), as.character(d$new_value),
+    as.character(d$new_value_missing)
+  )))
+}
+
+#' The corrections that block a resubmission, by signature
+#'
+#' A correction holds its assertion while its latest decision (by `decided_on`, then
+#' `decision_id`, as the views order them) is `"accept"`, or while it has none. A rejected
+#' or superseded correction holds nothing, so the same assertion may be proposed again.
+#'
+#' @param con A DBI connection.
+#' @param source Character. The source view.
+#' @param key Character. The source's key columns.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return A named character vector: `"duplicate_pending"` or `"duplicate_accepted"`,
+#'   named by `.correction_signature()`.
+#'
+#' @keywords internal
+#' @noRd
+.held_corrections <- function(con, source, key, dialect) {
+  q <- quoter(dialect)
+  tabs <- .source_tables(source)
+  # A source whose corrections layer is not deployed holds nothing; appending to it fails
+  # on its own, as before.
+  if (!DBI::dbExistsTable(con, tabs$corrections)) {
+    return(stats::setNames(character(), character()))
+  }
+  cols <- c("correction_id", key, "variable", "expected_prior", "expected_prior_missing",
+            "new_value", "new_value_missing")
+  corr <- DBI::dbGetQuery(con, paste("SELECT", paste(q(cols), collapse = ", "), "FROM",
+                                     q(tabs$corrections)))
+  dec <- DBI::dbGetQuery(con, paste(
+    "SELECT", paste(q(c("correction_id", "decision", "decided_on", "decision_id")),
+                    collapse = ", "),
+    "FROM", q(tabs$decisions)
+  ))
+  dec <- dec[order(dec$correction_id, -xtfrm(dec$decided_on), -xtfrm(dec$decision_id)), ,
+             drop = FALSE]
+  latest <- dec$decision[!duplicated(dec$correction_id)]
+  names(latest) <- dec$correction_id[!duplicated(dec$correction_id)]
+  state <- unname(latest[corr$correction_id])
+  verdict <- ifelse(is.na(state), "duplicate_pending",
+                    ifelse(state == "accept", "duplicate_accepted", NA_character_))
+  keep <- !is.na(verdict)
+  stats::setNames(verdict[keep], .correction_signature(corr[keep, , drop = FALSE], key))
+}
+
 #' Propose a batch of corrections from a filled template
 #'
 #' Validates every row of a submission made from [write_corrections_template()] and returns
@@ -263,6 +331,12 @@ write_corrections_template <- function(config, path) {
 #'   column's SQL type would round, overflow or truncate it. This last check runs after
 #'   the prior check.
 #' - `prior_mismatch`: the source no longer holds `expected_prior`.
+#' - `duplicate_pending` or `duplicate_accepted`: a correction already makes the same
+#'   assertion (same source, key, variable, prior and new value) and is undecided, or its
+#'   latest decision is to accept it. A proposed correction leaves the source unchanged
+#'   until it is accepted, so without this check the same file submitted twice would be
+#'   appended twice. An assertion whose correction was rejected or superseded may be
+#'   proposed again.
 #'
 #' With `dry_run = FALSE`, an all-`appendable` file is appended in one transaction, and a
 #' file with any other verdict is refused whole, with nothing written. Values are stored in
@@ -424,6 +498,7 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
       hits <- tabulate(match(found$intake_row_, live), nbins = length(live))
       set(live[hits == 0L], "unknown_key")
       set(live[hits > 1L], "ambiguous_key")
+      held <- run_step("read held corrections", .held_corrections(con, s, key, dialect))
 
       for (i in live[hits == 1L]) {
         v <- rows$variable[[i]]
@@ -458,6 +533,13 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         r$asserted_by <- rows$asserted_by[[i]]
         r$asserted_on <- now
         r$correction_id <- .short_id("c", list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")))
+        # A pending correction leaves the source unchanged, so a resubmitted row passes the
+        # prior check again; it is refused here instead of being appended a second time.
+        dup <- held[.correction_signature(r, key)]
+        if (!is.na(dup)) {
+          set(i, dup)
+          next
+        }
         r$.row <- i
         st$out_rows[[length(st$out_rows) + 1L]] <- r
       }

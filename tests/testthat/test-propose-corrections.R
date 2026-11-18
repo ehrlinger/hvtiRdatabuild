@@ -242,3 +242,53 @@ test_that("submitted text must be the whole of a supported form", {
   expect_false(ok("30 ", "numeric"))
   expect_identical(.parse_submitted(" 2", "character"), " 2")
 })
+
+test_that("a row repeating a pending or accepted correction is refused as a duplicate", {
+  s <- propose_setup()
+  first <- propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                               dry_run = FALSE, dialect = "duckdb")
+  verdict_of <- function(row) {
+    f <- write_submission(s$cfg, list(row))
+    suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts$verdict
+  }
+  # The same file again, and the same assertion written another way.
+  expect_identical(verdict_of(good_row()), "duplicate_pending")
+  expect_identical(verdict_of(good_row(expected_prior = "30.0", new_value = "35.00",
+                                       evidence_ref = "another note",
+                                       asserted_by = "reviewer_b")),
+                   "duplicate_pending")
+  # A different new value for the same cell is a new assertion, not a duplicate.
+  expect_identical(verdict_of(good_row(new_value = "36")), "appendable")
+  expect_error(
+    suppressMessages(propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                                         dry_run = FALSE, dialect = "duckdb")),
+    class = "hvtiRdatabuild_corrections_refused"
+  )
+  expect_identical(DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_corrections")$n,
+                   1)
+
+  id <- first$correction_ids[[1]]
+  decide <- function(d, decision, on) {
+    DBI::dbAppendTable(s$con, "stg_echo_correction_decisions", dec_row(d, id, decision, on))
+  }
+  decide("d1", "accept", "2026-02-01")
+  expect_identical(verdict_of(good_row()), "duplicate_accepted")
+  # Only the latest decision counts: once rejected, the assertion may be proposed again.
+  decide("d2", "reject", "2026-03-01")
+  expect_identical(verdict_of(good_row()), "appendable")
+  decide("d3", "supersede", "2026-04-01")
+  expect_identical(verdict_of(good_row()), "appendable")
+})
+
+test_that("a duplicate is judged per source and per key", {
+  s <- propose_setup()
+  propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                      dry_run = FALSE, dialect = "duckdb")
+  f <- write_submission(s$cfg, list(
+    good_row(),
+    good_row(mrn = "SYN203", encounter_date = "2020-03-01", expected_prior = "40"),
+    good_row(encounter_date = "2020-01-02")
+  ))
+  v <- suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts
+  expect_identical(v$verdict, c("duplicate_pending", "appendable", "unknown_key"))
+})
