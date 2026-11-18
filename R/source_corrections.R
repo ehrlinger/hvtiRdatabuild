@@ -371,9 +371,11 @@ write_corrections_template <- function(config, path) {
 #'   until it is accepted, so without this check the same file submitted twice would be
 #'   appended twice. An assertion whose correction was rejected or superseded may be
 #'   proposed again.
-#'   On SQL Server an append first takes an exclusive lock on each source's corrections, so
-#'   two submissions made at once are checked against each other, not only against what
-#'   was committed before both began.
+#' - `duplicate_in_file`: an earlier row of the same file makes the same assertion.
+#'
+#' On SQL Server an append first takes an exclusive lock on each source's corrections, so
+#' two submissions made at once are checked against each other, not only against what was
+#' committed before both began.
 #'
 #' With `dry_run = FALSE`, an all-`appendable` file is appended in one transaction, and a
 #' file with any other verdict is refused whole, with nothing written. Values are stored in
@@ -580,11 +582,14 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         r$correction_id <- .short_id("c", list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")))
         # A pending correction leaves the source unchanged, so a resubmitted row passes the
         # prior check again; it is refused here instead of being appended a second time.
-        dup <- held[.correction_signature(r, key)]
+        sig <- .correction_signature(r, key)
+        dup <- held[sig]
         if (!is.na(dup)) {
           set(i, dup)
           next
         }
+        # A later row of this file making the same assertion is refused too.
+        held[sig] <- "duplicate_in_file"
         r$.row <- i
         st$out_rows[[length(st$out_rows) + 1L]] <- r
       }

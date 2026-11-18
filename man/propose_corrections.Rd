@@ -48,10 +48,12 @@ latest decision is to accept it. A proposed correction leaves the source unchang
 until it is accepted, so without this check the same file submitted twice would be
 appended twice. An assertion whose correction was rejected or superseded may be
 proposed again.
-On SQL Server an append first takes an exclusive lock on each source's corrections, so
-two submissions made at once are checked against each other, not only against what
-was committed before both began.
+\item \code{duplicate_in_file}: an earlier row of the same file makes the same assertion.
 }
+
+On SQL Server an append first takes an exclusive lock on each source's corrections, so
+two submissions made at once are checked against each other, not only against what was
+committed before both began.
 
 With \code{dry_run = FALSE}, an all-\code{appendable} file is appended in one transaction, and a
 file with any other verdict is refused whole, with nothing written. Values are stored in

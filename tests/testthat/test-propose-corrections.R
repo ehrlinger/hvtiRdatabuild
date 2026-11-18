@@ -280,6 +280,23 @@ test_that("a row repeating a pending or accepted correction is refused as a dupl
   expect_identical(verdict_of(good_row()), "appendable")
 })
 
+test_that("a later row of the same file making the same assertion is refused", {
+  s <- propose_setup()
+  f <- write_submission(s$cfg, list(
+    good_row(),
+    good_row(expected_prior = "30.0", new_value = "35.00", evidence_ref = "other note"),
+    good_row(new_value = "36")
+  ))
+  v <- suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts
+  expect_identical(v$verdict, c("appendable", "duplicate_in_file", "appendable"))
+  expect_error(
+    suppressMessages(propose_corrections(s$cfg, s$con, f, dry_run = FALSE, dialect = "duckdb")),
+    class = "hvtiRdatabuild_corrections_refused"
+  )
+  expect_identical(DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_corrections")$n,
+                   0)
+})
+
 test_that("a duplicate is judged per source and per key", {
   s <- propose_setup()
   propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
