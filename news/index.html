@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">hvtiRdatabuild</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.6</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.3.7</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,6 +39,11 @@
       <small>Source: <a href="https://github.com/ehrlinger/hvtiRdatabuild/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.3.7" id="hvtirdatabuild-037">hvtiRdatabuild 0.3.7<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-037"></a></h2>
+<ul><li><p><code><a href="../reference/read_master_config.html">read_master_config()</a></code> refuses a <code>name</code>, <code>snapshots</code>, <code>current</code> or <code>build_program</code> that yaml did not read as one non-empty string. An unquoted <code>snapshots: .</code> became <code>NA</code>, and <code>name: .inf</code> became <code>"Inf"</code>; the error says to quote the value.</p></li>
+<li><p><code><a href="../reference/propose_corrections.html">propose_corrections()</a></code> refuses a row that repeats a correction still pending or accepted: same source, key, variable, prior and new value, compared in canonical text. The verdict is <code>duplicate_pending</code> or <code>duplicate_accepted</code>, and as with any other refused row the whole file is refused. A proposed correction leaves the source unchanged until it is accepted, so the same file submitted twice used to be appended twice. An assertion whose correction was rejected or superseded may be proposed again. A later row of the same file making the same assertion is <code>duplicate_in_file</code>. On SQL Server an append locks each source’s corrections first, so two submissions made at once cannot both append the same assertion.</p></li>
+</ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.3.6" id="hvtirdatabuild-036">hvtiRdatabuild 0.3.6<a class="anchor" aria-label="anchor" href="#hvtirdatabuild-036"></a></h2>
 <ul><li><p>New interim tools for correcting warehouse source views, superseded by the HVTR registry: <code><a href="../reference/generate_corrections_sql.html">generate_corrections_sql()</a></code> writes each declared source’s corrections tables and its corrected, applied, stale and conflicts views, covering every column; <code><a href="../reference/write_corrections_template.html">write_corrections_template()</a></code>, <code><a href="../reference/propose_corrections.html">propose_corrections()</a></code> and <code><a href="../reference/decide_corrections.html">decide_corrections()</a></code> take a whole submission and refuse it whole if any row fails, with a verdict per row and no values in any message; <code><a href="../reference/retire_filled_corrections.html">retire_filled_corrections()</a></code> retires fill-ins upstream has caught up with; and <code><a href="../reference/study_correction_candidates.html">study_correction_candidates()</a></code> turns a study’s own fixes into candidate corrections against its frozen pull. In these views, accepted corrections to one cell that disagree do not resolve to the latest: neither applies until one is superseded.</p></li>
