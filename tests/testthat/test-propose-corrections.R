@@ -292,3 +292,38 @@ test_that("a duplicate is judged per source and per key", {
   v <- suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts
   expect_identical(v$verdict, c("duplicate_pending", "appendable", "unknown_key"))
 })
+
+test_that("only corrections for the submitted keys are read, latest decision in SQL", {
+  s <- propose_setup()
+  DBI::dbAppendTable(s$con, "stg_echo_corrections", rbind(
+    corr_row("c1", "SYN201", "2020-01-01", "lvef", "30", 0L, "35", 0L),
+    corr_row("c2", "SYN202", "2020-02-01", "lvef", NA, 1L, "45", 0L),
+    corr_row("c3", "SYN201", "2020-01-01", "mr_grade", "2", 0L, "3", 0L),
+    corr_row("c4", "SYN201", "2020-01-01", "lvef", "30", 0L, "36", 0L)
+  ))
+  DBI::dbAppendTable(s$con, "stg_echo_correction_decisions", rbind(
+    dec_row("d1", "c3", "accept", "2026-02-01"),
+    dec_row("d2", "c4", "accept", "2026-02-01"),
+    dec_row("d3", "c4", "reject", "2026-03-01")
+  ))
+  key <- c("mrn", "encounter_date")
+  types <- table_types(s$con, "stg_echo")
+  tmp <- .intake_temp("duckdb", types[key])
+  DBI::dbExecute(s$con, tmp$create)
+  DBI::dbExecute(s$con, sprintf("INSERT INTO %s VALUES (1, 'SYN201', DATE '2020-01-01')",
+                                tmp$name))
+  held <- .held_corrections(s$con, "stg_echo", key, types, tmp$name, "duckdb")
+  # c2 is another key, and c4's latest decision is a reject: neither is held.
+  expect_setequal(unname(held), c("duplicate_pending", "duplicate_accepted"))
+  expect_length(held, 2L)
+})
+
+test_that("on SQL Server each source is locked, in name order, before any read", {
+  expect_identical(.source_lock_sql(c("stg_b", "stg_a"), "duckdb"), character())
+  sql <- .source_lock_sql(c("stg_b", "stg_a", "stg_b"), "mssql")
+  expect_length(sql, 2L)
+  expect_match(sql[[1]], "N'hvtiRdatabuild:stg_a_corrections'", fixed = TRUE)
+  expect_match(sql[[2]], "N'hvtiRdatabuild:stg_b_corrections'", fixed = TRUE)
+  expect_match(sql, "@LockMode = N'Exclusive', @LockOwner = N'Transaction'", fixed = TRUE)
+  expect_match(sql, "IF @r < 0 THROW", fixed = TRUE)
+})
