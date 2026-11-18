@@ -45,6 +45,16 @@ read_master_config <- function(path) {
          paste(missing, collapse = ", "), ".", call. = FALSE)
   }
 
+  # yaml reads an unquoted `.` as a number that failed to parse (NA), `.inf` as Inf and
+  # `2024` as a number. as.character() would pass each on as a plausible name or path.
+  for (f in c("name", "snapshots", "current", "build_program")) {
+    v <- raw[[f]]
+    if (!is.character(v) || length(v) != 1L || is.na(v) || !nzchar(v)) {
+      stop("'", f, "' must be a single non-empty string; quote it if yaml reads it ",
+           "as something else (for example `", f, ": '.'`).", call. = FALSE)
+    }
+  }
+
   key <- raw[["key"]]
   if (length(key) < 1L) {
     stop("'key' must name at least one column.", call. = FALSE)
