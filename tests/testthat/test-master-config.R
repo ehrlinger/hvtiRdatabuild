@@ -37,6 +37,21 @@ test_that("each required field is required", {
   }
 })
 
+test_that("a name or path field that yaml did not read as one string is refused", {
+  # yaml reads a bare `.` as a number that failed to parse (NA, with a warning), `.inf` as
+  # Inf and `2024` as a number; as.character() would turn each into a plausible field.
+  for (f in c("name", "snapshots", "current", "build_program")) {
+    for (v in c(".", ".inf", "2024", "[a, b]", "''")) {
+      lines <- sub(paste0("^", f, ": .*"), paste0(f, ": ", v), base_cfg)
+      expect_error(suppressWarnings(read_master_config(write_cfg(lines))),
+                   paste0("'", f, "' must be a single non-empty string"),
+                   info = paste(f, v))
+    }
+  }
+  quoted <- sub("^snapshots: .*", "snapshots: '.'", base_cfg)
+  expect_equal(read_master_config(write_cfg(quoted))$snapshots, ".")
+})
+
 test_that("a parent needs both master and libref", {
   expect_error(read_master_config(write_cfg(c(base_cfg, "parent:", "  master: p"))),
                "libref")
