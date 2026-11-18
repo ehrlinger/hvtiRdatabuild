@@ -15,6 +15,7 @@
 #   R7  the nvarchar(max) distinct count sees "Yes"/"yes" and "x"/"x " as disagreeing
 #   R8  every view agrees with the R reference, correction by correction
 #   R9  a resubmitted row is refused as a duplicate (needs PR #127)
+#   R10 an append waits for another submission's per-source lock (needs PR #127)
 #
 # How to run (on lri; never from the Mac against a mount):
 #
@@ -285,6 +286,27 @@ rehearse <- function() {
     }
   } else if (!has_dup_check) {
     report("R9", "duplicate check not in this build (PR #127); skipped", NA)
+  }
+
+  # R10. The per-source lock (PR #127): with the lock held on a second connection, an
+  # append waits out its 60-second timeout and fails, rather than reading past it.
+  if (length(appended) && exists(".source_lock_sql", envir = ns, inherits = FALSE)) {
+    other <- dbConnect(odbc::odbc(), dsn = dsn)
+    dbBegin(other)
+    for (x in int(".source_lock_sql")(src, "mssql")) dbExecute(other, x)
+    t0 <- Sys.time()
+    blocked <- tryCatch({
+      propose(list(row("SYN3", "2020-03-01", "mr_grade", "1", "z")), dry_run = FALSE)
+      FALSE
+    }, error = function(e) TRUE)
+    waited <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    try(dbRollback(other), silent = TRUE)
+    dbDisconnect(other)
+    outcome <- sprintf("%s after %.0f s", if (blocked) "refused" else "appended", waited)
+    report("R10", "an append waits for another submission's lock, then fails",
+           blocked && waited >= 55, outcome)
+  } else {
+    report("R10", "source lock not in this build (PR #127); skipped", NA)
   }
   sum(startsWith(ledger$lines, "FAIL"))
 }
