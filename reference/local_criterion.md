@@ -72,7 +72,7 @@ local_criterion("covid_14d", "COVID-19 within 14 days", role = "exclude", path =
 #> [1] "exclude"
 #> 
 #> $path
-#> [1] "/tmp/Rtmp8deRAi/file1bdc5f22406e.csv"
+#> [1] "/tmp/Rtmpa0gl6p/file1a956d68ac86.csv"
 #> 
 #> $sha256
 #> [1] "b93be0af3b15ac48e7e3cdcd31e91c3f6a1e91d64d1d830f0e0136081fd8e887"
@@ -80,7 +80,7 @@ local_criterion("covid_14d", "COVID-19 within 14 days", role = "exclude", path =
 #> $decide
 #> function (units, path) 
 #> rep(FALSE, nrow(units))
-#> <environment: 0x6543ec1f8130>
+#> <environment: 0x5edad4911b20>
 #> 
 #> $undetermined
 #> [1] "review"

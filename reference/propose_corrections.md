@@ -67,6 +67,21 @@ Invisibly, a list: `verdicts` (a data frame of `row`, `source`,
 
 - `prior_mismatch`: the source no longer holds `expected_prior`.
 
+- `duplicate_pending` or `duplicate_accepted`: a correction already
+  makes the same assertion (same source, key, variable, prior and new
+  value) and is undecided, or its latest decision is to accept it. A
+  proposed correction leaves the source unchanged until it is accepted,
+  so without this check the same file submitted twice would be appended
+  twice. An assertion whose correction was rejected or superseded may be
+  proposed again.
+
+- `duplicate_in_file`: an earlier row of the same file makes the same
+  assertion.
+
+On SQL Server an append first takes an exclusive lock on each source's
+corrections, so two submissions made at once are checked against each
+other, not only against what was committed before both began.
+
 With `dry_run = FALSE`, an all-`appendable` file is appended in one
 transaction, and a file with any other verdict is refused whole, with
 nothing written. Values are stored in a canonical text form, so `"30.0"`
@@ -134,7 +149,7 @@ if (requireNamespace("duckdb", quietly = TRUE)) {
   unlink(c(cfg_path, sub, sql_dir), recursive = TRUE)
 }
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmp8deRAi/duckdb
+#> ℹ /tmp/Rtmpa0gl6p/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
