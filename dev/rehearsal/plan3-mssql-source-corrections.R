@@ -81,21 +81,30 @@ rehearse <- function() {
               packageVersion("odbc"), getRversion()))
   has_dup_check <- exists(".held_corrections", envir = ns, inherits = FALSE)
 
-  stamp <- format(Sys.time(), "%H%M%S")
+  # Names are unique to this run: time, process id and a random suffix. Cleanup drops only what
+  # this run created, recorded in `made` after each CREATE succeeds, so a failed or concurrent
+  # run never drops another run's objects.
+  stamp <- paste0(format(Sys.time(), "%Y%m%d%H%M%S"), "_", Sys.getpid(), "_",
+                  paste(sample(c(0:9, letters[1:6]), 6, replace = TRUE), collapse = ""))
   src <- paste0("rh_echo_", stamp)
   master <- paste0("rh_master_", stamp)
   tabs <- int(".source_tables")(src)
   work <- tempfile("plan3-")
   dir.create(work)
 
+  made <- new.env()
+  made$views <- character()
+  made$tables <- character()
+  create <- function(sql, name, kind) {
+    dbExecute(con, sql)
+    made[[kind]] <- c(made[[kind]], name)
+  }
   on.exit({
-    for (v in c(tabs$corrected, tabs$applied, tabs$stale, tabs$conflicts, master)) {
-      try(dbExecute(con, sprintf("IF OBJECT_ID('%1$s', 'V') IS NOT NULL DROP VIEW [%1$s]", v)),
-          silent = TRUE)
+    for (v in rev(made$views)) {
+      try(dbExecute(con, sprintf("DROP VIEW [%s]", v)), silent = TRUE)
     }
-    for (t in c(tabs$corrections, tabs$decisions, src)) {
-      try(dbExecute(con, sprintf("IF OBJECT_ID('%1$s', 'U') IS NOT NULL DROP TABLE [%1$s]", t)),
-          silent = TRUE)
+    for (t in rev(made$tables)) {
+      try(dbExecute(con, sprintf("DROP TABLE [%s]", t)), silent = TRUE)
     }
     dbDisconnect(con)
     unlink(work, recursive = TRUE)
@@ -111,11 +120,17 @@ rehearse <- function() {
 
   # The source: invented rows. Three keys differ only by case or a trailing space, so they are
   # three rows to an exact comparison and one to the default collation.
-  dbExecute(con, sprintf(paste(
+  ours <- c(src, master, unlist(tabs[c("corrections", "decisions", "corrected", "applied",
+                                       "stale", "conflicts")], use.names = FALSE))
+  taken <- ours[!is.na(vapply(ours, function(n) {
+    dbGetQuery(con, sprintf("SELECT OBJECT_ID(N'%s') AS id", n))$id
+  }, numeric(1)))]
+  if (length(taken)) halt("An object this run would create already exists; nothing was made.")
+  create(sprintf(paste(
     "CREATE TABLE [%s] (mrn nvarchar(16) NOT NULL, encounter_date date NOT NULL,",
     "lvef float NULL, mr_grade nvarchar(8) NULL, note nvarchar(max) NULL,",
     "seen_dt datetime NULL, seen_dt2 datetime2(6) NULL)"
-  ), src))
+  ), src), src, "tables")
   dbExecute(con, sprintf(paste(
     "INSERT INTO [%s] VALUES",
     "(N'SYN1', '2020-01-01', 30, N'2', N'n1', '2020-01-01 10:00:00.997',",
@@ -126,7 +141,7 @@ rehearse <- function() {
     " '2020-02-01 09:00:00.654321'),",
     "(N'SYN3', '2020-03-01', NULL, N'1', NULL, '2020-03-01 08:00:00', NULL)"
   ), src))
-  dbExecute(con, sprintf("CREATE VIEW [%s] AS SELECT * FROM [%s]", master, src))
+  create(sprintf("CREATE VIEW [%s] AS SELECT * FROM [%s]", master, src), master, "views")
 
   cfg_path <- file.path(work, "master.yml")
   writeLines(c(paste0("name: ", master), "key: [mrn, encounter_date]",
@@ -139,7 +154,19 @@ rehearse <- function() {
   # R2. Deploy the generated objects, mssql branch.
   deployed <- attempt("R2", "generated tables and views deploy", {
     st <- int(".corrections_statements")(cfg, con, "mssql")[[src]]
-    for (x in c(st$tables, st$views)) dbExecute(con, x)
+    # Each statement names the object it creates; record that name, and refuse one this run
+    # did not check for in advance.
+    target <- function(x) {
+      sub("(?s)^.*?CREATE (OR ALTER )?(TABLE|VIEW) \\[([^]]+)\\].*$", "\\3", x, perl = TRUE)
+    }
+    for (x in st$tables) {
+      stopifnot(target(x) %in% ours)
+      create(x, target(x), "tables")
+    }
+    for (x in st$views) {
+      stopifnot(target(x) %in% ours)
+      create(x, target(x), "views")
+    }
   })
   if (deployed) report("R2", "generated tables and views deploy", TRUE)
   if (!deployed) halt("Nothing further can run without the deployed objects.")
