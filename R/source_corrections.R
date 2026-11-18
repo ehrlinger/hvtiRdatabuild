@@ -243,6 +243,108 @@ write_corrections_template <- function(config, path) {
           .key_join_sql("b", "t", key, types, dialect))
 }
 
+#' One text per correction: its source key, variable, prior and new value
+#'
+#' Two corrections with the same signature make the same assertion about the same cell.
+#' Keys and values are compared in their canonical text form, so `"30.0"` and `"30"` agree.
+#'
+#' @param d A data frame of corrections, with the key columns, `variable`,
+#'   `expected_prior`, `expected_prior_missing`, `new_value` and `new_value_missing`.
+#' @param key Character. The source's key columns.
+#'
+#' @return A character vector, one element per row of `d`.
+#'
+#' @keywords internal
+#' @noRd
+.correction_signature <- function(d, key) {
+  texts <- lapply(key, function(k) {
+    vapply(seq_len(nrow(d)), function(j) value_text(d[[k]][j]), character(1))
+  })
+  .composite_key(c(texts, list(
+    as.character(d$variable), as.character(d$expected_prior),
+    as.character(d$expected_prior_missing), as.character(d$new_value),
+    as.character(d$new_value_missing)
+  )))
+}
+
+#' The corrections that block a resubmission, by signature
+#'
+#' A correction holds its assertion while its latest decision (by `decided_on`, then
+#' `decision_id`, as the views order them) is `"accept"`, or while it has none. A rejected
+#' or superseded correction holds nothing, so the same assertion may be proposed again.
+#'
+#' Only corrections whose key is in the intake table are read, joined exactly as the intake
+#' lookup is, and each one's latest decision is chosen in SQL, so the cost follows the
+#' submission rather than the history.
+#'
+#' @param con A DBI connection.
+#' @param source Character. The source view.
+#' @param key Character. The source's key columns.
+#' @param types A named character vector of the source's SQL types, covering `key`.
+#' @param intake Character. The intake temp table's name.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return A named character vector: `"duplicate_pending"` or `"duplicate_accepted"`,
+#'   named by `.correction_signature()`.
+#'
+#' @keywords internal
+#' @noRd
+.held_corrections <- function(con, source, key, types, intake, dialect) {
+  q <- quoter(dialect)
+  tabs <- .source_tables(source)
+  # A source whose corrections layer is not deployed holds nothing; appending to it fails
+  # on its own, as before.
+  if (!DBI::dbExistsTable(con, tabs$corrections)) {
+    return(stats::setNames(character(), character()))
+  }
+  cols <- c("correction_id", key, "variable", "expected_prior", "expected_prior_missing",
+            "new_value", "new_value_missing")
+  sql <- paste0(
+    "WITH latest AS (\n",
+    "  SELECT correction_id, decision,\n",
+    "         ROW_NUMBER() OVER (PARTITION BY correction_id\n",
+    "                            ORDER BY decided_on DESC, decision_id DESC) AS rn\n",
+    "  FROM ", q(tabs$decisions), "\n",
+    ")\n",
+    "SELECT ", paste0("c.", q(cols), collapse = ", "), ", l.decision AS latest_decision_\n",
+    "FROM ", q(tabs$corrections), " c\n",
+    "LEFT JOIN latest l ON l.correction_id = c.correction_id AND l.rn = 1\n",
+    "WHERE (l.decision IS NULL OR l.decision = 'accept')\n",
+    "  AND EXISTS (SELECT 1 FROM ", intake, " t WHERE ",
+    .key_join_sql("c", "t", key, types, dialect), ")"
+  )
+  held <- DBI::dbGetQuery(con, sql)
+  verdict <- ifelse(is.na(held$latest_decision_), "duplicate_pending", "duplicate_accepted")
+  stats::setNames(verdict, .correction_signature(held, key))
+}
+
+#' Statements that lock each source's corrections for the rest of the transaction
+#'
+#' The duplicate check reads the corrections table and the append writes it. Under
+#' snapshot isolation two submissions could both read before either commits, find nothing
+#' held, and both append the same assertion. On SQL Server an exclusive application lock,
+#' owned by the transaction and taken before its first read, makes the second submission
+#' wait for the first to commit and then see its rows. Sources are locked in name order,
+#' so two submissions cannot deadlock. duckdb has no such lock and gets none.
+#'
+#' @param sources Character. The sources the submission writes to.
+#' @param dialect `"mssql"` or `"duckdb"`.
+#'
+#' @return A character vector of statements, empty on duckdb.
+#'
+#' @keywords internal
+#' @noRd
+.source_lock_sql <- function(sources, dialect) {
+  if (!identical(dialect, "mssql")) return(character())
+  vapply(sort(unique(sources)), function(s) {
+    paste0("DECLARE @r int; EXEC @r = sp_getapplock @Resource = N",
+           sql_string(paste0("hvtiRdatabuild:", .source_tables(s)$corrections)),
+           ", @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 60000; ",
+           "IF @r < 0 THROW 51000, N'propose_corrections(): the corrections table is ",
+           "locked by another submission.', 1;")
+  }, character(1), USE.NAMES = FALSE)
+}
+
 #' Propose a batch of corrections from a filled template
 #'
 #' Validates every row of a submission made from [write_corrections_template()] and returns
@@ -263,6 +365,17 @@ write_corrections_template <- function(config, path) {
 #'   column's SQL type would round, overflow or truncate it. This last check runs after
 #'   the prior check.
 #' - `prior_mismatch`: the source no longer holds `expected_prior`.
+#' - `duplicate_pending` or `duplicate_accepted`: a correction already makes the same
+#'   assertion (same source, key, variable, prior and new value) and is undecided, or its
+#'   latest decision is to accept it. A proposed correction leaves the source unchanged
+#'   until it is accepted, so without this check the same file submitted twice would be
+#'   appended twice. An assertion whose correction was rejected or superseded may be
+#'   proposed again.
+#' - `duplicate_in_file`: an earlier row of the same file makes the same assertion.
+#'
+#' On SQL Server an append first takes an exclusive lock on each source's corrections, so
+#' two submissions made at once are checked against each other, not only against what was
+#' committed before both began.
 #'
 #' With `dry_run = FALSE`, an all-`appendable` file is appended in one transaction, and a
 #' file with any other verdict is refused whole, with nothing written. Values are stored in
@@ -372,7 +485,14 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
   st$out_rows <- list()
   now <- Sys.time()
   write_all <- function() {
-    for (s in intersect(names(config$sources), rows$source[is.na(st$verdict)])) {
+    targets <- intersect(names(config$sources), rows$source[is.na(st$verdict)])
+    # Before any read, so this transaction's snapshot sees every earlier submission.
+    if (!dry_run) {
+      for (x in .source_lock_sql(targets, dialect)) {
+        run_step("lock source corrections", DBI::dbExecute(con, x))
+      }
+    }
+    for (s in targets) {
       idx <- which(rows$source == s & is.na(st$verdict))
       key <- config$sources[[s]]$key
       types <- run_step("read source columns", table_types(con, s))
@@ -420,6 +540,8 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
       found <- run_step("look up source rows", DBI::dbGetQuery(
         con, .intake_lookup_sql(tmp$name, s, key, types, wanted, dialect)
       ))
+      held <- run_step("read held corrections",
+                       .held_corrections(con, s, key, types, tmp$name, dialect))
       run_step("drop intake table", DBI::dbExecute(con, paste("DROP TABLE", tmp$name)))
       hits <- tabulate(match(found$intake_row_, live), nbins = length(live))
       set(live[hits == 0L], "unknown_key")
@@ -458,6 +580,16 @@ propose_corrections <- function(config, con, file, dry_run = TRUE, dialect = "ms
         r$asserted_by <- rows$asserted_by[[i]]
         r$asserted_on <- now
         r$correction_id <- .short_id("c", list(tpl$sha256, i, format(now, "%Y-%m-%d %H:%M:%OS6")))
+        # A pending correction leaves the source unchanged, so a resubmitted row passes the
+        # prior check again; it is refused here instead of being appended a second time.
+        sig <- .correction_signature(r, key)
+        dup <- held[sig]
+        if (!is.na(dup)) {
+          set(i, dup)
+          next
+        }
+        # A later row of this file making the same assertion is refused too.
+        held[sig] <- "duplicate_in_file"
         r$.row <- i
         st$out_rows[[length(st$out_rows) + 1L]] <- r
       }

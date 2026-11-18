@@ -242,3 +242,105 @@ test_that("submitted text must be the whole of a supported form", {
   expect_false(ok("30 ", "numeric"))
   expect_identical(.parse_submitted(" 2", "character"), " 2")
 })
+
+test_that("a row repeating a pending or accepted correction is refused as a duplicate", {
+  s <- propose_setup()
+  first <- propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                               dry_run = FALSE, dialect = "duckdb")
+  verdict_of <- function(row) {
+    f <- write_submission(s$cfg, list(row))
+    suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts$verdict
+  }
+  # The same file again, and the same assertion written another way.
+  expect_identical(verdict_of(good_row()), "duplicate_pending")
+  expect_identical(verdict_of(good_row(expected_prior = "30.0", new_value = "35.00",
+                                       evidence_ref = "another note",
+                                       asserted_by = "reviewer_b")),
+                   "duplicate_pending")
+  # A different new value for the same cell is a new assertion, not a duplicate.
+  expect_identical(verdict_of(good_row(new_value = "36")), "appendable")
+  expect_error(
+    suppressMessages(propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                                         dry_run = FALSE, dialect = "duckdb")),
+    class = "hvtiRdatabuild_corrections_refused"
+  )
+  expect_identical(DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_corrections")$n,
+                   1)
+
+  id <- first$correction_ids[[1]]
+  decide <- function(d, decision, on) {
+    DBI::dbAppendTable(s$con, "stg_echo_correction_decisions", dec_row(d, id, decision, on))
+  }
+  decide("d1", "accept", "2026-02-01")
+  expect_identical(verdict_of(good_row()), "duplicate_accepted")
+  # Only the latest decision counts: once rejected, the assertion may be proposed again.
+  decide("d2", "reject", "2026-03-01")
+  expect_identical(verdict_of(good_row()), "appendable")
+  decide("d3", "supersede", "2026-04-01")
+  expect_identical(verdict_of(good_row()), "appendable")
+})
+
+test_that("a later row of the same file making the same assertion is refused", {
+  s <- propose_setup()
+  f <- write_submission(s$cfg, list(
+    good_row(),
+    good_row(expected_prior = "30.0", new_value = "35.00", evidence_ref = "other note"),
+    good_row(new_value = "36")
+  ))
+  v <- suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts
+  expect_identical(v$verdict, c("appendable", "duplicate_in_file", "appendable"))
+  expect_error(
+    suppressMessages(propose_corrections(s$cfg, s$con, f, dry_run = FALSE, dialect = "duckdb")),
+    class = "hvtiRdatabuild_corrections_refused"
+  )
+  expect_identical(DBI::dbGetQuery(s$con, "SELECT COUNT(*) AS n FROM stg_echo_corrections")$n,
+                   0)
+})
+
+test_that("a duplicate is judged per source and per key", {
+  s <- propose_setup()
+  propose_corrections(s$cfg, s$con, write_submission(s$cfg, list(good_row())),
+                      dry_run = FALSE, dialect = "duckdb")
+  f <- write_submission(s$cfg, list(
+    good_row(),
+    good_row(mrn = "SYN203", encounter_date = "2020-03-01", expected_prior = "40"),
+    good_row(encounter_date = "2020-01-02")
+  ))
+  v <- suppressMessages(propose_corrections(s$cfg, s$con, f, dialect = "duckdb"))$verdicts
+  expect_identical(v$verdict, c("duplicate_pending", "appendable", "unknown_key"))
+})
+
+test_that("only corrections for the submitted keys are read, latest decision in SQL", {
+  s <- propose_setup()
+  DBI::dbAppendTable(s$con, "stg_echo_corrections", rbind(
+    corr_row("c1", "SYN201", "2020-01-01", "lvef", "30", 0L, "35", 0L),
+    corr_row("c2", "SYN202", "2020-02-01", "lvef", NA, 1L, "45", 0L),
+    corr_row("c3", "SYN201", "2020-01-01", "mr_grade", "2", 0L, "3", 0L),
+    corr_row("c4", "SYN201", "2020-01-01", "lvef", "30", 0L, "36", 0L)
+  ))
+  DBI::dbAppendTable(s$con, "stg_echo_correction_decisions", rbind(
+    dec_row("d1", "c3", "accept", "2026-02-01"),
+    dec_row("d2", "c4", "accept", "2026-02-01"),
+    dec_row("d3", "c4", "reject", "2026-03-01")
+  ))
+  key <- c("mrn", "encounter_date")
+  types <- table_types(s$con, "stg_echo")
+  tmp <- .intake_temp("duckdb", types[key])
+  DBI::dbExecute(s$con, tmp$create)
+  DBI::dbExecute(s$con, sprintf("INSERT INTO %s VALUES (1, 'SYN201', DATE '2020-01-01')",
+                                tmp$name))
+  held <- .held_corrections(s$con, "stg_echo", key, types, tmp$name, "duckdb")
+  # c2 is another key, and c4's latest decision is a reject: neither is held.
+  expect_setequal(unname(held), c("duplicate_pending", "duplicate_accepted"))
+  expect_length(held, 2L)
+})
+
+test_that("on SQL Server each source is locked, in name order, before any read", {
+  expect_identical(.source_lock_sql(c("stg_b", "stg_a"), "duckdb"), character())
+  sql <- .source_lock_sql(c("stg_b", "stg_a", "stg_b"), "mssql")
+  expect_length(sql, 2L)
+  expect_match(sql[[1]], "N'hvtiRdatabuild:stg_a_corrections'", fixed = TRUE)
+  expect_match(sql[[2]], "N'hvtiRdatabuild:stg_b_corrections'", fixed = TRUE)
+  expect_match(sql, "@LockMode = N'Exclusive', @LockOwner = N'Transaction'", fixed = TRUE)
+  expect_match(sql, "IF @r < 0 THROW", fixed = TRUE)
+})
