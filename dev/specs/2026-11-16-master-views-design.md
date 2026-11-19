@@ -236,6 +236,24 @@ with nothing written. A study fix that upstream has since made for itself is cau
 way. The helper writes a file for a human to review and submit, never appends, and prints
 counts, never values.
 
+### 3.6 The mitral master: what the stress test must carry (added 2026-11-19)
+
+The mitral master is the stress test of §1 item 6 and §10. The mitral research meetings of
+2026-11-05 and 2026-11-19 named the cases below, each one mapped here to the layer that
+answers it. They are inputs to the mitral model, not decisions about it; capturing and
+adjudicating corrections stays with the registry design (issue #101).
+
+| Case | Layer | What the design does with it |
+|---|---|---|
+| **Ad hoc pulls merged at study and master level.** Intraop pre-pump and post-pump MR and gradients come from a separate extract because the regular echo pull returns one value; the two values sit in two warehouse tables. | Source | Each table is a source view, or one view names both values distinctly, and both enter the regular pull. The separate extract is retired only after its values agree with the views for the cases it covered. A value absent from the warehouse cannot be recovered downstream, so the fix is at the source. |
+| **Study fixes stranded below the master.** Fixes applied at the end of study builds that never moved up; chart-reviewed fill-ins (discharge echo, pacemaker status) ready for the master. | Corrections | §3.5 and §3.4. A fill-in carries a missing prior and goes stale once the source holds a value (G7). Data management asks for a fix to be adjudicated again before it moves up; its evidence depends on the era, so "no evidence found" is recorded, not left blank. |
+| **A published study dataset used as a source.** A study's earlier published dataset supplied variables to later builds. | None | Not a source under this design (§11, masters with no warehouse source). Its values enter only as corrections with evidence, or the study's source tables are registered. |
+| **The discharge echo.** The last transthoracic echo before discharge, from longitudinal echo; when none exists the intraop transesophageal echo is the fallback, and a later echo at re-repair is not seen. Built only for the mitral cohort, never for all cardiac surgery. | Rules | One named derivation step, defined once at warehouse level so an aortic study and a mitral study get the same answer. This is the known hard derivation in §10. |
+| **Recode rules and study definitions.** A graded MR scale collapsed to four levels with straddling grades rounded down at discharge; posterior-only prolapse versus posterior-only repair. | Rules | §3.2: named derivations, refused at intake as `derived_variable`. The master holds the anatomic finding and the repair; each study's definition is its own step. |
+| **Raw over summarized echo.** Echo reports reach analysts filtered by echo type. | Source | Source views carry every echo with its type as a column; the filter is a rule or a study choice, not a pull step. |
+| **A variable missing for whole years.** Left atrial appendage occlusion was collected only for AF procedures under one form version. | Source | Not correctable by intake: no cell exists to correct. The gap is recovered at the source or documented by form version, and the rules never impute it. |
+| **Echo rows with no identifier.** Thousands of echo rows arrived without a record number, since fixed upstream. | Study pull | The pull-time check reports identifier coverage as a rate, never values (issue #71). |
+
 ## 4. Ownership
 
 - **Data engineering:** the schemas, the rights to deploy views, the corrections tables,
@@ -431,7 +449,8 @@ A master whose current deployment has no passing gate record is not offered to s
 - [ ] **Read access to the masters.** Whether study builds read through a role granted on
       the views only, so no programmer needs rights on the source tables.
 - [ ] **The mitral stress test.** Which of its derivations (the discharge echo is the known
-      hard one) must be modelled before the cardiac design is frozen.
+      hard one) must be modelled before the cardiac design is frozen. §3.6 lists the
+      cases the mitral meetings named.
 - [ ] **Encounter-date semantics** for masters whose encounter is not a surgery.
 - [ ] **Snapshot isolation.** `ALLOW_SNAPSHOT_ISOLATION` on the warehouse database (§6.1).
 - [ ] **Database snapshots for the gate.** Rights to create one, and whether SAS can read it
